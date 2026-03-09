@@ -19,5 +19,7 @@ func TestHealthz(t *testing.T) {
 	r := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodGet, "/healthz", nil)
 	s.Handler().ServeHTTP(r, req)
-	if r.Code != http.StatusOK { t.Fatalf("expected 200") }
+	if r.Code != http.StatusOK {
+		t.Fatalf("expected 200")
+	}
 }

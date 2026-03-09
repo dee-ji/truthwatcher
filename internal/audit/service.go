@@ -7,7 +7,9 @@ import (
 	"github.com/truthwatcher/truthwatcher/internal/domain"
 )
 
-type Service interface { List(context.Context) ([]domain.AuditEvent, error) }
+type Service interface {
+	List(context.Context) ([]domain.AuditEvent, error)
+}
 
 type StubService struct{}
 

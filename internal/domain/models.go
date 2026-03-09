@@ -11,11 +11,11 @@ type Intent struct {
 }
 
 type Deployment struct {
-	ID            string    `json:"id"`
-	IntentID      string    `json:"intent_id"`
-	Status        string    `json:"status"`
-	IdempotencyKey string   `json:"idempotency_key"`
-	CreatedAt     time.Time `json:"created_at"`
+	ID             string    `json:"id"`
+	IntentID       string    `json:"intent_id"`
+	Status         string    `json:"status"`
+	IdempotencyKey string    `json:"idempotency_key"`
+	CreatedAt      time.Time `json:"created_at"`
 }
 
 type Device struct {
