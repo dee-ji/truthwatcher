@@ -1,0 +1,23 @@
+name: Release
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - name: Build release artifacts
+        run: make build
+      - name: Package artifacts
+        run: tar -czf truthwatcher-${GITHUB_REF_NAME}.tar.gz bin/
+      - name: TODO publish artifacts
+        run: |
+          echo "TODO: Publish release assets and container images"

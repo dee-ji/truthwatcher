@@ -1,0 +1,16 @@
+# Truthwatcher sample configuration
+api:
+  listen_address: ":8080"
+
+intent:
+  source: "git"
+  repo: "https://example.com/network-intent.git"
+
+deployment:
+  strategy: "phased"
+  phase_delay: "30s"
+
+observability:
+  drift_scan_interval: "5m"
+
+# TODO: Add vendor adapters and per-platform credentials.
