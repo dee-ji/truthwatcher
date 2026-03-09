@@ -1,4 +1,4 @@
-api:
-  image: truthwatcher/api:latest
-worker:
-  image: truthwatcher/worker:latest
+spanreed:
+  image: truthwatcher/spanreed:latest
+squire:
+  image: truthwatcher/squire:latest

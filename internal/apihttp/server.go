@@ -139,6 +139,10 @@ func (s *Server) createDeployment(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, 201, out)
 }
 func (s *Server) getDeployment(w http.ResponseWriter, r *http.Request) {
-	out, _ := s.deploy.Get(r.Context(), strings.TrimPrefix(r.URL.Path, "/api/v1/deployments/"))
+	out, err := s.deploy.Get(r.Context(), strings.TrimPrefix(r.URL.Path, "/api/v1/deployments/"))
+	if err != nil {
+		writeJSON(w, 404, map[string]string{"error": err.Error()})
+		return
+	}
 	writeJSON(w, 200, out)
 }

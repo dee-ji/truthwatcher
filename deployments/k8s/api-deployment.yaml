@@ -1,20 +1,20 @@
 apiVersion: apps/v1
 kind: Deployment
-metadata: {name: truthwatcher-api}
+metadata: {name: truthwatcher-spanreed}
 spec:
   replicas: 1
-  selector: {matchLabels: {app: truthwatcher-api}}
+  selector: {matchLabels: {app: truthwatcher-spanreed}}
   template:
-    metadata: {labels: {app: truthwatcher-api}}
+    metadata: {labels: {app: truthwatcher-spanreed}}
     spec:
       containers:
-        - name: api
-          image: truthwatcher/api:latest
+        - name: spanreed
+          image: truthwatcher/spanreed:latest
           ports: [{containerPort: 8080}]
 ---
 apiVersion: v1
 kind: Service
-metadata: {name: truthwatcher-api}
+metadata: {name: truthwatcher-spanreed}
 spec:
-  selector: {app: truthwatcher-api}
+  selector: {app: truthwatcher-spanreed}
   ports: [{port: 80, targetPort: 8080}]

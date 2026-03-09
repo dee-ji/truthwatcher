@@ -1,5 +1,12 @@
 package main
 
-import "log"
+import (
+	"fmt"
 
-func main() { log.Println("tw-worker started: queue consumers are placeholder stubs") }
+	"github.com/truthwatcher/truthwatcher/pkg/version"
+)
+
+func main() {
+	// TODO: Remove legacy wrapper after external scripts migrate to cmd/squire.
+	fmt.Printf("tw-worker is deprecated; run squire instead (version %s)\n", version.Version)
+}

@@ -8,19 +8,20 @@ services:
       POSTGRES_DB: truthwatcher
     ports: ["5432:5432"]
     healthcheck: {test: ["CMD-SHELL", "pg_isready -U truthwatcher"], interval: 5s, timeout: 5s, retries: 10}
+
   redis:
     image: redis:7
     ports: ["6379:6379"]
-  api:
+
+  spanreed:
     build:
       context: .
-      dockerfile: deployments/docker/radiant/Dockerfile
-    command: ["/app/tw-server"]
+      dockerfile: deployments/docker/spanreed/Dockerfile
     ports: ["8080:8080"]
     depends_on: [postgres, redis]
-  worker:
+
+  squire:
     build:
       context: .
-      dockerfile: deployments/docker/stormlight/Dockerfile
-    command: ["/app/tw-worker"]
+      dockerfile: deployments/docker/squire/Dockerfile
     depends_on: [postgres, redis]
