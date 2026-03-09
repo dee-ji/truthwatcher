@@ -1,0 +1,18 @@
+metadata:
+  name: leaf-fabric-v1
+  owner: netops
+  description: baseline intent for a leaf/spine pod
+target_scope:
+  sites: ["dc1"]
+desired_services:
+  - type: l3-underlay
+routing_intent:
+  bgp:
+    asn: 65000
+interface_intent:
+  uplinks:
+    speed: 100g
+policy:
+  security: placeholder
+rollout_policy:
+  strategy: canary

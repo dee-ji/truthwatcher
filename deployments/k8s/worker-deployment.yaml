@@ -1,0 +1,12 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata: {name: truthwatcher-worker}
+spec:
+  replicas: 1
+  selector: {matchLabels: {app: truthwatcher-worker}}
+  template:
+    metadata: {labels: {app: truthwatcher-worker}}
+    spec:
+      containers:
+        - name: worker
+          image: truthwatcher/worker:latest

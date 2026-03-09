@@ -1,0 +1,19 @@
+openapi: 3.0.3
+info: {title: Truthwatcher API, version: 0.1.0}
+paths:
+  /healthz: {get: {responses: {'200': {description: ok}}}}
+  /readyz: {get: {responses: {'200': {description: ready}}}}
+  /version: {get: {responses: {'200': {description: version}}}}
+  /api/v1/intents:
+    get: {responses: {'200': {description: list intents}}}
+    post: {responses: {'201': {description: created}}}
+  /api/v1/intents/{id}:
+    get: {parameters: [{name: id, in: path, required: true, schema: {type: string}}], responses: {'200': {description: intent}}}
+  /api/v1/intents/{id}/validate: {post: {responses: {'200': {description: valid}}}}
+  /api/v1/intents/{id}/compile: {post: {responses: {'202': {description: accepted}}}}
+  /api/v1/topology/devices: {get: {responses: {'200': {description: devices}}}}
+  /api/v1/topology/links: {get: {responses: {'200': {description: links}}}}
+  /api/v1/deployments: {post: {responses: {'201': {description: deployment created}}}}
+  /api/v1/deployments/{id}: {get: {responses: {'200': {description: deployment}}}}
+  /api/v1/reconcile/runs: {post: {responses: {'202': {description: run created}}}}
+  /api/v1/audit/events: {get: {responses: {'200': {description: audit events}}}}

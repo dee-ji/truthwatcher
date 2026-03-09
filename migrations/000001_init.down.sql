@@ -1,0 +1,1 @@
+DROP TABLE IF EXISTS role_bindings, permissions, roles, users, audit_events, drift_findings, operational_snapshots, config_snapshots, deployment_targets, deployment_runs, deployment_plans, compiled_artifacts, intent_revisions, intent_sets, circuits, links, interfaces, devices, sites, platforms, vendors CASCADE;

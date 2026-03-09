@@ -1,14 +1,21 @@
 package main
 
 import (
-	"context"
-	"log"
+	"fmt"
+	"os"
+	"strings"
 
-	"github.com/truthwatcher/truthwatcher/internal/app"
+	"github.com/truthwatcher/truthwatcher/pkg/version"
 )
 
 func main() {
-	if err := app.Run(context.Background(), "twctl"); err != nil {
-		log.Fatal(err)
+	cmd := strings.Join(os.Args[1:], " ")
+	switch cmd {
+	case "intent validate", "intent diff", "topology query", "deploy create", "deploy get", "state compare", "render preview":
+		fmt.Printf("%s: scaffold\n", cmd)
+	case "version":
+		fmt.Println(version.Version)
+	default:
+		fmt.Println("usage: twctl [intent validate|intent diff|topology query|deploy create|deploy get|state compare|render preview|version]")
 	}
 }

@@ -1,10 +1,8 @@
-FROM golang:1.22 AS builder
+FROM golang:1.22 AS build
 WORKDIR /src
-COPY go.mod go.work ./
-COPY cmd/ cmd/
-COPY internal/ internal/
-RUN go build -o /out/stormlight ./cmd/stormlight
+COPY . .
+RUN go build -o /out/tw-worker ./cmd/tw-worker
 
 FROM gcr.io/distroless/base-debian12
-COPY --from=builder /out/stormlight /usr/local/bin/stormlight
-ENTRYPOINT ["/usr/local/bin/stormlight"]
+COPY --from=build /out/tw-worker /app/tw-worker
+ENTRYPOINT ["/app/tw-worker"]
