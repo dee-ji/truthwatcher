@@ -1,10 +1,8 @@
-FROM golang:1.22 AS builder
+FROM golang:1.22 AS build
 WORKDIR /src
-COPY go.mod go.work ./
-COPY cmd/ cmd/
-COPY internal/ internal/
-RUN go build -o /out/radiant ./cmd/radiant
+COPY . .
+RUN go build -o /out/tw-server ./cmd/tw-server
 
 FROM gcr.io/distroless/base-debian12
-COPY --from=builder /out/radiant /usr/local/bin/radiant
-ENTRYPOINT ["/usr/local/bin/radiant"]
+COPY --from=build /out/tw-server /app/tw-server
+ENTRYPOINT ["/app/tw-server"]

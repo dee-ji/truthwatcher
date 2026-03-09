@@ -1,0 +1,15 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Truthwatcher Intent",
+  "type": "object",
+  "required": ["metadata", "target_scope", "desired_services"],
+  "properties": {
+    "metadata": {"type": "object", "required": ["name", "owner"], "properties": {"name": {"type": "string"}, "owner": {"type": "string"}}},
+    "target_scope": {"type": "object", "properties": {"sites": {"type": "array", "items": {"type": "string"}}}},
+    "desired_services": {"type": "array", "items": {"type": "object"}},
+    "routing_intent": {"type": "object"},
+    "interface_intent": {"type": "object"},
+    "policy": {"type": "object"},
+    "rollout_policy": {"type": "object"}
+  }
+}

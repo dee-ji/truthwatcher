@@ -1,28 +1,28 @@
 # Truthwatcher
 
-Truthwatcher is an intent-driven network management system that lets engineers:
+Truthwatcher is an open-source, intent-driven network management platform for hyperscaler-style control planes.
 
-- Express high-level network intent.
-- Translate intent into vendor-specific configurations.
-- Deploy changes safely in phases.
-- Monitor drift from desired state.
+## Current maturity
+Initial production-grade scaffold: buildable binaries, API/CLI skeletons, migrations, drivers, and docs.
 
-## Repository Layout
+## Quickstart
+1. `cp .env.example .env`
+2. `make build`
+3. `make test`
+4. `make compose-up`
+5. `curl localhost:8080/healthz`
 
-- `cmd/`: command binaries.
-- `internal/`: private domain modules.
-- `pkg/`: reusable public Go packages.
-- `docs/`: architecture and design documentation.
-- `deployments/`: deployment artifacts (including Dockerfiles).
-- `configs/`: sample configuration.
-- `examples/`: future usage examples.
-- `test/`: cross-package/integration tests.
-- `build/`: build-related assets.
+## Main services
+- `tw-server`: API + control-plane entrypoint.
+- `tw-worker`: queue worker scaffold.
+- `twctl`: operator CLI.
+- `tw-migrate`: migration command scaffold.
 
-## Quick Start
+## Local stack
+Docker Compose provides PostgreSQL, Redis, API, and worker.
 
-```bash
-make build
-make test
-make run
-```
+## Roadmap summary
+- Persist domain services with PostgreSQL repositories.
+- Introduce Redis-backed queue/stream workflows.
+- Expand compiler and vendor drivers.
+- Add OIDC/JWT and RBAC enforcement.

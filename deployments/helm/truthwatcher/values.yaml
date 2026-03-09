@@ -1,0 +1,4 @@
+api:
+  image: truthwatcher/api:latest
+worker:
+  image: truthwatcher/worker:latest

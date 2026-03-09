@@ -1,0 +1,20 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata: {name: truthwatcher-api}
+spec:
+  replicas: 1
+  selector: {matchLabels: {app: truthwatcher-api}}
+  template:
+    metadata: {labels: {app: truthwatcher-api}}
+    spec:
+      containers:
+        - name: api
+          image: truthwatcher/api:latest
+          ports: [{containerPort: 8080}]
+---
+apiVersion: v1
+kind: Service
+metadata: {name: truthwatcher-api}
+spec:
+  selector: {app: truthwatcher-api}
+  ports: [{port: 80, targetPort: 8080}]

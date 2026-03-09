@@ -1,25 +1,40 @@
-GO ?= go
-BINS := radiant spanreed highstorm stormlight seekers squire twctl
+.PHONY: help build test lint fmt run-api run-worker migrate-up migrate-down compose-up compose-down openapi fixtures
 
-.PHONY: all build test lint run clean
+help:
+	@grep -E '^[a-zA-Z_-]+:.*?## ' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "%-20s %s\n", $$1, $$2}'
 
-all: build
+build: ## Build all binaries
+	go build ./...
 
-build:
-	@mkdir -p bin
-	@for bin in $(BINS); do \
-		$(GO) build -o bin/$$bin ./cmd/$$bin; \
-	done
+test: ## Run tests
+	go test ./...
 
-test:
-	$(GO) test ./...
+lint: ## Run lightweight lint
+	go vet ./...
 
-lint:
-	$(GO) fmt ./...
-	$(GO) vet ./...
+fmt: ## Format code
+	gofmt -w $(shell find . -name '*.go' -not -path './vendor/*')
 
-run:
-	$(GO) run ./cmd/twctl
+run-api: ## Run API service
+	go run ./cmd/tw-server
 
-clean:
-	rm -rf bin
+run-worker: ## Run worker service
+	go run ./cmd/tw-worker
+
+migrate-up: ## Apply migrations (placeholder)
+	go run ./cmd/tw-migrate up
+
+migrate-down: ## Rollback migrations (placeholder)
+	go run ./cmd/tw-migrate down
+
+compose-up: ## Start local stack
+	docker compose up -d --build
+
+compose-down: ## Stop local stack
+	docker compose down -v
+
+openapi: ## Validate OpenAPI exists
+	@test -f openapi/truthwatcher.yaml
+
+fixtures: ## show fixtures
+	@find examples -type f
