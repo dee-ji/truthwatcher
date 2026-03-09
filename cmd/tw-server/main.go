@@ -1,22 +1,12 @@
 package main
 
 import (
-	"context"
-	"log/slog"
-	"os"
+	"fmt"
 
-	"github.com/truthwatcher/truthwatcher/internal/apihttp"
-	"github.com/truthwatcher/truthwatcher/internal/audit"
-	"github.com/truthwatcher/truthwatcher/internal/deploy"
-	"github.com/truthwatcher/truthwatcher/internal/intent"
-	"github.com/truthwatcher/truthwatcher/internal/reconcile"
-	"github.com/truthwatcher/truthwatcher/internal/topology"
+	"github.com/truthwatcher/truthwatcher/pkg/version"
 )
 
 func main() {
-	logger := slog.New(slog.NewJSONHandler(os.Stdout, nil))
-	srv := apihttp.New(logger, intent.NewInMemoryService(), topology.NewStubService(), deploy.NewStubService(), reconcile.NewStubService(), audit.NewStubService())
-	if err := srv.Run(context.Background(), ":8080"); err != nil {
-		logger.Error("server exited", "error", err)
-	}
+	// TODO: Remove legacy wrapper after external scripts migrate to cmd/spanreed.
+	fmt.Printf("tw-server is deprecated; run spanreed instead (version %s)\n", version.Version)
 }

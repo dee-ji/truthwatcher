@@ -1,14 +1,8 @@
 package main
 
-import (
-	"context"
-	"log"
-
-	"github.com/truthwatcher/truthwatcher/internal/app"
-)
+import "log"
 
 func main() {
-	if err := app.Run(context.Background(), "squire"); err != nil {
-		log.Fatal(err)
-	}
+	// TODO: Wire queue consumers and execution backends once Highstorm dispatch contracts stabilize.
+	log.Println("squire started: execution worker scaffold is active")
 }

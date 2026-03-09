@@ -16,13 +16,16 @@ func Run(ctx context.Context, component string) error {
 	default:
 	}
 
-	if component == "radiant" {
+	switch component {
+	case "radiant":
 		return runRadiant(ctx)
+	case "highstorm", "stormlight", "seekers":
+		// TODO: Implement component-specific runtime graphs and dependency injection.
+		fmt.Printf("%s starting (bootstrap placeholder)\n", component)
+		return nil
+	default:
+		return fmt.Errorf("unknown component %q", component)
 	}
-
-	// TODO: Wire component-specific dependency graphs and runtime lifecycle.
-	fmt.Printf("%s starting (bootstrap placeholder)\n", component)
-	return nil
 }
 
 func runRadiant(ctx context.Context) error {

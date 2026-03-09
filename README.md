@@ -3,26 +3,30 @@
 Truthwatcher is an open-source, intent-driven network management platform for hyperscaler-style control planes.
 
 ## Current maturity
-Initial production-grade scaffold: buildable binaries, API/CLI skeletons, migrations, drivers, and docs.
+Initial scaffold: buildable binaries, API/CLI skeletons, migrations, drivers, and docs with intentional TODO stubs for subsystem internals.
 
 ## Quickstart
-1. `cp .env.example .env`
-2. `make build`
-3. `make test`
-4. `make compose-up`
-5. `curl localhost:8080/healthz`
+1. `make build`
+2. `make test`
+3. `make compose-up`
+4. `curl localhost:8080/healthz`
 
-## Main services
-- `tw-server`: API + control-plane entrypoint.
-- `tw-worker`: queue worker scaffold.
+## Core services
+- `radiant`: control-plane orchestration service.
+- `spanreed`: API and external interface service.
+- `highstorm`: deployment orchestration engine.
+- `stormlight`: drift detection and reconcile trigger service.
+- `seekers`: topology discovery and ingestion service.
+- `squire`: execution worker service.
 - `twctl`: operator CLI.
-- `tw-migrate`: migration command scaffold.
+
+Legacy compatibility binaries (`tw-server`, `tw-worker`) remain as deprecation wrappers.
 
 ## Local stack
-Docker Compose provides PostgreSQL, Redis, API, and worker.
+Docker Compose provides PostgreSQL, Redis, Spanreed API, and Squire worker scaffolding.
 
 ## Roadmap summary
-- Persist domain services with PostgreSQL repositories.
+- Persist domain services with Archive-backed PostgreSQL repositories.
 - Introduce Redis-backed queue/stream workflows.
-- Expand compiler and vendor drivers.
-- Add OIDC/JWT and RBAC enforcement.
+- Expand Elsecall artifact rendering and vendor drivers.
+- Add OIDC/JWT authentication and policy-backed authorization.

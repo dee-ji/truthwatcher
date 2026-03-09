@@ -1,12 +1,25 @@
 apiVersion: apps/v1
 kind: Deployment
-metadata: {name: {{ include "truthwatcher.fullname" . }}-api}
+metadata: {name: {{ include "truthwatcher.fullname" . }}-spanreed}
 spec:
   replicas: 1
-  selector: {matchLabels: {app: api}}
+  selector: {matchLabels: {app: spanreed}}
   template:
-    metadata: {labels: {app: api}}
+    metadata: {labels: {app: spanreed}}
     spec:
       containers:
-      - name: api
-        image: {{ .Values.api.image }}
+      - name: spanreed
+        image: {{ .Values.spanreed.image }}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata: {name: {{ include "truthwatcher.fullname" . }}-squire}
+spec:
+  replicas: 1
+  selector: {matchLabels: {app: squire}}
+  template:
+    metadata: {labels: {app: squire}}
+    spec:
+      containers:
+      - name: squire
+        image: {{ .Values.squire.image }}
