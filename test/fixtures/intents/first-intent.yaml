@@ -1,7 +1,7 @@
 metadata:
   name: campus-leaf-1
   owner: netops
-  description: first vertical slice intent for leaf onboarding
+  description: First vertical slice intent
 target_scope:
   sites: ["dc1"]
 desired_services:
@@ -9,6 +9,3 @@ desired_services:
 routing_intent:
   bgp:
     asn: 65000
-interface_intent:
-  uplinks:
-    speed: 100g

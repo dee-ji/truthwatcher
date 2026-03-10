@@ -80,14 +80,25 @@ func writeJSON(w http.ResponseWriter, code int, v any) {
 }
 func (s *Server) handleIntents(w http.ResponseWriter, r *http.Request) {
 	if r.Method == http.MethodGet {
-		out, _ := s.intent.List(r.Context())
+		out, err := s.intent.List(r.Context())
+		if err != nil {
+			writeJSON(w, 500, map[string]string{"error": err.Error()})
+			return
+		}
 		writeJSON(w, 200, out)
 		return
 	}
 	if r.Method == http.MethodPost {
 		var in domain.Intent
-		_ = json.NewDecoder(r.Body).Decode(&in)
-		out, _ := s.intent.Create(r.Context(), in)
+		if err := json.NewDecoder(r.Body).Decode(&in); err != nil {
+			writeJSON(w, 400, map[string]string{"error": err.Error()})
+			return
+		}
+		out, err := s.intent.Create(r.Context(), in)
+		if err != nil {
+			writeJSON(w, 400, map[string]string{"error": err.Error()})
+			return
+		}
 		writeJSON(w, 201, out)
 		return
 	}
@@ -106,7 +117,7 @@ func (s *Server) handleIntentByID(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, 200, out)
 		return
 	}
-	if len(parts) == 2 && parts[1] == "validate" {
+	if len(parts) == 2 && parts[1] == "validate" && r.Method == http.MethodPost {
 		if err := s.intent.Validate(r.Context(), id); err != nil {
 			writeJSON(w, 404, map[string]string{"error": err.Error()})
 			return
@@ -114,7 +125,7 @@ func (s *Server) handleIntentByID(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, 200, map[string]string{"status": "valid"})
 		return
 	}
-	if len(parts) == 2 && parts[1] == "compile" {
+	if len(parts) == 2 && parts[1] == "compile" && r.Method == http.MethodPost {
 		out, err := s.intent.Compile(r.Context(), id)
 		if err != nil {
 			writeJSON(w, 404, map[string]string{"error": err.Error()})

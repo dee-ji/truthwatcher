@@ -2,12 +2,14 @@ package main
 
 import (
 	"context"
+	"database/sql"
 	"log/slog"
 	"os"
 
 	"github.com/truthwatcher/truthwatcher/internal/apihttp"
 	"github.com/truthwatcher/truthwatcher/internal/audit"
 	"github.com/truthwatcher/truthwatcher/internal/deploy"
+	"github.com/truthwatcher/truthwatcher/internal/elsecall"
 	"github.com/truthwatcher/truthwatcher/internal/intent"
 	"github.com/truthwatcher/truthwatcher/internal/reconcile"
 	"github.com/truthwatcher/truthwatcher/internal/topology"
@@ -15,16 +17,24 @@ import (
 
 func main() {
 	logger := slog.New(slog.NewJSONHandler(os.Stdout, nil))
-	srv := apihttp.New(
-		logger,
-		intent.NewInMemoryService(),
-		topology.NewStubService(),
-		deploy.NewStubService(),
-		reconcile.NewStubService(),
-		audit.NewStubService(),
-	)
+	dsn := os.Getenv("DATABASE_URL")
+	if dsn == "" {
+		dsn = "postgres://truthwatcher:truthwatcher@localhost:5432/truthwatcher?sslmode=disable"
+	}
+	db, _ := sql.Open("postgres", dsn)
+	auditSvc := audit.Service(audit.NewStubService())
+	intentSvc := intent.Service(intent.NewInMemoryService())
+	if db != nil {
+		if err := db.Ping(); err == nil {
+			auditSvc = audit.NewPostgresService(db)
+			intentSvc = intent.NewPostgresService(db, auditSvc, elsecall.NewCompilerService())
+			logger.Info("spanreed configured with postgres backend")
+		} else {
+			logger.Warn("postgres unavailable, using in-memory services", "error", err)
+		}
+	}
 
-	// TODO: Read listen address and backing service implementations from config.
+	srv := apihttp.New(logger, intentSvc, topology.NewStubService(), deploy.NewStubService(), reconcile.NewStubService(), auditSvc)
 	if err := srv.Run(context.Background(), ":8080"); err != nil {
 		logger.Error("spanreed exited", "error", err)
 	}

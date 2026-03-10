@@ -3,11 +3,20 @@ package domain
 import "time"
 
 type Intent struct {
-	ID          string    `json:"id"`
-	Name        string    `json:"name"`
-	Description string    `json:"description"`
-	Revision    int       `json:"revision"`
-	CreatedAt   time.Time `json:"created_at"`
+	ID          string                 `json:"id"`
+	Name        string                 `json:"name"`
+	Description string                 `json:"description"`
+	Revision    int                    `json:"revision"`
+	CreatedAt   time.Time              `json:"created_at"`
+	Spec        map[string]any         `json:"spec,omitempty"`
+	Artifacts   []CompiledArtifactView `json:"artifacts,omitempty"`
+}
+
+type CompiledArtifactView struct {
+	Vendor    string    `json:"vendor"`
+	Format    string    `json:"format"`
+	Artifact  string    `json:"artifact"`
+	CreatedAt time.Time `json:"created_at"`
 }
 
 type Deployment struct {
@@ -31,10 +40,11 @@ type Link struct {
 }
 
 type AuditEvent struct {
-	ID        string    `json:"id"`
-	Actor     string    `json:"actor"`
-	Action    string    `json:"action"`
-	CreatedAt time.Time `json:"created_at"`
+	ID        string         `json:"id"`
+	Actor     string         `json:"actor"`
+	Action    string         `json:"action"`
+	Payload   map[string]any `json:"payload,omitempty"`
+	CreatedAt time.Time      `json:"created_at"`
 }
 
 type ReconcileRun struct {
