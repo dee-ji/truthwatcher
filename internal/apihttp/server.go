@@ -223,12 +223,16 @@ func (s *Server) createDeployment(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(405)
 		return
 	}
-	var req struct {
-		IntentID       string `json:"intent_id"`
-		IdempotencyKey string `json:"idempotency_key"`
+	var req domain.DeploymentPlanRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeJSON(w, 400, map[string]string{"error": err.Error()})
+		return
 	}
-	_ = json.NewDecoder(r.Body).Decode(&req)
-	out, _ := s.deploy.Create(r.Context(), req.IntentID, req.IdempotencyKey)
+	out, err := s.deploy.Create(r.Context(), req)
+	if err != nil {
+		writeJSON(w, 400, map[string]string{"error": err.Error()})
+		return
+	}
 	writeJSON(w, 201, out)
 }
 func (s *Server) getDeployment(w http.ResponseWriter, r *http.Request) {

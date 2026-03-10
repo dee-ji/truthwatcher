@@ -41,7 +41,7 @@ func main() {
 		}
 	}
 
-	srv := apihttp.New(logger, intentSvc, topologySvc, deploy.NewStubService(), reconcile.NewStubService(), auditSvc)
+	srv := apihttp.New(logger, intentSvc, topologySvc, deploy.NewStubServiceWithDependencies(auditSvc, intentSvc), reconcile.NewStubService(), auditSvc)
 	if err := srv.Run(context.Background(), ":8080"); err != nil {
 		logger.Error("spanreed exited", "error", err)
 	}
