@@ -20,8 +20,10 @@ import (
 
 func testServer() *Server {
 	topo := topology.NewService(topology.NewInMemoryRepository())
+	intentSvc := intent.NewInMemoryService()
+	auditSvc := audit.NewStubService()
 	_ = topo.Import(context.Background(), domain.TopologySnapshot{Devices: []domain.Device{{ID: "d1", Hostname: "leaf-1"}}})
-	return New(slog.New(slog.NewTextHandler(os.Stdout, nil)), intent.NewInMemoryService(), topo, deploy.NewStubService(), reconcile.NewStubService(), audit.NewStubService())
+	return New(slog.New(slog.NewTextHandler(os.Stdout, nil)), intentSvc, topo, deploy.NewStubServiceWithDependencies(auditSvc, intentSvc), reconcile.NewStubService(), auditSvc)
 }
 
 func TestHealthz(t *testing.T) {
@@ -92,5 +94,52 @@ func TestTopologyIntegrationEndpoints(t *testing.T) {
 	s.Handler().ServeHTTP(deviceRes, httptest.NewRequest(http.MethodGet, "/api/v1/topology/devices/d1", nil))
 	if deviceRes.Code != http.StatusOK || !bytes.Contains(deviceRes.Body.Bytes(), []byte("adjacent_device_ids")) {
 		t.Fatalf("device detail failed: code=%d body=%s", deviceRes.Code, deviceRes.Body.String())
+	}
+}
+
+func TestDeploymentEndpoints(t *testing.T) {
+	s := testServer()
+
+	createIntentBody := []byte(`{"name":"deployable","spec":{"metadata":{"name":"deployable"}}}`)
+	intentRes := httptest.NewRecorder()
+	s.Handler().ServeHTTP(intentRes, httptest.NewRequest(http.MethodPost, "/api/v1/intents", bytes.NewReader(createIntentBody)))
+	if intentRes.Code != http.StatusCreated {
+		t.Fatalf("intent create expected 201 got %d", intentRes.Code)
+	}
+	var intentResp map[string]any
+	_ = json.Unmarshal(intentRes.Body.Bytes(), &intentResp)
+	intentID := intentResp["id"].(string)
+
+	compileRes := httptest.NewRecorder()
+	s.Handler().ServeHTTP(compileRes, httptest.NewRequest(http.MethodPost, "/api/v1/intents/"+intentID+"/compile", bytes.NewReader([]byte(`{"vendor":"junos"}`))))
+	if compileRes.Code != http.StatusAccepted {
+		t.Fatalf("intent compile expected 202 got %d", compileRes.Code)
+	}
+
+	reqBody := []byte(`{"intent_id":"` + intentID + `","idempotency_key":"deploy-1","mode":"dry-run","targets":["leaf-1","leaf-2"],"batch_size":1,"canary_targets":1,"require_manual_approval":true}`)
+	res := httptest.NewRecorder()
+	s.Handler().ServeHTTP(res, httptest.NewRequest(http.MethodPost, "/api/v1/deployments", bytes.NewReader(reqBody)))
+	if res.Code != http.StatusCreated {
+		t.Fatalf("deployment create expected 201 got %d body=%s", res.Code, res.Body.String())
+	}
+	var dep domain.Deployment
+	_ = json.Unmarshal(res.Body.Bytes(), &dep)
+	if dep.Mode != "dry-run" {
+		t.Fatalf("expected dry-run mode got %s", dep.Mode)
+	}
+
+	getRes := httptest.NewRecorder()
+	s.Handler().ServeHTTP(getRes, httptest.NewRequest(http.MethodGet, "/api/v1/deployments/"+dep.ID, nil))
+	if getRes.Code != http.StatusOK {
+		t.Fatalf("deployment get expected 200 got %d", getRes.Code)
+	}
+}
+
+func TestDeploymentCreateValidation(t *testing.T) {
+	s := testServer()
+	res := httptest.NewRecorder()
+	s.Handler().ServeHTTP(res, httptest.NewRequest(http.MethodPost, "/api/v1/deployments", bytes.NewReader([]byte(`{"intent_id":"intent-1"}`))))
+	if res.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400 got %d", res.Code)
 	}
 }

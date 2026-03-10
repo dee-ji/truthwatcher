@@ -21,11 +21,69 @@ type CompiledArtifactView struct {
 }
 
 type Deployment struct {
-	ID             string    `json:"id"`
-	IntentID       string    `json:"intent_id"`
-	Status         string    `json:"status"`
-	IdempotencyKey string    `json:"idempotency_key"`
-	CreatedAt      time.Time `json:"created_at"`
+	ID             string          `json:"id"`
+	IntentID       string          `json:"intent_id"`
+	Status         string          `json:"status"`
+	IdempotencyKey string          `json:"idempotency_key"`
+	Mode           string          `json:"mode"`
+	ArtifactRefs   []string        `json:"artifact_refs,omitempty"`
+	Targets        []string        `json:"targets,omitempty"`
+	Rollout        Rollout         `json:"rollout"`
+	StopConditions []StopCondition `json:"stop_conditions,omitempty"`
+	RollbackPlan   RollbackPlan    `json:"rollback_plan"`
+	CreatedAt      time.Time       `json:"created_at"`
+}
+
+type Rollout struct {
+	Waves []RolloutWave `json:"waves,omitempty"`
+}
+
+type RolloutWave struct {
+	Name               string `json:"name"`
+	Order              int    `json:"order"`
+	MaxTargets         int    `json:"max_targets"`
+	CanaryTargets      int    `json:"canary_targets,omitempty"`
+	RequiresApproval   bool   `json:"requires_approval"`
+	PlannedTargetCount int    `json:"planned_target_count"`
+}
+
+type StopCondition struct {
+	Type      string `json:"type"`
+	Threshold string `json:"threshold,omitempty"`
+	Reason    string `json:"reason,omitempty"`
+}
+
+type RollbackPlan struct {
+	Strategy string   `json:"strategy"`
+	Steps    []string `json:"steps,omitempty"`
+}
+
+type DeploymentPlanRequest struct {
+	IntentID              string   `json:"intent_id"`
+	IdempotencyKey        string   `json:"idempotency_key"`
+	Mode                  string   `json:"mode,omitempty"`
+	Targets               []string `json:"targets,omitempty"`
+	BatchSize             int      `json:"batch_size,omitempty"`
+	CanaryTargets         int      `json:"canary_targets,omitempty"`
+	RequireManualApproval bool     `json:"require_manual_approval,omitempty"`
+}
+
+type DeploymentRun struct {
+	ID               string    `json:"id"`
+	DeploymentPlanID string    `json:"deployment_plan_id"`
+	Status           string    `json:"status"`
+	Simulation       bool      `json:"simulation"`
+	CreatedAt        time.Time `json:"created_at"`
+}
+
+type DeploymentTarget struct {
+	ID              string    `json:"id"`
+	DeploymentRunID string    `json:"deployment_run_id"`
+	DeviceID        string    `json:"device_id"`
+	ArtifactRef     string    `json:"artifact_ref"`
+	Wave            int       `json:"wave"`
+	Status          string    `json:"status"`
+	CreatedAt       time.Time `json:"created_at"`
 }
 
 type Vendor struct {

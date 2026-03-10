@@ -91,6 +91,16 @@ func (s *InMemoryService) Compile(ctx context.Context, id, vendor string) (strin
 	if err != nil {
 		return "", err
 	}
+	s.mu.Lock()
+	in.Artifacts = append(in.Artifacts, domain.CompiledArtifactView{
+		Vendor:    artifact.Vendor,
+		Format:    artifact.Format,
+		Artifact:  artifact.Contents,
+		Metadata:  artifact.Metadata,
+		CreatedAt: time.Now().UTC(),
+	})
+	s.intents[id] = in
+	s.mu.Unlock()
 	return "compiled " + artifact.Vendor, nil
 }
 
