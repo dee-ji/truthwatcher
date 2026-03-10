@@ -69,11 +69,16 @@ type DeploymentPlanRequest struct {
 }
 
 type DeploymentRun struct {
-	ID               string    `json:"id"`
-	DeploymentPlanID string    `json:"deployment_plan_id"`
-	Status           string    `json:"status"`
-	Simulation       bool      `json:"simulation"`
-	CreatedAt        time.Time `json:"created_at"`
+	ID               string             `json:"id"`
+	DeploymentPlanID string             `json:"deployment_plan_id"`
+	Status           string             `json:"status"`
+	Simulation       bool               `json:"simulation"`
+	CreatedAt        time.Time          `json:"created_at"`
+	StartedAt        time.Time          `json:"started_at,omitempty"`
+	FinishedAt       time.Time          `json:"finished_at,omitempty"`
+	DurationSeconds  float64            `json:"duration_seconds,omitempty"`
+	StoppedReason    string             `json:"stopped_reason,omitempty"`
+	Targets          []DeploymentTarget `json:"targets,omitempty"`
 }
 
 type DeploymentTarget struct {
@@ -83,6 +88,7 @@ type DeploymentTarget struct {
 	ArtifactRef     string    `json:"artifact_ref"`
 	Wave            int       `json:"wave"`
 	Status          string    `json:"status"`
+	Result          string    `json:"result,omitempty"`
 	CreatedAt       time.Time `json:"created_at"`
 }
 

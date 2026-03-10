@@ -13,15 +13,22 @@ services:
     image: redis:7
     ports: ["6379:6379"]
 
-  spanreed:
+  api:
     build:
       context: .
       dockerfile: deployments/docker/spanreed/Dockerfile
+    environment:
+      DATABASE_URL: postgres://truthwatcher:truthwatcher@postgres:5432/truthwatcher?sslmode=disable
+      REDIS_ADDR: redis:6379
+      API_ADDR: :8080
     ports: ["8080:8080"]
     depends_on: [postgres, redis]
 
-  squire:
+  worker:
     build:
       context: .
       dockerfile: deployments/docker/squire/Dockerfile
+    environment:
+      DATABASE_URL: postgres://truthwatcher:truthwatcher@postgres:5432/truthwatcher?sslmode=disable
+      REDIS_ADDR: redis:6379
     depends_on: [postgres, redis]
