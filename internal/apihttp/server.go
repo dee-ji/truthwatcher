@@ -3,6 +3,7 @@ package apihttp
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"log/slog"
 	"net/http"
 	"strings"
@@ -45,14 +46,12 @@ func (s *Server) Handler() http.Handler {
 	})
 	mux.HandleFunc("/api/v1/intents", s.handleIntents)
 	mux.HandleFunc("/api/v1/intents/", s.handleIntentByID)
-	mux.HandleFunc("/api/v1/topology/devices", func(w http.ResponseWriter, r *http.Request) {
-		out, _ := s.topology.Devices(r.Context())
-		writeJSON(w, 200, out)
-	})
-	mux.HandleFunc("/api/v1/topology/links", func(w http.ResponseWriter, r *http.Request) {
-		out, _ := s.topology.Links(r.Context())
-		writeJSON(w, 200, out)
-	})
+	mux.HandleFunc("/api/v1/topology/devices", s.handleTopologyDevices)
+	mux.HandleFunc("/api/v1/topology/devices/", s.handleTopologyDeviceByID)
+	mux.HandleFunc("/api/v1/topology/links", s.handleTopologyLinks)
+	mux.HandleFunc("/api/v1/topology/import", s.handleTopologyImport)
+	mux.HandleFunc("/api/v1/topology/export", s.handleTopologyExport)
+	mux.HandleFunc("/api/v1/topology/query/adjacency", s.handleTopologyAdjacency)
 	mux.HandleFunc("/api/v1/deployments", s.createDeployment)
 	mux.HandleFunc("/api/v1/deployments/", s.getDeployment)
 	mux.HandleFunc("/api/v1/reconcile/runs", func(w http.ResponseWriter, r *http.Request) {
@@ -141,6 +140,83 @@ func (s *Server) handleIntentByID(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	w.WriteHeader(404)
+}
+
+func topologyFilter(r *http.Request) topology.DeviceFilter {
+	q := r.URL.Query()
+	return topology.DeviceFilter{Site: q.Get("site"), Vendor: q.Get("vendor"), Platform: q.Get("platform")}
+}
+
+func (s *Server) handleTopologyDevices(w http.ResponseWriter, r *http.Request) {
+	out, err := s.topology.Devices(r.Context(), topologyFilter(r))
+	if err != nil {
+		writeJSON(w, 500, map[string]string{"error": err.Error()})
+		return
+	}
+	writeJSON(w, 200, out)
+}
+
+func (s *Server) handleTopologyDeviceByID(w http.ResponseWriter, r *http.Request) {
+	id := strings.TrimPrefix(r.URL.Path, "/api/v1/topology/devices/")
+	out, err := s.topology.Device(r.Context(), id)
+	if err != nil {
+		if errors.Is(err, topology.ErrNotFound) {
+			writeJSON(w, 404, map[string]string{"error": err.Error()})
+			return
+		}
+		writeJSON(w, 500, map[string]string{"error": err.Error()})
+		return
+	}
+	writeJSON(w, 200, out)
+}
+
+func (s *Server) handleTopologyLinks(w http.ResponseWriter, r *http.Request) {
+	out, err := s.topology.Links(r.Context(), topologyFilter(r))
+	if err != nil {
+		writeJSON(w, 500, map[string]string{"error": err.Error()})
+		return
+	}
+	writeJSON(w, 200, out)
+}
+
+func (s *Server) handleTopologyImport(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		w.WriteHeader(http.StatusMethodNotAllowed)
+		return
+	}
+	var in domain.TopologySnapshot
+	if err := json.NewDecoder(r.Body).Decode(&in); err != nil {
+		writeJSON(w, 400, map[string]string{"error": err.Error()})
+		return
+	}
+	if err := s.topology.Import(r.Context(), in); err != nil {
+		writeJSON(w, 500, map[string]string{"error": err.Error()})
+		return
+	}
+	writeJSON(w, 202, map[string]string{"status": "imported"})
+}
+
+func (s *Server) handleTopologyExport(w http.ResponseWriter, r *http.Request) {
+	out, err := s.topology.Export(r.Context())
+	if err != nil {
+		writeJSON(w, 500, map[string]string{"error": err.Error()})
+		return
+	}
+	writeJSON(w, 200, out)
+}
+
+func (s *Server) handleTopologyAdjacency(w http.ResponseWriter, r *http.Request) {
+	id := r.URL.Query().Get("device_id")
+	if id == "" {
+		writeJSON(w, 400, map[string]string{"error": "device_id is required"})
+		return
+	}
+	out, err := s.topology.AdjacentDeviceIDs(r.Context(), id)
+	if err != nil {
+		writeJSON(w, 404, map[string]string{"error": err.Error()})
+		return
+	}
+	writeJSON(w, 200, map[string]any{"device_id": id, "adjacent_device_ids": out})
 }
 func (s *Server) createDeployment(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {

@@ -28,16 +28,65 @@ type Deployment struct {
 	CreatedAt      time.Time `json:"created_at"`
 }
 
-type Device struct {
+type Vendor struct {
+	ID   string `json:"id"`
+	Name string `json:"name"`
+}
+
+type Platform struct {
 	ID       string `json:"id"`
-	Hostname string `json:"hostname"`
-	Vendor   string `json:"vendor"`
+	VendorID string `json:"vendor_id"`
+	Name     string `json:"name"`
+}
+
+type Site struct {
+	ID   string `json:"id"`
+	Name string `json:"name"`
+}
+
+type Device struct {
+	ID         string `json:"id"`
+	Hostname   string `json:"hostname"`
+	Vendor     string `json:"vendor"`
+	Platform   string `json:"platform,omitempty"`
+	Site       string `json:"site,omitempty"`
+	VendorID   string `json:"vendor_id,omitempty"`
+	PlatformID string `json:"platform_id,omitempty"`
+	SiteID     string `json:"site_id,omitempty"`
+}
+
+type Interface struct {
+	ID       string `json:"id"`
+	DeviceID string `json:"device_id"`
+	Name     string `json:"name"`
 }
 
 type Link struct {
-	ID         string `json:"id"`
-	FromDevice string `json:"from_device"`
-	ToDevice   string `json:"to_device"`
+	ID             string `json:"id"`
+	AInterfaceID   string `json:"a_interface_id"`
+	ZInterfaceID   string `json:"z_interface_id"`
+	FromDeviceID   string `json:"from_device_id,omitempty"`
+	ToDeviceID     string `json:"to_device_id,omitempty"`
+	FromDevice     string `json:"from_device,omitempty"`
+	ToDevice       string `json:"to_device,omitempty"`
+	AInterfaceName string `json:"a_interface_name,omitempty"`
+	ZInterfaceName string `json:"z_interface_name,omitempty"`
+}
+
+type DeviceDetail struct {
+	Device            Device      `json:"device"`
+	Interfaces        []Interface `json:"interfaces"`
+	AdjacentDeviceIDs []string    `json:"adjacent_device_ids"`
+	Links             []Link      `json:"links"`
+}
+
+type TopologySnapshot struct {
+	Vendors    []Vendor    `json:"vendors" yaml:"vendors"`
+	Platforms  []Platform  `json:"platforms" yaml:"platforms"`
+	Sites      []Site      `json:"sites" yaml:"sites"`
+	Devices    []Device    `json:"devices" yaml:"devices"`
+	Interfaces []Interface `json:"interfaces" yaml:"interfaces"`
+	Links      []Link      `json:"links" yaml:"links"`
 }
 
 type AuditEvent struct {

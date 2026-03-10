@@ -34,7 +34,14 @@ func main() {
 		}
 	}
 
-	srv := apihttp.New(logger, intentSvc, topology.NewStubService(), deploy.NewStubService(), reconcile.NewStubService(), auditSvc)
+	topologySvc := topology.Service(topology.NewStubService())
+	if db != nil {
+		if err := db.Ping(); err == nil {
+			topologySvc = topology.NewService(topology.NewPostgresRepository(db))
+		}
+	}
+
+	srv := apihttp.New(logger, intentSvc, topologySvc, deploy.NewStubService(), reconcile.NewStubService(), auditSvc)
 	if err := srv.Run(context.Background(), ":8080"); err != nil {
 		logger.Error("spanreed exited", "error", err)
 	}
