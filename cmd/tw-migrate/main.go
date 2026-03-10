@@ -10,5 +10,14 @@ func main() {
 		fmt.Println("usage: tw-migrate [up|down|status]")
 		return
 	}
-	fmt.Printf("migration command %s executed (scaffold)\n", os.Args[1])
+
+	cmd := os.Args[1]
+	switch cmd {
+	case "up", "down", "status":
+		fmt.Printf("tw-migrate %s: scaffold command executed\n", cmd)
+		fmt.Println("TODO(truthwatcher): connect to migration engine and apply SQL files from ./migrations")
+	default:
+		fmt.Printf("unknown command %q\n", cmd)
+		fmt.Println("usage: tw-migrate [up|down|status]")
+	}
 }

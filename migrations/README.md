@@ -1,5 +1,12 @@
-# Migrations
+# migrations/
 
-Use `cmd/tw-migrate` for scaffolded migration management.
+SQL migrations for Archive-backed persistence scaffolding.
 
-Files follow golang-migrate naming conventions.
+## Current status
+Migration files define conceptual schema evolution, but `cmd/tw-migrate` is still a command scaffold and does not yet apply SQL to a live database.
+
+## Naming
+Files use golang-migrate style naming: `NNNNNN_description.(up|down).sql`.
+
+## TODO
+- TODO(truthwatcher): integrate real migration execution, locking, and status tracking.

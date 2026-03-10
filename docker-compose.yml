@@ -13,7 +13,7 @@ services:
     image: redis:7
     ports: ["6379:6379"]
 
-  api:
+  spanreed:
     build:
       context: .
       dockerfile: deployments/docker/spanreed/Dockerfile
@@ -24,7 +24,7 @@ services:
     ports: ["8080:8080"]
     depends_on: [postgres, redis]
 
-  worker:
+  squire:
     build:
       context: .
       dockerfile: deployments/docker/squire/Dockerfile
