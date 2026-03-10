@@ -1,0 +1,13 @@
+[
+  {
+    "device_id": "leaf-1",
+    "captured_at": "2026-01-01T00:00:00Z",
+    "content": {
+      "bgp": {
+        "session_state": "established",
+        "peers_up": 4
+      }
+    },
+    "source": "offline-fixture"
+  }
+]

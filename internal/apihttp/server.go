@@ -54,10 +54,9 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("/api/v1/topology/query/adjacency", s.handleTopologyAdjacency)
 	mux.HandleFunc("/api/v1/deployments", s.createDeployment)
 	mux.HandleFunc("/api/v1/deployments/", s.getDeployment)
-	mux.HandleFunc("/api/v1/reconcile/runs", func(w http.ResponseWriter, r *http.Request) {
-		out, _ := s.reconcile.CreateRun(r.Context())
-		writeJSON(w, 202, out)
-	})
+	mux.HandleFunc("/api/v1/reconcile/runs", s.handleReconcileRuns)
+	mux.HandleFunc("/api/v1/reconcile/runs/", s.handleReconcileRunByID)
+	mux.HandleFunc("/api/v1/drift/findings", s.handleDriftFindings)
 	mux.HandleFunc("/api/v1/audit/events", func(w http.ResponseWriter, r *http.Request) {
 		out, _ := s.audit.List(r.Context())
 		writeJSON(w, 200, out)
@@ -239,6 +238,50 @@ func (s *Server) getDeployment(w http.ResponseWriter, r *http.Request) {
 	out, err := s.deploy.Get(r.Context(), strings.TrimPrefix(r.URL.Path, "/api/v1/deployments/"))
 	if err != nil {
 		writeJSON(w, 404, map[string]string{"error": err.Error()})
+		return
+	}
+	writeJSON(w, 200, out)
+}
+
+func (s *Server) handleReconcileRuns(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		w.WriteHeader(http.StatusMethodNotAllowed)
+		return
+	}
+	var req domain.ReconcileRunRequest
+	if r.Body != nil {
+		_ = json.NewDecoder(r.Body).Decode(&req)
+	}
+	out, err := s.reconcile.CreateRun(r.Context(), req)
+	if err != nil {
+		writeJSON(w, 400, map[string]string{"error": err.Error()})
+		return
+	}
+	writeJSON(w, http.StatusAccepted, out)
+}
+
+func (s *Server) handleReconcileRunByID(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		w.WriteHeader(http.StatusMethodNotAllowed)
+		return
+	}
+	id := strings.TrimPrefix(r.URL.Path, "/api/v1/reconcile/runs/")
+	out, err := s.reconcile.GetRun(r.Context(), id)
+	if err != nil {
+		writeJSON(w, 404, map[string]string{"error": err.Error()})
+		return
+	}
+	writeJSON(w, 200, out)
+}
+
+func (s *Server) handleDriftFindings(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		w.WriteHeader(http.StatusMethodNotAllowed)
+		return
+	}
+	out, err := s.reconcile.ListFindings(r.Context())
+	if err != nil {
+		writeJSON(w, 500, map[string]string{"error": err.Error()})
 		return
 	}
 	writeJSON(w, 200, out)

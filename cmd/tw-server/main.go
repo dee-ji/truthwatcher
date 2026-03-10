@@ -11,6 +11,7 @@ import (
 	"github.com/truthwatcher/truthwatcher/internal/intent"
 	"github.com/truthwatcher/truthwatcher/internal/queue"
 	"github.com/truthwatcher/truthwatcher/internal/reconcile"
+	"github.com/truthwatcher/truthwatcher/internal/state"
 	"github.com/truthwatcher/truthwatcher/internal/topology"
 )
 
@@ -28,7 +29,9 @@ func main() {
 	intentSvc := intent.NewInMemoryService()
 	auditSvc := audit.NewStubService()
 	deploySvc := deploy.NewStubServiceWithDependencies(auditSvc, intentSvc).WithQueue(queueBackend)
-	srv := apihttp.New(logger, intentSvc, topology.NewStubService(), deploySvc, reconcile.NewStubService(), auditSvc)
+	stateSvc := state.NewService(state.NewInMemoryRepository())
+	reconcileSvc := reconcile.NewService(reconcile.NewInMemoryRepository(), intentSvc, stateSvc, auditSvc)
+	srv := apihttp.New(logger, intentSvc, topology.NewStubService(), deploySvc, reconcileSvc, auditSvc)
 	if err := srv.Run(context.Background(), envOr("API_ADDR", ":8080")); err != nil {
 		logger.Error("tw-server exited", "error", err)
 	}
