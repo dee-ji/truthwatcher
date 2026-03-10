@@ -8,9 +8,11 @@ import (
 
 	"github.com/truthwatcher/truthwatcher/internal/apihttp"
 	"github.com/truthwatcher/truthwatcher/internal/audit"
+	"github.com/truthwatcher/truthwatcher/internal/authn"
 	"github.com/truthwatcher/truthwatcher/internal/deploy"
 	"github.com/truthwatcher/truthwatcher/internal/elsecall"
 	"github.com/truthwatcher/truthwatcher/internal/intent"
+	"github.com/truthwatcher/truthwatcher/internal/rbac"
 	"github.com/truthwatcher/truthwatcher/internal/reconcile"
 	"github.com/truthwatcher/truthwatcher/internal/topology"
 )
@@ -41,7 +43,9 @@ func main() {
 		}
 	}
 
-	srv := apihttp.New(logger, intentSvc, topologySvc, deploy.NewStubServiceWithDependencies(auditSvc, intentSvc), reconcile.NewStubService(), auditSvc)
+	authConfig := authn.Config{Mode: authn.ModeJWT, LocalDevBypass: true, BypassSubject: "spanreed-local", BypassRoles: []string{"admin"}}
+	rbacEval := rbac.NewSimpleEvaluator(rbac.DefaultRoleCatalog())
+	srv := apihttp.New(logger, intentSvc, topologySvc, deploy.NewStubServiceWithDependencies(auditSvc, intentSvc), reconcile.NewStubService(), auditSvc, authConfig, rbacEval)
 	if err := srv.Run(context.Background(), ":8080"); err != nil {
 		logger.Error("spanreed exited", "error", err)
 	}

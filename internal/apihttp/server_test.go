@@ -11,22 +11,29 @@ import (
 	"testing"
 
 	"github.com/truthwatcher/truthwatcher/internal/audit"
+	"github.com/truthwatcher/truthwatcher/internal/authn"
 	"github.com/truthwatcher/truthwatcher/internal/deploy"
 	"github.com/truthwatcher/truthwatcher/internal/domain"
 	"github.com/truthwatcher/truthwatcher/internal/intent"
+	"github.com/truthwatcher/truthwatcher/internal/rbac"
 	"github.com/truthwatcher/truthwatcher/internal/reconcile"
 	"github.com/truthwatcher/truthwatcher/internal/state"
 	"github.com/truthwatcher/truthwatcher/internal/topology"
 )
 
-func testServer() *Server {
+func testServer(roles ...string) *Server {
 	topo := topology.NewService(topology.NewInMemoryRepository())
 	intentSvc := intent.NewInMemoryService()
 	auditSvc := audit.NewStubService()
 	_ = topo.Import(context.Background(), domain.TopologySnapshot{Devices: []domain.Device{{ID: "d1", Hostname: "leaf-1"}}})
 	stateSvc := state.NewService(state.NewInMemoryRepository())
 	reconcileSvc := reconcile.NewService(reconcile.NewInMemoryRepository(), intentSvc, stateSvc, auditSvc)
-	return New(slog.New(slog.NewTextHandler(os.Stdout, nil)), intentSvc, topo, deploy.NewStubServiceWithDependencies(auditSvc, intentSvc), reconcileSvc, auditSvc)
+	selectedRoles := roles
+	if len(selectedRoles) == 0 {
+		selectedRoles = []string{"admin"}
+	}
+	authConfig := authn.Config{Mode: authn.ModeJWT, LocalDevBypass: true, BypassSubject: "test", BypassRoles: selectedRoles}
+	return New(slog.New(slog.NewTextHandler(os.Stdout, nil)), intentSvc, topo, deploy.NewStubServiceWithDependencies(auditSvc, intentSvc), reconcileSvc, auditSvc, authConfig, rbac.NewSimpleEvaluator(rbac.DefaultRoleCatalog()))
 }
 
 func TestHealthz(t *testing.T) {
@@ -180,5 +187,27 @@ func TestReconcileEndpoints(t *testing.T) {
 	s.Handler().ServeHTTP(findingsRes, httptest.NewRequest(http.MethodGet, "/api/v1/drift/findings", nil))
 	if findingsRes.Code != http.StatusOK {
 		t.Fatalf("drift findings expected 200 got %d", findingsRes.Code)
+	}
+}
+
+func TestRBACIntentCreateDeniedForViewer(t *testing.T) {
+	s := testServer("viewer")
+	create := map[string]any{"name": "leaf", "spec": map[string]any{"metadata": map[string]any{"name": "leaf-1"}}}
+	b, _ := json.Marshal(create)
+	res := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/intents", bytes.NewReader(b))
+	s.Handler().ServeHTTP(res, req)
+	if res.Code != http.StatusForbidden {
+		t.Fatalf("expected 403 got %d body=%s", res.Code, res.Body.String())
+	}
+}
+
+func TestRBACDeploymentCreateDeniedForViewer(t *testing.T) {
+	s := testServer("viewer")
+	res := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/deployments", bytes.NewReader([]byte(`{"intent_id":"intent-1"}`)))
+	s.Handler().ServeHTTP(res, req)
+	if res.Code != http.StatusForbidden {
+		t.Fatalf("expected 403 got %d body=%s", res.Code, res.Body.String())
 	}
 }

@@ -442,3 +442,15 @@ Key ideas:
 Truthwatcher exists to ensure that the deployed network always reflects the intended network.
 
 ---
+
+## Security-Sensitive Contribution Guidance
+
+Changes in authentication, authorization, identity mapping, request middleware, and deployment safety checks are security-sensitive.
+
+When modifying these paths:
+
+1. Prefer explicit allow/deny checks near endpoint handlers rather than implicit magic.
+2. Keep local-dev bypass behavior loudly visible in logs and docs.
+3. Add or update tests for both allowed and denied authorization outcomes.
+4. Document new permissions, default roles, and migration impacts.
+5. Avoid introducing hidden default credentials or production-insecure fallbacks.
