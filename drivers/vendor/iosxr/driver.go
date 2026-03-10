@@ -1,10 +1,16 @@
 package iosxr
 
-import "fmt"
+import (
+	"context"
+	"fmt"
+
+	"github.com/truthwatcher/truthwatcher/internal/rendering"
+)
 
 type Driver struct{}
 
-func (Driver) Name() string { return "iosxr" }
-func (Driver) Render(target string, ir map[string]string) (string, error) {
-	return fmt.Sprintf("! vendor=iosxr target=%s\nhostname %s\n", target, ir["hostname"]), nil
+func (Driver) Vendor() string { return "iosxr" }
+
+func (Driver) Render(_ context.Context, ir rendering.DeviceConfigIR) (rendering.Artifact, error) {
+	return rendering.Artifact{Vendor: "iosxr", Format: "text", Filename: ir.Hostname + ".cfg", Contents: fmt.Sprintf("! vendor=iosxr\nhostname %s\n", ir.Hostname)}, nil
 }

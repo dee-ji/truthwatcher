@@ -22,7 +22,7 @@ type Service interface {
 	List(context.Context) ([]domain.Intent, error)
 	Get(context.Context, string) (domain.Intent, error)
 	Validate(context.Context, string) error
-	Compile(context.Context, string) (string, error)
+	Compile(context.Context, string, string) (string, error)
 }
 
 type InMemoryService struct {
@@ -78,12 +78,20 @@ func (s *InMemoryService) Validate(ctx context.Context, id string) error {
 	}
 	return validateSpec(in.Spec)
 }
-func (s *InMemoryService) Compile(ctx context.Context, id string) (string, error) {
-	_, err := s.Get(ctx, id)
+func (s *InMemoryService) Compile(ctx context.Context, id, vendor string) (string, error) {
+	in, err := s.Get(ctx, id)
 	if err != nil {
 		return "", err
 	}
-	return "compile queued", nil
+	if vendor == "" {
+		vendor = "junos"
+	}
+	compiler := elsecall.NewCompilerService()
+	artifact, err := compiler.RenderForVendor(ctx, vendor, compiler.BuildIntermediate(in.Spec))
+	if err != nil {
+		return "", err
+	}
+	return "compiled " + artifact.Vendor, nil
 }
 
 type PostgresService struct {
@@ -171,7 +179,7 @@ WHERE s.id = $1::uuid`, id).Scan(&in.ID, &in.Name, &in.Revision, &payload, &in.C
 	_ = json.Unmarshal(payload, &in.Spec)
 
 	artRows, err := s.db.QueryContext(ctx, `
-SELECT target_vendor, 'text', artifact, created_at
+SELECT target_vendor, artifact_format, artifact, artifact_metadata, created_at
 FROM compiled_artifacts
 WHERE intent_revision_id = (
   SELECT id FROM intent_revisions WHERE intent_set_id = $1::uuid ORDER BY revision DESC LIMIT 1
@@ -181,7 +189,9 @@ ORDER BY created_at DESC`, id)
 		defer artRows.Close()
 		for artRows.Next() {
 			var a domain.CompiledArtifactView
-			_ = artRows.Scan(&a.Vendor, &a.Format, &a.Artifact, &a.CreatedAt)
+			var metadata []byte
+			_ = artRows.Scan(&a.Vendor, &a.Format, &a.Artifact, &metadata, &a.CreatedAt)
+			_ = json.Unmarshal(metadata, &a.Metadata)
 			in.Artifacts = append(in.Artifacts, a)
 		}
 	}
@@ -200,7 +210,7 @@ func (s *PostgresService) Validate(ctx context.Context, id string) error {
 	return nil
 }
 
-func (s *PostgresService) Compile(ctx context.Context, id string) (string, error) {
+func (s *PostgresService) Compile(ctx context.Context, id, vendor string) (string, error) {
 	in, err := s.Get(ctx, id)
 	if err != nil {
 		return "", err
@@ -208,16 +218,22 @@ func (s *PostgresService) Compile(ctx context.Context, id string) (string, error
 	if err := validateSpec(in.Spec); err != nil {
 		return "", err
 	}
-	ir := s.compiler.BuildIntermediate(in.Spec)
-	artifact := s.compiler.RenderJunos(ir)
-	_, err = s.db.ExecContext(ctx, `
-INSERT INTO compiled_artifacts (intent_revision_id, target_vendor, artifact)
-VALUES ((SELECT id FROM intent_revisions WHERE intent_set_id = $1::uuid ORDER BY revision DESC LIMIT 1), $2, $3)
-`, id, artifact.Vendor, artifact.Rendered)
+	if vendor == "" {
+		vendor = "junos"
+	}
+	artifact, err := s.compiler.RenderForVendor(ctx, vendor, s.compiler.BuildIntermediate(in.Spec))
 	if err != nil {
 		return "", err
 	}
-	_ = s.audit.Emit(ctx, "spanreed", "intent.compiled", map[string]any{"intent_id": id, "vendor": artifact.Vendor})
+	metadata, _ := json.Marshal(artifact.Metadata)
+	_, err = s.db.ExecContext(ctx, `
+INSERT INTO compiled_artifacts (intent_revision_id, target_vendor, artifact_format, artifact_metadata, artifact)
+VALUES ((SELECT id FROM intent_revisions WHERE intent_set_id = $1::uuid ORDER BY revision DESC LIMIT 1), $2, $3, $4::jsonb, $5)
+`, id, artifact.Vendor, artifact.Format, string(metadata), artifact.Contents)
+	if err != nil {
+		return "", err
+	}
+	_ = s.audit.Emit(ctx, "spanreed", "intent.compiled", map[string]any{"intent_id": id, "vendor": artifact.Vendor, "format": artifact.Format})
 	return "compiled", nil
 }
 

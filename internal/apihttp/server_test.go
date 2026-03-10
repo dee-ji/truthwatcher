@@ -53,7 +53,7 @@ func TestIntentEndpoints(t *testing.T) {
 	}
 
 	compileRes := httptest.NewRecorder()
-	compileReq := httptest.NewRequest(http.MethodPost, "/api/v1/intents/"+id+"/compile", nil)
+	compileReq := httptest.NewRequest(http.MethodPost, "/api/v1/intents/"+id+"/compile", bytes.NewReader([]byte(`{"vendor":"junos"}`)))
 	s.Handler().ServeHTTP(compileRes, compileReq)
 	if compileRes.Code != http.StatusAccepted {
 		t.Fatalf("expected 202 got %d", compileRes.Code)

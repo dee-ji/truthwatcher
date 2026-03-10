@@ -13,10 +13,11 @@ type Intent struct {
 }
 
 type CompiledArtifactView struct {
-	Vendor    string    `json:"vendor"`
-	Format    string    `json:"format"`
-	Artifact  string    `json:"artifact"`
-	CreatedAt time.Time `json:"created_at"`
+	Vendor    string            `json:"vendor"`
+	Format    string            `json:"format"`
+	Artifact  string            `json:"artifact"`
+	Metadata  map[string]string `json:"metadata,omitempty"`
+	CreatedAt time.Time         `json:"created_at"`
 }
 
 type Deployment struct {

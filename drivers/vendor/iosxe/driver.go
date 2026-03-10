@@ -1,10 +1,16 @@
 package iosxe
 
-import "fmt"
+import (
+	"context"
+	"fmt"
+
+	"github.com/truthwatcher/truthwatcher/internal/rendering"
+)
 
 type Driver struct{}
 
-func (Driver) Name() string { return "iosxe" }
-func (Driver) Render(target string, ir map[string]string) (string, error) {
-	return fmt.Sprintf("! vendor=iosxe target=%s\nhostname %s\n", target, ir["hostname"]), nil
+func (Driver) Vendor() string { return "iosxe" }
+
+func (Driver) Render(_ context.Context, ir rendering.DeviceConfigIR) (rendering.Artifact, error) {
+	return rendering.Artifact{Vendor: "iosxe", Format: "text", Filename: ir.Hostname + ".cfg", Contents: fmt.Sprintf("! vendor=iosxe\nhostname %s\n", ir.Hostname)}, nil
 }

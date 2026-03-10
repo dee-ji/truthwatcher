@@ -1,0 +1,10 @@
+{
+  "vendor": "junos",
+  "format": "set",
+  "filename": "campus-leaf-1.set",
+  "metadata": {
+    "hostname": "campus-leaf-1",
+    "role": "leaf",
+    "target_sites": "dc1"
+  }
+}

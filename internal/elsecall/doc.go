@@ -1,3 +1,2 @@
-// Package elsecall contains placeholder logic for the elsecall domain.
-// TODO: Implement network-specific behavior and interfaces.
+// Package elsecall compiles normalized intent into vendor-neutral IR and renders artifacts through vendor drivers.
 package elsecall

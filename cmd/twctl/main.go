@@ -12,7 +12,7 @@ import (
 
 func main() {
 	if len(os.Args) < 2 {
-		fmt.Println("usage: twctl intent validate <file>|twctl render preview <id>")
+		fmt.Println("usage: twctl intent validate <file>|twctl render preview <id> [--vendor=<name>]")
 		os.Exit(1)
 	}
 	api := os.Getenv("TW_API")
@@ -24,9 +24,13 @@ func main() {
 	case len(os.Args) >= 4 && os.Args[1] == "intent" && os.Args[2] == "validate":
 		runIntentValidate(os.Args[3])
 	case len(os.Args) >= 4 && os.Args[1] == "render" && os.Args[2] == "preview":
-		runRenderPreview(api, os.Args[3])
+		vendor := "junos"
+		if len(os.Args) >= 5 && strings.HasPrefix(os.Args[4], "--vendor=") {
+			vendor = strings.TrimPrefix(os.Args[4], "--vendor=")
+		}
+		runRenderPreview(api, os.Args[3], vendor)
 	default:
-		fmt.Println("usage: twctl intent validate <file>|twctl render preview <id>")
+		fmt.Println("usage: twctl intent validate <file>|twctl render preview <id> [--vendor=<name>]")
 		os.Exit(1)
 	}
 }
@@ -44,8 +48,9 @@ func runIntentValidate(path string) {
 	fmt.Println("intent valid")
 }
 
-func runRenderPreview(api, id string) {
-	resp, err := http.Post(api+"/api/v1/intents/"+id+"/compile", "application/json", bytes.NewReader([]byte("{}")))
+func runRenderPreview(api, id, vendor string) {
+	body, _ := json.Marshal(map[string]string{"vendor": vendor})
+	resp, err := http.Post(api+"/api/v1/intents/"+id+"/compile", "application/json", bytes.NewReader(body))
 	if err != nil {
 		panic(err)
 	}
@@ -62,8 +67,9 @@ func runRenderPreview(api, id string) {
 	}
 	var out struct {
 		Artifacts []struct {
-			Vendor   string `json:"vendor"`
-			Artifact string `json:"artifact"`
+			Vendor   string            `json:"vendor"`
+			Artifact string            `json:"artifact"`
+			Metadata map[string]string `json:"metadata"`
 		} `json:"artifacts"`
 	}
 	_ = json.NewDecoder(getResp.Body).Decode(&out)
@@ -71,5 +77,5 @@ func runRenderPreview(api, id string) {
 		fmt.Println("no artifacts generated")
 		return
 	}
-	fmt.Printf("vendor=%s\n%s\n", out.Artifacts[0].Vendor, out.Artifacts[0].Artifact)
+	fmt.Printf("vendor=%s metadata=%v\n%s\n", out.Artifacts[0].Vendor, out.Artifacts[0].Metadata, out.Artifacts[0].Artifact)
 }
