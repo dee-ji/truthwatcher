@@ -1,6 +1,13 @@
 package vendor
 
+import (
+	"context"
+
+	"github.com/truthwatcher/truthwatcher/internal/rendering"
+)
+
+// Renderer describes a vendor renderer implementation backed by vendor-neutral IR.
 type Renderer interface {
-	Name() string
-	Render(target string, ir map[string]string) (string, error)
+	Vendor() string
+	Render(context.Context, rendering.DeviceConfigIR) (rendering.Artifact, error)
 }

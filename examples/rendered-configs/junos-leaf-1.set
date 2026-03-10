@@ -1,1 +1,4 @@
-set system host-name leaf-1
+set system host-name campus-leaf-1
+set routing-options autonomous-system 65000
+## TODO(truthwatcher): service "l3-underlay" is not yet rendered for junos
+## TODO(truthwatcher): section "interface_intent" is not yet rendered for junos

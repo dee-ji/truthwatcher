@@ -126,7 +126,13 @@ func (s *Server) handleIntentByID(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if len(parts) == 2 && parts[1] == "compile" && r.Method == http.MethodPost {
-		out, err := s.intent.Compile(r.Context(), id)
+		var req struct {
+			Vendor string `json:"vendor"`
+		}
+		if r.Body != nil {
+			_ = json.NewDecoder(r.Body).Decode(&req)
+		}
+		out, err := s.intent.Compile(r.Context(), id, req.Vendor)
 		if err != nil {
 			writeJSON(w, 404, map[string]string{"error": err.Error()})
 			return

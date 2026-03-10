@@ -1,36 +1,80 @@
 package elsecall
 
-import "fmt"
+import (
+	"context"
+	"errors"
+	"fmt"
+	"sort"
 
-type Artifact struct {
-	Vendor   string
-	Format   string
-	Rendered string
+	"github.com/truthwatcher/truthwatcher/drivers/junos"
+	"github.com/truthwatcher/truthwatcher/internal/rendering"
+)
+
+var ErrUnsupportedVendor = errors.New("unsupported vendor")
+
+type CompilerService struct {
+	drivers map[string]rendering.Driver
 }
 
-type IntermediateArtifact struct {
-	Hostname string
-	Role     string
+func NewCompilerService() *CompilerService {
+	j := junos.Driver{}
+	return &CompilerService{drivers: map[string]rendering.Driver{j.Vendor(): j}}
 }
 
-type CompilerService struct{}
-
-func NewCompilerService() *CompilerService { return &CompilerService{} }
-
-func (s *CompilerService) BuildIntermediate(spec map[string]any) IntermediateArtifact {
-	hostname := "unnamed-device"
+func (s *CompilerService) BuildIntermediate(spec map[string]any) rendering.DeviceConfigIR {
+	ir := rendering.DeviceConfigIR{Hostname: "unnamed-device", Role: "leaf"}
 	if metadata, ok := spec["metadata"].(map[string]any); ok {
 		if name, ok := metadata["name"].(string); ok && name != "" {
-			hostname = name
+			ir.Hostname = name
 		}
 	}
-	return IntermediateArtifact{Hostname: hostname, Role: "leaf"}
+	if routing, ok := spec["routing_intent"].(map[string]any); ok {
+		if bgp, ok := routing["bgp"].(map[string]any); ok {
+			switch asn := bgp["asn"].(type) {
+			case int:
+				ir.BGPASN = asn
+			case float64:
+				ir.BGPASN = int(asn)
+			}
+		}
+	}
+	if svc, ok := spec["desired_services"].([]any); ok {
+		for _, item := range svc {
+			if m, ok := item.(map[string]any); ok {
+				if t, ok := m["type"].(string); ok && t != "" {
+					ir.Services = append(ir.Services, t)
+				}
+			}
+		}
+	}
+	if scope, ok := spec["target_scope"].(map[string]any); ok {
+		if sites, ok := scope["sites"].([]any); ok {
+			for _, site := range sites {
+				if s, ok := site.(string); ok && s != "" {
+					ir.TargetSites = append(ir.TargetSites, s)
+				}
+			}
+		}
+	}
+	if _, ok := spec["interface_intent"]; ok {
+		ir.TODOSections = append(ir.TODOSections, "interface_intent")
+	}
+	if ir.BGPASN == 0 {
+		ir.BGPASN = 65000
+	}
+	ir.Normalize()
+	return ir
 }
 
-func (s *CompilerService) RenderJunos(ir IntermediateArtifact) Artifact {
-	return Artifact{
-		Vendor:   "junos",
-		Format:   "set",
-		Rendered: fmt.Sprintf("set system host-name %s\nset routing-options autonomous-system 65000\n", ir.Hostname),
+func (s *CompilerService) RenderForVendor(ctx context.Context, vendor string, ir rendering.DeviceConfigIR) (rendering.Artifact, error) {
+	d, ok := s.drivers[vendor]
+	if !ok {
+		keys := make([]string, 0, len(s.drivers))
+		for k := range s.drivers {
+			keys = append(keys, k)
+		}
+		sort.Strings(keys)
+		return rendering.Artifact{}, fmt.Errorf("%w: %s (supported: %v)", ErrUnsupportedVendor, vendor, keys)
 	}
+	return d.Render(ctx, ir)
 }
