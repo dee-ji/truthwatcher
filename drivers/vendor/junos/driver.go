@@ -6,5 +6,9 @@ type Driver struct{}
 
 func (Driver) Name() string { return "junos" }
 func (Driver) Render(target string, ir map[string]string) (string, error) {
-	return fmt.Sprintf("! vendor=junos target=%s\nhostname %s\n", target, ir["hostname"]), nil
+	hostname := ir["hostname"]
+	if hostname == "" {
+		hostname = target
+	}
+	return fmt.Sprintf("set system host-name %s\nset routing-options autonomous-system 65000\n", hostname), nil
 }
