@@ -1,0 +1,16 @@
+[
+  {
+    "device_id": "leaf-1",
+    "captured_at": "2026-01-01T00:00:00Z",
+    "artifact_ref": "intent-leaf-1/junos",
+    "content": "set system host-name leaf-1\nset routing-options autonomous-system 65000\n",
+    "source": "offline-fixture"
+  },
+  {
+    "device_id": "leaf-2",
+    "captured_at": "2026-01-01T00:00:00Z",
+    "artifact_ref": "intent-leaf-2/junos",
+    "content": "set system host-name leaf-2\nset routing-options autonomous-system 65010\n",
+    "source": "offline-fixture"
+  }
+]

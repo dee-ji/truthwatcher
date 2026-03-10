@@ -15,6 +15,7 @@ import (
 	"github.com/truthwatcher/truthwatcher/internal/domain"
 	"github.com/truthwatcher/truthwatcher/internal/intent"
 	"github.com/truthwatcher/truthwatcher/internal/reconcile"
+	"github.com/truthwatcher/truthwatcher/internal/state"
 	"github.com/truthwatcher/truthwatcher/internal/topology"
 )
 
@@ -23,7 +24,9 @@ func testServer() *Server {
 	intentSvc := intent.NewInMemoryService()
 	auditSvc := audit.NewStubService()
 	_ = topo.Import(context.Background(), domain.TopologySnapshot{Devices: []domain.Device{{ID: "d1", Hostname: "leaf-1"}}})
-	return New(slog.New(slog.NewTextHandler(os.Stdout, nil)), intentSvc, topo, deploy.NewStubServiceWithDependencies(auditSvc, intentSvc), reconcile.NewStubService(), auditSvc)
+	stateSvc := state.NewService(state.NewInMemoryRepository())
+	reconcileSvc := reconcile.NewService(reconcile.NewInMemoryRepository(), intentSvc, stateSvc, auditSvc)
+	return New(slog.New(slog.NewTextHandler(os.Stdout, nil)), intentSvc, topo, deploy.NewStubServiceWithDependencies(auditSvc, intentSvc), reconcileSvc, auditSvc)
 }
 
 func TestHealthz(t *testing.T) {
@@ -141,5 +144,41 @@ func TestDeploymentCreateValidation(t *testing.T) {
 	s.Handler().ServeHTTP(res, httptest.NewRequest(http.MethodPost, "/api/v1/deployments", bytes.NewReader([]byte(`{"intent_id":"intent-1"}`))))
 	if res.Code != http.StatusBadRequest {
 		t.Fatalf("expected 400 got %d", res.Code)
+	}
+}
+
+func TestReconcileEndpoints(t *testing.T) {
+	s := testServer()
+
+	createIntentBody := []byte(`{"name":"recon","spec":{"metadata":{"name":"leaf-1"}}}`)
+	intentRes := httptest.NewRecorder()
+	s.Handler().ServeHTTP(intentRes, httptest.NewRequest(http.MethodPost, "/api/v1/intents", bytes.NewReader(createIntentBody)))
+	if intentRes.Code != http.StatusCreated {
+		t.Fatalf("intent create expected 201 got %d", intentRes.Code)
+	}
+	var intentResp map[string]any
+	_ = json.Unmarshal(intentRes.Body.Bytes(), &intentResp)
+	intentID := intentResp["id"].(string)
+	s.Handler().ServeHTTP(httptest.NewRecorder(), httptest.NewRequest(http.MethodPost, "/api/v1/intents/"+intentID+"/compile", bytes.NewReader([]byte(`{"vendor":"junos"}`))))
+
+	runRes := httptest.NewRecorder()
+	body := []byte(`{"intent_id":"` + intentID + `"}`)
+	s.Handler().ServeHTTP(runRes, httptest.NewRequest(http.MethodPost, "/api/v1/reconcile/runs", bytes.NewReader(body)))
+	if runRes.Code != http.StatusAccepted {
+		t.Fatalf("reconcile run expected 202 got %d body=%s", runRes.Code, runRes.Body.String())
+	}
+	var run domain.ReconcileRun
+	_ = json.Unmarshal(runRes.Body.Bytes(), &run)
+
+	getRes := httptest.NewRecorder()
+	s.Handler().ServeHTTP(getRes, httptest.NewRequest(http.MethodGet, "/api/v1/reconcile/runs/"+run.ID, nil))
+	if getRes.Code != http.StatusOK {
+		t.Fatalf("reconcile get expected 200 got %d", getRes.Code)
+	}
+
+	findingsRes := httptest.NewRecorder()
+	s.Handler().ServeHTTP(findingsRes, httptest.NewRequest(http.MethodGet, "/api/v1/drift/findings", nil))
+	if findingsRes.Code != http.StatusOK {
+		t.Fatalf("drift findings expected 200 got %d", findingsRes.Code)
 	}
 }

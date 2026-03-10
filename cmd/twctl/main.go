@@ -32,13 +32,16 @@ func main() {
 		runDeployCreate(api, os.Args[3], os.Args[4:])
 	case len(os.Args) >= 4 && os.Args[1] == "deploy" && os.Args[2] == "get":
 		runDeployGet(api, os.Args[3])
+
+	case len(os.Args) >= 4 && os.Args[1] == "state" && os.Args[2] == "compare":
+		runStateCompare(api, os.Args[3])
 	default:
 		printUsageAndExit()
 	}
 }
 
 func printUsageAndExit() {
-	fmt.Println("usage: twctl intent validate <file>|twctl render preview <id> [--vendor=<name>]|twctl deploy create <intent-id> --idempotency-key=<key> [--target=<device>] [--mode=dry-run]|twctl deploy get <deployment-id>")
+	fmt.Println("usage: twctl intent validate <file>|twctl render preview <id> [--vendor=<name>]|twctl deploy create <intent-id> --idempotency-key=<key> [--target=<device>] [--mode=dry-run]|twctl deploy get <deployment-id>|twctl state compare <intent-id>")
 	os.Exit(1)
 }
 
@@ -133,6 +136,21 @@ func runDeployGet(api, deploymentID string) {
 	payload, _ := io.ReadAll(resp.Body)
 	if resp.StatusCode >= 300 {
 		fmt.Printf("deployment get failed: %s\n", string(payload))
+		os.Exit(1)
+	}
+	fmt.Println(string(payload))
+}
+
+func runStateCompare(api, intentID string) {
+	body, _ := json.Marshal(map[string]any{"intent_id": intentID, "actor": "twctl"})
+	resp, err := http.Post(api+"/api/v1/reconcile/runs", "application/json", bytes.NewReader(body))
+	if err != nil {
+		panic(err)
+	}
+	defer resp.Body.Close()
+	payload, _ := io.ReadAll(resp.Body)
+	if resp.StatusCode >= 300 {
+		fmt.Printf("state compare failed: %s\n", string(payload))
 		os.Exit(1)
 	}
 	fmt.Println(string(payload))
