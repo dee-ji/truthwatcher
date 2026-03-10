@@ -1,19 +1,240 @@
 openapi: 3.0.3
-info: {title: Truthwatcher API, version: 0.1.0}
+info:
+  title: Truthwatcher API
+  version: 0.1.0
+servers:
+  - url: http://localhost:8080
 paths:
-  /healthz: {get: {responses: {'200': {description: ok}}}}
-  /readyz: {get: {responses: {'200': {description: ready}}}}
-  /version: {get: {responses: {'200': {description: version}}}}
+  /healthz:
+    get:
+      summary: Liveness check
+      responses:
+        '200': {description: ok}
+  /readyz:
+    get:
+      summary: Readiness check
+      responses:
+        '200': {description: ready}
+  /version:
+    get:
+      summary: Build version metadata
+      responses:
+        '200':
+          description: version payload
+          content:
+            application/json:
+              schema:
+                type: object
+                properties: {version: {type: string}}
+
   /api/v1/intents:
-    get: {responses: {'200': {description: list intents}}}
-    post: {responses: {'201': {description: created}}}
+    get:
+      summary: List intents
+      responses:
+        '200': {description: list intents}
+    post:
+      summary: Create intent revision entry
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name]
+              properties:
+                id: {type: string}
+                name: {type: string}
+                description: {type: string}
+                revision: {type: integer}
+                spec: {type: object, additionalProperties: true}
+            example:
+              name: leaf-fabric
+              description: baseline underlay policy
+              revision: 1
+              spec:
+                metadata: {name: campus-leaf-1}
+                routing_intent: {bgp: {asn: 65000}}
+      responses:
+        '201': {description: created}
+
   /api/v1/intents/{id}:
-    get: {parameters: [{name: id, in: path, required: true, schema: {type: string}}], responses: {'200': {description: intent}}}
-  /api/v1/intents/{id}/validate: {post: {responses: {'200': {description: valid}}}}
-  /api/v1/intents/{id}/compile: {post: {responses: {'202': {description: accepted}}}}
-  /api/v1/topology/devices: {get: {responses: {'200': {description: devices}}}}
-  /api/v1/topology/links: {get: {responses: {'200': {description: links}}}}
-  /api/v1/deployments: {post: {responses: {'201': {description: deployment created}}}}
-  /api/v1/deployments/{id}: {get: {responses: {'200': {description: deployment}}}}
-  /api/v1/reconcile/runs: {post: {responses: {'202': {description: run created}}}}
-  /api/v1/audit/events: {get: {responses: {'200': {description: audit events}}}}
+    get:
+      summary: Get intent by id
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: {type: string}
+      responses:
+        '200': {description: intent}
+        '404': {description: not found}
+
+  /api/v1/intents/{id}/validate:
+    post:
+      summary: Validate intent revision
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: {type: string}
+      responses:
+        '200': {description: valid}
+
+  /api/v1/intents/{id}/compile:
+    post:
+      summary: Compile intent for vendor artifact generation
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: {type: string}
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties: {vendor: {type: string}}
+            example: {vendor: junos}
+      responses:
+        '202': {description: accepted}
+
+  /api/v1/topology/devices:
+    get:
+      summary: List topology devices
+      parameters:
+        - {name: site, in: query, schema: {type: string}}
+        - {name: vendor, in: query, schema: {type: string}}
+        - {name: platform, in: query, schema: {type: string}}
+      responses:
+        '200': {description: devices}
+
+  /api/v1/topology/devices/{id}:
+    get:
+      summary: Get topology device detail
+      parameters:
+        - {name: id, in: path, required: true, schema: {type: string}}
+      responses:
+        '200': {description: detail}
+        '404': {description: not found}
+
+  /api/v1/topology/links:
+    get:
+      summary: List topology links
+      parameters:
+        - {name: site, in: query, schema: {type: string}}
+        - {name: vendor, in: query, schema: {type: string}}
+        - {name: platform, in: query, schema: {type: string}}
+      responses:
+        '200': {description: links}
+
+  /api/v1/topology/import:
+    post:
+      summary: Import topology snapshot
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {type: object, additionalProperties: true}
+            example:
+              vendors: [{id: v-junos, name: junos}]
+              platforms: [{id: p-qfx, vendor_id: v-junos, name: qfx}]
+              sites: [{id: dc1, name: dc1}]
+              devices: [{id: leaf-1, hostname: leaf-1, vendor: junos, platform: qfx, site: dc1}]
+              interfaces: [{id: leaf-1:xe-0/0/0, device_id: leaf-1, name: xe-0/0/0}]
+              links: []
+      responses:
+        '202': {description: imported}
+
+  /api/v1/topology/export:
+    get:
+      summary: Export current topology snapshot
+      responses:
+        '200': {description: topology snapshot}
+
+  /api/v1/topology/query/adjacency:
+    get:
+      summary: List adjacent device ids
+      parameters:
+        - {name: device_id, in: query, required: true, schema: {type: string}}
+      responses:
+        '200': {description: adjacency}
+        '400': {description: missing device_id}
+
+  /api/v1/deployments:
+    post:
+      summary: Create deployment plan
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [intent_id]
+              properties:
+                intent_id: {type: string}
+                idempotency_key: {type: string}
+                mode: {type: string}
+                targets:
+                  type: array
+                  items: {type: string}
+                batch_size: {type: integer}
+                canary_targets: {type: integer}
+                require_manual_approval: {type: boolean}
+            example:
+              intent_id: leaf-fabric
+              idempotency_key: deploy-001
+              mode: dry-run
+              targets: [leaf-1, leaf-2]
+              batch_size: 1
+              canary_targets: 1
+      responses:
+        '201': {description: deployment created}
+
+  /api/v1/deployments/{id}:
+    get:
+      summary: Get deployment by id
+      parameters:
+        - {name: id, in: path, required: true, schema: {type: string}}
+      responses:
+        '200': {description: deployment}
+        '404': {description: not found}
+
+  /api/v1/reconcile/runs:
+    post:
+      summary: Create reconcile run
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                intent_id: {type: string}
+                actor: {type: string}
+            example:
+              intent_id: leaf-fabric
+              actor: twctl
+      responses:
+        '202': {description: run created}
+
+  /api/v1/reconcile/runs/{id}:
+    get:
+      summary: Get reconcile run
+      parameters:
+        - {name: id, in: path, required: true, schema: {type: string}}
+      responses:
+        '200': {description: reconcile run}
+        '404': {description: not found}
+
+  /api/v1/drift/findings:
+    get:
+      summary: List drift findings
+      responses:
+        '200': {description: drift findings}
+
+  /api/v1/audit/events:
+    get:
+      summary: List audit events
+      responses:
+        '200': {description: audit events}

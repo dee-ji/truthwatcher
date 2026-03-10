@@ -1,15 +1,46 @@
 # Truthwatcher
 
-Truthwatcher is an open-source, intent-driven network management platform for hyperscaler-style control planes.
+Truthwatcher is an open-source, intent-driven network management platform.
+
+It is organized as a control-plane scaffold that keeps architectural language and interfaces stable while subsystem internals are incrementally implemented.
 
 ## Current maturity
-Initial scaffold: buildable binaries, API/CLI skeletons, migrations, drivers, and docs with intentional TODO stubs for subsystem internals.
+Truthwatcher is in an intentional foundation phase: binaries compile, HTTP endpoints and migrations exist, tests exercise core scaffolding, and major subsystems expose explicit TODO surfaces rather than pretending to be production-complete.
 
-## Quickstart
+## Platform vocabulary
+Use these terms consistently across code, docs, and APIs:
+
+- **intent**: desired network behavior and policy definition.
+- **revision**: immutable version of an intent set.
+- **artifact**: compiled, vendor-targeted output from Elsecall.
+- **topology**: devices, links, and adjacency graph state.
+- **deployment**: rollout plan and execution lifecycle for intent revisions.
+- **state**: observed snapshots from the live network.
+- **reconcile**: convergence workflow from drift findings back to declared intent.
+- **drift**: mismatch between intended artifacts and observed state.
+- **audit**: append-only record of control-plane actions.
+- **driver**: vendor-specific renderer/execution adapter contract implementation.
+
+## Quickstart (new contributor)
+### 1) Build and test the monorepo
 1. `make build`
 2. `make test`
-3. `make compose-up`
-4. `curl localhost:8080/healthz`
+
+### 2) Start local platform dependencies and core services
+1. `make compose-up`
+2. `curl -s localhost:8080/healthz`
+3. `curl -s localhost:8080/version`
+
+Compose currently starts PostgreSQL, Redis, Spanreed (`:8080`), and Squire. Radiant/Highstorm/Stormlight/Seekers are available as local binaries.
+
+### 3) Run foundational checks
+1. `make migrate-up` (migration CLI scaffold; currently no real DB apply)
+2. `make openapi`
+
+### 4) Inspect starter assets
+- `examples/intents/leaf-fabric.yaml` for intent input.
+- `examples/topology/fabric-small.yaml` for topology fixtures.
+- `examples/rendered-configs/` for compiled artifacts.
 
 ## Core services
 - `radiant`: control-plane orchestration service.
@@ -17,16 +48,18 @@ Initial scaffold: buildable binaries, API/CLI skeletons, migrations, drivers, an
 - `highstorm`: deployment orchestration engine.
 - `stormlight`: drift detection and reconcile trigger service.
 - `seekers`: topology discovery and ingestion service.
-- `squire`: execution worker service.
+- `squire`: distributed execution worker service.
 - `twctl`: operator CLI.
 
 Legacy compatibility binaries (`tw-server`, `tw-worker`) remain as deprecation wrappers.
 
-## Local stack
-Docker Compose provides PostgreSQL, Redis, Spanreed API, and Squire worker scaffolding.
+## Intentional TODO surfaces
+Truthwatcher keeps these areas explicitly stubbed for safe iteration:
 
-## Roadmap summary
-- Persist domain services with Archive-backed PostgreSQL repositories.
-- Introduce Redis-backed queue/stream workflows.
-- Expand Elsecall artifact rendering and vendor drivers.
-- Add OIDC/JWT authentication and policy-backed authorization.
+- Real migration execution and state tracking in `cmd/tw-migrate`.
+- Persistent repositories for core domain services (Archive-backed).
+- Live execution adapters and transactional deployment orchestration.
+- OIDC-backed authn/authz integration beyond local/dev modes.
+- Rich topology analytics and simulation depth in Oathgate/Shadesmar.
+
+See `ROADMAP.md` for phased expansion.
