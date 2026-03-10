@@ -10,9 +10,11 @@ import (
 	"time"
 
 	"github.com/truthwatcher/truthwatcher/internal/audit"
+	"github.com/truthwatcher/truthwatcher/internal/authn"
 	"github.com/truthwatcher/truthwatcher/internal/deploy"
 	"github.com/truthwatcher/truthwatcher/internal/domain"
 	"github.com/truthwatcher/truthwatcher/internal/intent"
+	"github.com/truthwatcher/truthwatcher/internal/rbac"
 	"github.com/truthwatcher/truthwatcher/internal/reconcile"
 	"github.com/truthwatcher/truthwatcher/internal/topology"
 	"github.com/truthwatcher/truthwatcher/pkg/version"
@@ -25,10 +27,30 @@ type Server struct {
 	reconcile reconcile.Service
 	audit     audit.Service
 	logger    *slog.Logger
+	authnMW   authn.Middleware
+	rbacEval  rbac.Evaluator
 }
 
-func New(logger *slog.Logger, i intent.Service, t topology.Service, d deploy.Service, r reconcile.Service, a audit.Service) *Server {
-	return &Server{intent: i, topology: t, deploy: d, reconcile: r, audit: a, logger: logger}
+func New(
+	logger *slog.Logger,
+	i intent.Service,
+	t topology.Service,
+	d deploy.Service,
+	r reconcile.Service,
+	a audit.Service,
+	authnConfig authn.Config,
+	rbacEval rbac.Evaluator,
+) *Server {
+	return &Server{
+		intent:    i,
+		topology:  t,
+		deploy:    d,
+		reconcile: r,
+		audit:     a,
+		logger:    logger,
+		authnMW:   authn.NewMiddleware(authnConfig, authn.NewParser(), logger),
+		rbacEval:  rbacEval,
+	}
 }
 
 func (s *Server) Handler() http.Handler {
@@ -61,10 +83,11 @@ func (s *Server) Handler() http.Handler {
 		out, _ := s.audit.List(r.Context())
 		writeJSON(w, 200, out)
 	})
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		s.logger.Info("http", "method", r.Method, "path", r.URL.Path)
 		mux.ServeHTTP(w, r)
 	})
+	return s.authnMW.Wrap(handler)
 }
 func (s *Server) Run(ctx context.Context, addr string) error {
 	h := &http.Server{Addr: addr, Handler: s.Handler(), ReadHeaderTimeout: 5 * time.Second}
@@ -87,6 +110,9 @@ func (s *Server) handleIntents(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if r.Method == http.MethodPost {
+		if !s.requirePermission(w, r, rbac.PermissionIntentWrite) {
+			return
+		}
 		var in domain.Intent
 		if err := json.NewDecoder(r.Body).Decode(&in); err != nil {
 			writeJSON(w, 400, map[string]string{"error": err.Error()})
@@ -116,6 +142,9 @@ func (s *Server) handleIntentByID(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if len(parts) == 2 && parts[1] == "validate" && r.Method == http.MethodPost {
+		if !s.requirePermission(w, r, rbac.PermissionIntentWrite) {
+			return
+		}
 		if err := s.intent.Validate(r.Context(), id); err != nil {
 			writeJSON(w, 404, map[string]string{"error": err.Error()})
 			return
@@ -124,6 +153,9 @@ func (s *Server) handleIntentByID(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if len(parts) == 2 && parts[1] == "compile" && r.Method == http.MethodPost {
+		if !s.requirePermission(w, r, rbac.PermissionIntentWrite) {
+			return
+		}
 		var req struct {
 			Vendor string `json:"vendor"`
 		}
@@ -183,6 +215,9 @@ func (s *Server) handleTopologyImport(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusMethodNotAllowed)
 		return
 	}
+	if !s.requirePermission(w, r, rbac.PermissionTopologyWrite) {
+		return
+	}
 	var in domain.TopologySnapshot
 	if err := json.NewDecoder(r.Body).Decode(&in); err != nil {
 		writeJSON(w, 400, map[string]string{"error": err.Error()})
@@ -222,6 +257,9 @@ func (s *Server) createDeployment(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(405)
 		return
 	}
+	if !s.requirePermission(w, r, rbac.PermissionDeploymentWrite) {
+		return
+	}
 	var req domain.DeploymentPlanRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		writeJSON(w, 400, map[string]string{"error": err.Error()})
@@ -246,6 +284,9 @@ func (s *Server) getDeployment(w http.ResponseWriter, r *http.Request) {
 func (s *Server) handleReconcileRuns(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		w.WriteHeader(http.StatusMethodNotAllowed)
+		return
+	}
+	if !s.requirePermission(w, r, rbac.PermissionReconcileWrite) {
 		return
 	}
 	var req domain.ReconcileRunRequest
@@ -285,4 +326,15 @@ func (s *Server) handleDriftFindings(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, 200, out)
+}
+
+func (s *Server) requirePermission(w http.ResponseWriter, r *http.Request, permission string) bool {
+	if s.rbacEval == nil {
+		return true
+	}
+	if err := s.rbacEval.Evaluate(r.Context(), permission); err != nil {
+		writeJSON(w, http.StatusForbidden, map[string]string{"error": err.Error()})
+		return false
+	}
+	return true
 }

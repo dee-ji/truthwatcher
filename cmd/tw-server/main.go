@@ -7,9 +7,11 @@ import (
 
 	"github.com/truthwatcher/truthwatcher/internal/apihttp"
 	"github.com/truthwatcher/truthwatcher/internal/audit"
+	"github.com/truthwatcher/truthwatcher/internal/authn"
 	"github.com/truthwatcher/truthwatcher/internal/deploy"
 	"github.com/truthwatcher/truthwatcher/internal/intent"
 	"github.com/truthwatcher/truthwatcher/internal/queue"
+	"github.com/truthwatcher/truthwatcher/internal/rbac"
 	"github.com/truthwatcher/truthwatcher/internal/reconcile"
 	"github.com/truthwatcher/truthwatcher/internal/state"
 	"github.com/truthwatcher/truthwatcher/internal/topology"
@@ -31,7 +33,18 @@ func main() {
 	deploySvc := deploy.NewStubServiceWithDependencies(auditSvc, intentSvc).WithQueue(queueBackend)
 	stateSvc := state.NewService(state.NewInMemoryRepository())
 	reconcileSvc := reconcile.NewService(reconcile.NewInMemoryRepository(), intentSvc, stateSvc, auditSvc)
-	srv := apihttp.New(logger, intentSvc, topology.NewStubService(), deploySvc, reconcileSvc, auditSvc)
+	authConfig := authn.Config{
+		Mode:           authn.ModeJWT,
+		LocalDevBypass: envOr("AUTH_LOCAL_DEV_BYPASS", "true") == "true",
+		BypassSubject:  envOr("AUTH_BYPASS_SUBJECT", "local-dev"),
+		BypassRoles:    []string{envOr("AUTH_BYPASS_ROLE", "admin")},
+	}
+	if err := authConfig.Validate(); err != nil {
+		logger.Error("invalid auth configuration", "error", err)
+		os.Exit(1)
+	}
+	rbacEval := rbac.NewSimpleEvaluator(rbac.DefaultRoleCatalog())
+	srv := apihttp.New(logger, intentSvc, topology.NewStubService(), deploySvc, reconcileSvc, auditSvc, authConfig, rbacEval)
 	if err := srv.Run(context.Background(), envOr("API_ADDR", ":8080")); err != nil {
 		logger.Error("tw-server exited", "error", err)
 	}

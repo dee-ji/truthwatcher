@@ -2,6 +2,16 @@
 api:
   listen_address: ":8080"
 
+auth:
+  mode: "jwt"
+  local_dev_bypass: true
+  bypass_subject: "local-dev"
+  bypass_roles:
+    - "admin"
+  jwt:
+    issuer: "https://issuer.example.com"
+    audience: "truthwatcher-api"
+
 intent:
   source: "git"
   repo: "https://example.com/network-intent.git"
