@@ -4,3 +4,6 @@
 *.out
 .DS_Store
 coverage.txt
+
+ui/node_modules/
+ui/dist/

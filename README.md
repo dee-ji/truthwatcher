@@ -42,6 +42,14 @@ Compose currently starts PostgreSQL, Redis, Spanreed (`:8080`), and Squire. Radi
 - `examples/topology/fabric-small.yaml` for topology fixtures.
 - `examples/rendered-configs/` for compiled artifacts.
 
+### 5) Run the UI foundation
+1. `cd ui`
+2. `npm install`
+3. `cp .env.example .env`
+4. `npm run dev`
+
+The UI expects Spanreed API at `VITE_API_BASE_URL` (default `http://localhost:8080`).
+
 ## Core services
 - `radiant`: control-plane orchestration service.
 - `spanreed`: API and external interface service.
