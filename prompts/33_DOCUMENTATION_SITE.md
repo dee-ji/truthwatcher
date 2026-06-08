@@ -1,0 +1,45 @@
+Before coding, read these files:
+- PROJECT_TRUTHWATCHER.md
+- AGENT_COLLABORATION_CONTRACT.md
+- ARCHITECTURE_DECISIONS.md
+- DATA_MODEL.md
+- SAFETY_MODEL.md
+- MVP_SPEC.md
+- EXTENSIBILITY_MODEL.md
+- ROADMAP.md
+
+Act as an informed engineering sidekick. Challenge scope creep. Do not simply agree. If a requested implementation conflicts with the project constitution, stop and explain the conflict.
+
+Rules:
+- Keep Truthwatcher as a single Go binary plus PostgreSQL unless explicitly asked otherwise.
+- Do not introduce Docker, Kubernetes, microservices, message brokers, or cloud dependencies.
+- Do not introduce write-capable network automation.
+- Do not build observability features.
+- Do not build a full chat platform before the evidence kernel exists.
+- Prefer boring, explicit Go code.
+- Add tests where practical.
+- Update ROADMAP.md only with completed work and next steps.
+- Do not rewrite vision documents unless directly asked.
+
+
+Task: write first user-facing documentation.
+
+Deliverables:
+1. Update README.md with:
+   - what Truthwatcher is
+   - what it is not
+   - quickstart
+   - safety model
+   - architecture
+2. Add docs:
+   - `docs/concepts/evidence-first.md`
+   - `docs/concepts/discover-how-to-discover.md`
+   - `docs/concepts/assets-facts-relationships.md`
+   - `docs/concepts/extensibility.md`
+3. Add example workflow:
+   - fake discovery from fixtures
+   - inspect evidence
+   - inspect graph
+
+Constraints:
+- Do not overpromise future features as complete.
