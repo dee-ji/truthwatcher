@@ -1,0 +1,52 @@
+# Go build outputs
+bin/
+dist/
+build/
+truthwatcher
+*.exe
+*.test
+*.out
+
+# Coverage and profiling
+coverage.out
+coverage.html
+*.coverprofile
+*.prof
+
+# Go workspace and local caches
+go.work
+go.work.sum
+.gocache/
+
+# GoLand and JetBrains local project state
+.editorconfig
+.idea/
+*.iml
+
+# Environment and local configuration
+.env
+.env.*
+!.env.example
+*.local
+truthwatcher.yaml
+truthwatcher.yml
+truthwatcher.local.yaml
+
+# Temporary data
+tmp/
+temp/
+.tmp/
+data/
+pgdata/
+*.tmp
+
+# Frontend dependencies and build artifacts
+node_modules/
+web/node_modules/
+web/dist/
+web/build/
+web/.vite/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*

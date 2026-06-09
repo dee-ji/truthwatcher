@@ -20,6 +20,14 @@ Rules:
 - Every major design decision must update ARCHITECTURE_DECISIONS.md.
 - Every Codex/agent task must be small and bounded.
 
+Completed:
+
+- Repository guardrails added: `.gitignore`, `.editorconfig`, `Makefile`, and `CONTRIBUTING.md`.
+
+Next steps:
+
+- Execute `prompts/01_PROJECT_SKELETON.md` only when explicitly requested.
+
 ## Phase 1: Single-Binary Kernel
 
 Goal: create a Go application that runs as a single CLI/server binary.
