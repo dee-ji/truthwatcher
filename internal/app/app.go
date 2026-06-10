@@ -195,7 +195,10 @@ func serveHTTP(ctx context.Context, cfg config.Config, logger *slog.Logger, stdo
 	defer listener.Close()
 
 	server := &http.Server{
-		Handler:           api.NewHandler(),
+		Handler: api.NewHandler(api.Options{
+			Version: Version,
+			Logger:  logger,
+		}),
 		ReadHeaderTimeout: 5 * time.Second,
 	}
 
