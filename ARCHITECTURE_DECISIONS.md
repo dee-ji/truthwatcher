@@ -127,3 +127,11 @@ Decision: Use Go's standard `database/sql` package with `github.com/lib/pq` as t
 Reason: Truthwatcher needs a small PostgreSQL foundation without an ORM or query framework. `lib/pq` provides a focused `database/sql` driver with a small API surface, keeping early database code explicit and boring.
 
 Implication: Database access should stay behind internal packages. If later requirements need PostgreSQL-specific features that are awkward through `database/sql`, the driver choice can be revisited without changing the project architecture.
+
+## ADR-012: Built-In Discovery Profiles Use Go Structs First
+
+Decision: Define initial discovery profiles as compile-time Go structs.
+
+Reason: The first profiles only need to map vendor-neutral tasks to known read-only commands and parser hints. Go structs avoid adding YAML/JSON parsing dependencies, runtime plugin loading, or external configuration before the collector and parser contracts stabilize.
+
+Implication: Built-in profiles remain simple and testable. Runtime profile loading can be revisited later after the safety policy, collectors, and parser registry are proven.

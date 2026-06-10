@@ -128,10 +128,11 @@ Goal: safely collect basic identity and topology data from one seed device.
 Completed:
 
 - Read-only policy engine added for vendor-neutral discovery task allowlisting and dangerous command denial.
+- Built-in Juniper Junos and Cisco IOS-XR discovery profiles added with read-only command mappings and parser hints.
 
 Next steps:
 
-- Execute `prompts/09_DISCOVERY_PROFILE_REGISTRY.md` only when explicitly requested.
+- Execute `prompts/10_SSH_COLLECTOR_INTERFACE.md` only when explicitly requested.
 
 Deliverables:
 
