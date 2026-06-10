@@ -3,6 +3,7 @@ package app
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"log/slog"
@@ -10,6 +11,7 @@ import (
 	"testing"
 
 	"truthwatcher/internal/config"
+	"truthwatcher/internal/policy"
 )
 
 func TestVersionCommand(t *testing.T) {
@@ -105,6 +107,43 @@ func TestMigrateRequiresDatabaseURL(t *testing.T) {
 	err := app.Run(context.Background(), []string{"migrate", "status"}, &stdout, &stderr)
 	if err == nil {
 		t.Fatal("migrate without database url returned nil error")
+	}
+	if !strings.Contains(err.Error(), config.EnvDatabaseURL) {
+		t.Fatalf("error = %q, want database url env name", err.Error())
+	}
+}
+
+func TestParseDiscoveryTasksDefaults(t *testing.T) {
+	tasks, err := parseDiscoveryTasks("")
+	if err != nil {
+		t.Fatalf("parseDiscoveryTasks returned error: %v", err)
+	}
+	if got, want := len(tasks), 4; got != want {
+		t.Fatalf("task count = %d, want %d", got, want)
+	}
+}
+
+func TestParseDiscoveryTasksRejectsUnknownTask(t *testing.T) {
+	_, err := parseDiscoveryTasks("identify_device,format_disk")
+	if !errors.Is(err, policy.ErrTaskNotAllowed) {
+		t.Fatalf("expected ErrTaskNotAllowed, got %v", err)
+	}
+}
+
+func TestDiscoverFakeRequiresDatabaseURL(t *testing.T) {
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+
+	app := App{
+		Version: "test-version",
+		loadConfig: func() (config.Config, error) {
+			return config.Default(), nil
+		},
+	}
+
+	err := app.Run(context.Background(), []string{"discover", "fake", "--target", "fixture://junos-mx"}, &stdout, &stderr)
+	if err == nil {
+		t.Fatal("discover fake without database url returned nil error")
 	}
 	if !strings.Contains(err.Error(), config.EnvDatabaseURL) {
 		t.Fatalf("error = %q, want database url env name", err.Error())

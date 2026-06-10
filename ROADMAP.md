@@ -129,10 +129,11 @@ Completed:
 
 - Read-only policy engine added for vendor-neutral discovery task allowlisting and dangerous command denial.
 - Built-in Juniper Junos and Cisco IOS-XR discovery profiles added with read-only command mappings and parser hints.
+- Fake local collector added for fixture-backed evidence creation without network access.
 
 Next steps:
 
-- Execute `prompts/10_SSH_COLLECTOR_INTERFACE.md` only when explicitly requested.
+- Implement real SSH collection only when explicitly requested.
 
 Deliverables:
 

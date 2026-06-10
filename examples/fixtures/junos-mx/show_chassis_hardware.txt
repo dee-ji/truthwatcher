@@ -1,0 +1,6 @@
+Hardware inventory:
+Item             Version  Part number  Serial number     Description
+Chassis                                JN1234ABCDEF      MX480
+Routing Engine 0 REV 12   750-123456   RE0SERIAL001      RE-S-2X00x6
+FPC 0            REV 33   750-654321   FPC0SERIAL001     MPC7E 3D
+  PIC 0          BUILTIN  BUILTIN      BUILTIN           10x 10GE

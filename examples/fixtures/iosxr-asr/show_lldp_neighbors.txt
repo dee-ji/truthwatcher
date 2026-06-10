@@ -1,0 +1,6 @@
+Capability codes:
+  (R) Router, (B) Bridge, (T) Telephone, (C) DOCSIS Cable Device
+
+Device ID       Local Intf     Hold-time  Capability  Port ID
+spine-01        Gi0/0/0/0      120        R           Eth1/3
+spine-02        Gi0/0/0/1      120        R           Eth1/4

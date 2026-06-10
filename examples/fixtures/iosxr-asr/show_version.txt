@@ -1,0 +1,4 @@
+Cisco IOS XR Software, Version 7.9.2
+Cisco ASR 9000 Series Router
+System uptime is 8 weeks, 2 days, 4 hours
+Hostname: xr-edge-01

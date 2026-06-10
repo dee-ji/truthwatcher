@@ -2,6 +2,7 @@ package app
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"flag"
 	"fmt"
@@ -18,6 +19,7 @@ import (
 	"truthwatcher/internal/discovery"
 	"truthwatcher/internal/evidence"
 	"truthwatcher/internal/logging"
+	"truthwatcher/internal/policy"
 	"truthwatcher/migrations"
 )
 
@@ -63,6 +65,8 @@ func (a App) Run(ctx context.Context, args []string, stdout, stderr io.Writer) e
 		return a.runServer(ctx, args[1:], stdout, stderr)
 	case "migrate":
 		return a.runMigrate(ctx, args[1:], stdout)
+	case "discover":
+		return a.runDiscover(ctx, args[1:], stdout, stderr)
 	default:
 		printUsage(stderr)
 		return fmt.Errorf("unknown command %q", args[0])
@@ -185,6 +189,136 @@ func (a App) runMigrate(ctx context.Context, args []string, stdout io.Writer) er
 	}
 }
 
+func (a App) runDiscover(ctx context.Context, args []string, stdout, stderr io.Writer) error {
+	if len(args) == 0 {
+		return fmt.Errorf("usage: truthwatcher discover fake --target fixture://junos-mx")
+	}
+
+	switch args[0] {
+	case "fake":
+		return a.runDiscoverFake(ctx, args[1:], stdout, stderr)
+	default:
+		return fmt.Errorf("usage: truthwatcher discover fake --target fixture://junos-mx")
+	}
+}
+
+func (a App) runDiscoverFake(ctx context.Context, args []string, stdout, stderr io.Writer) error {
+	loadConfig := a.loadConfig
+	if loadConfig == nil {
+		loadConfig = config.Load
+	}
+
+	cfg, err := loadConfig()
+	if err != nil {
+		return err
+	}
+
+	var target string
+	var profileName string
+	var taskList string
+	var fixtureRoot string
+	flags := flag.NewFlagSet("discover fake", flag.ContinueOnError)
+	flags.SetOutput(stderr)
+	flags.StringVar(&target, "target", "", "fixture target, for example fixture://junos-mx")
+	flags.StringVar(&profileName, "profile", "", "built-in discovery profile; inferred from fixture target when omitted")
+	flags.StringVar(&taskList, "tasks", "", "comma-separated discovery tasks; defaults to fixture-backed identity, inventory, neighbors, and BGP summary")
+	flags.StringVar(&fixtureRoot, "fixtures", discovery.DefaultFixtureRoot, "fixture root directory")
+	if err := flags.Parse(args); err != nil {
+		return err
+	}
+	if flags.NArg() != 0 {
+		return fmt.Errorf("discover fake accepts flags only")
+	}
+	if strings.TrimSpace(target) == "" {
+		return fmt.Errorf("--target is required")
+	}
+	if strings.TrimSpace(cfg.DatabaseURL) == "" {
+		return fmt.Errorf("%s is required for discover fake", config.EnvDatabaseURL)
+	}
+	if strings.TrimSpace(profileName) == "" {
+		profileName, err = discovery.InferFakeProfileName(target)
+		if err != nil {
+			return err
+		}
+	}
+
+	profile, ok := discovery.BuiltInProfile(profileName)
+	if !ok {
+		return fmt.Errorf("unknown discovery profile %q", profileName)
+	}
+
+	tasks, err := parseDiscoveryTasks(taskList)
+	if err != nil {
+		return err
+	}
+
+	conn, err := db.Open(ctx, cfg.DatabaseURL)
+	if err != nil {
+		return err
+	}
+	defer conn.Close()
+
+	runService := discovery.NewService(db.NewDiscoveryRunRepository(conn))
+	evidenceService := evidence.NewService(db.NewEvidenceRepository(conn))
+
+	seedInput, err := fakeSeedInput(target, profile, tasks)
+	if err != nil {
+		return err
+	}
+	run, err := runService.CreateDiscoveryRun(ctx, discovery.CreateDiscoveryRunParams{SeedInput: seedInput})
+	if err != nil {
+		return err
+	}
+	run, err = runService.UpdateDiscoveryRunStatus(ctx, discovery.UpdateDiscoveryRunStatusParams{
+		ID:     run.ID,
+		Status: discovery.StatusRunning,
+	})
+	if err != nil {
+		return err
+	}
+
+	collector := discovery.NewFakeCollector(fixtureRoot, policy.NewEngine())
+	outputs, err := collector.Collect(ctx, target, profile, tasks)
+	if err != nil {
+		markDiscoveryRunFailed(ctx, runService, run.ID, err)
+		return err
+	}
+
+	for _, output := range outputs {
+		metadata, err := collectedOutputMetadata(output)
+		if err != nil {
+			markDiscoveryRunFailed(ctx, runService, run.ID, err)
+			return err
+		}
+		created, err := evidenceService.CreateEvidence(ctx, evidence.CreateEvidenceParams{
+			DiscoveryRunID: run.ID,
+			Target:         output.Target,
+			Method:         output.Method,
+			CommandOrAPI:   output.Command,
+			RawOutput:      output.RawOutput,
+			Metadata:       metadata,
+		})
+		if err != nil {
+			markDiscoveryRunFailed(ctx, runService, run.ID, err)
+			return err
+		}
+		fmt.Fprintf(stdout, "stored evidence %s %q\n", created.ID, created.CommandOrAPI)
+	}
+
+	completedAt := time.Now().UTC()
+	run, err = runService.UpdateDiscoveryRunStatus(ctx, discovery.UpdateDiscoveryRunStatusParams{
+		ID:          run.ID,
+		Status:      discovery.StatusCompleted,
+		CompletedAt: &completedAt,
+	})
+	if err != nil {
+		return err
+	}
+
+	fmt.Fprintf(stdout, "completed discovery run %s with %d evidence records\n", run.ID, len(outputs))
+	return nil
+}
+
 func serveHTTP(ctx context.Context, cfg config.Config, logger *slog.Logger, stdout io.Writer) error {
 	if logger == nil {
 		logger = slog.New(slog.NewTextHandler(io.Discard, nil))
@@ -256,16 +390,87 @@ func serveHTTP(ctx context.Context, cfg config.Config, logger *slog.Logger, stdo
 	}
 }
 
+func parseDiscoveryTasks(taskList string) ([]policy.Task, error) {
+	if strings.TrimSpace(taskList) == "" {
+		return discovery.DefaultFakeTasks(), nil
+	}
+
+	engine := policy.NewEngine()
+	parts := strings.Split(taskList, ",")
+	tasks := make([]policy.Task, 0, len(parts))
+	for _, part := range parts {
+		task := policy.Task(strings.TrimSpace(part))
+		if err := engine.CheckTask(task); err != nil {
+			return nil, err
+		}
+		tasks = append(tasks, task)
+	}
+	if len(tasks) == 0 {
+		return nil, fmt.Errorf("at least one discovery task is required")
+	}
+	return tasks, nil
+}
+
+func fakeSeedInput(target string, profile discovery.Profile, tasks []policy.Task) (json.RawMessage, error) {
+	seed := struct {
+		Target  string        `json:"target"`
+		Method  string        `json:"method"`
+		Profile string        `json:"profile"`
+		Tasks   []policy.Task `json:"tasks"`
+	}{
+		Target:  target,
+		Method:  discovery.FakeMethod,
+		Profile: profile.Name,
+		Tasks:   tasks,
+	}
+	return json.Marshal(seed)
+}
+
+func collectedOutputMetadata(output discovery.CollectedOutput) (json.RawMessage, error) {
+	metadata := struct {
+		Collector   string      `json:"collector"`
+		Task        policy.Task `json:"task"`
+		Profile     string      `json:"profile"`
+		Platform    string      `json:"platform"`
+		Vendor      string      `json:"vendor"`
+		ParserHints []string    `json:"parser_hints"`
+	}{
+		Collector:   discovery.FakeMethod,
+		Task:        output.Task,
+		Profile:     output.ProfileName,
+		Platform:    output.Platform,
+		Vendor:      output.Vendor,
+		ParserHints: output.ParserHints,
+	}
+	return json.Marshal(metadata)
+}
+
+func markDiscoveryRunFailed(ctx context.Context, service discovery.Service, id string, cause error) {
+	if cause == nil {
+		return
+	}
+	message := cause.Error()
+	completedAt := time.Now().UTC()
+	_, _ = service.UpdateDiscoveryRunStatus(ctx, discovery.UpdateDiscoveryRunStatusParams{
+		ID:           id,
+		Status:       discovery.StatusFailed,
+		CompletedAt:  &completedAt,
+		ErrorMessage: &message,
+	})
+}
+
 func printUsage(w io.Writer) {
 	fmt.Fprint(w, `Usage:
   truthwatcher version
   truthwatcher server [--addr 127.0.0.1:8080] [--config ./truthwatcher.yaml]
   truthwatcher migrate up
   truthwatcher migrate status
+  truthwatcher discover fake --target fixture://junos-mx
 
 Commands:
   version   Print the Truthwatcher version.
   server    Start the HTTP server skeleton.
   migrate   Run or inspect database migrations.
+  discover  Run a local fixture-backed discovery.
 `)
 }

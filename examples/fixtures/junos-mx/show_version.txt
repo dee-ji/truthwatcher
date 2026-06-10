@@ -1,0 +1,6 @@
+Hostname: mx-edge-01
+Model: mx480
+Junos: 22.4R3-S2.4
+JUNOS OS Kernel 64-bit  [20240112.1]
+JUNOS Base OS boot  [22.4R3-S2.4]
+JUNOS Base OS Software Suite  [22.4R3-S2.4]

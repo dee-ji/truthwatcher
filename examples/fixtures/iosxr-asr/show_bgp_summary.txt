@@ -1,0 +1,4 @@
+BGP router identifier 198.51.100.10, local AS number 65000
+BGP generic scan interval 60 secs
+Neighbor        Spk    AS MsgRcvd MsgSent   TblVer  InQ OutQ  Up/Down  St/PfxRcd
+192.0.2.2         0 65002    1000    1002       42    0    0 1w2d      18

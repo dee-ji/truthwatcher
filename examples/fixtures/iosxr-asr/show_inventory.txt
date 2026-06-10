@@ -1,0 +1,5 @@
+NAME: "Rack 0", DESCR: "Cisco ASR 9904 Chassis"
+PID: ASR-9904          , VID: V02, SN: FOX1234ABCD
+
+NAME: "0/0", DESCR: "Modular Line Card"
+PID: A9K-MOD160-SE     , VID: V07, SN: FOC9876WXYZ
