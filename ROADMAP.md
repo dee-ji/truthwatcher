@@ -125,6 +125,14 @@ Acceptance criteria:
 
 Goal: safely collect basic identity and topology data from one seed device.
 
+Completed:
+
+- Read-only policy engine added for vendor-neutral discovery task allowlisting and dangerous command denial.
+
+Next steps:
+
+- Execute `prompts/09_DISCOVERY_PROFILE_REGISTRY.md` only when explicitly requested.
+
 Deliverables:
 
 - SSH collector interface.
