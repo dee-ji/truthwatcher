@@ -135,3 +135,11 @@ Decision: Define initial discovery profiles as compile-time Go structs.
 Reason: The first profiles only need to map vendor-neutral tasks to known read-only commands and parser hints. Go structs avoid adding YAML/JSON parsing dependencies, runtime plugin loading, or external configuration before the collector and parser contracts stabilize.
 
 Implication: Built-in profiles remain simple and testable. Runtime profile loading can be revisited later after the safety policy, collectors, and parser registry are proven.
+
+## ADR-013: SSH Collector Uses golang.org/x/crypto/ssh
+
+Decision: Use `golang.org/x/crypto/ssh` for the optional SSH collector boundary.
+
+Reason: The Go standard library does not include an SSH client. `golang.org/x/crypto/ssh` is the well-known Go SSH implementation maintained in the Go extended libraries, and it keeps the collector dependency focused on protocol transport rather than a larger automation framework.
+
+Implication: SSH collection remains behind the existing `Collector` interface. Commands must still come from discovery profiles and pass policy before execution. The first implementation supports one configured credential source per run, uses known_hosts verification by default, and does not perform credential guessing, brute force, terminal server traversal, configuration commands, or write-capable automation.

@@ -17,6 +17,7 @@ coverage.html
 go.work
 go.work.sum
 .gocache/
+.gomodcache/
 
 # GoLand and JetBrains local project state
 .editorconfig
