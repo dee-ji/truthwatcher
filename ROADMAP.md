@@ -56,10 +56,11 @@ Completed:
 - Internal package layout created for app, config, logging, API, DB, discovery, evidence, assets, policy, and audit.
 - Server starts without database, migrations, frontend, collectors, or agents.
 - Environment-based configuration and standard-library structured logging added for the server.
+- PostgreSQL database foundation added with `database/sql`, embedded migrations, and `truthwatcher migrate up/status`.
 
 Next steps:
 
-- Execute `prompts/03_DATABASE_MIGRATIONS.md` only when explicitly requested.
+- Execute `prompts/04_HTTP_API_FOUNDATION.md` only when explicitly requested.
 
 ## Phase 2: Evidence Store
 

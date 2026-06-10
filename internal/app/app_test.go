@@ -80,3 +80,33 @@ func TestUnknownCommand(t *testing.T) {
 		t.Fatalf("stderr = %q, want usage", stderr.String())
 	}
 }
+
+func TestMigrateRequiresSubcommand(t *testing.T) {
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+
+	err := New().Run(context.Background(), []string{"migrate"}, &stdout, &stderr)
+	if err == nil {
+		t.Fatal("migrate without subcommand returned nil error")
+	}
+}
+
+func TestMigrateRequiresDatabaseURL(t *testing.T) {
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+
+	app := App{
+		Version: "test-version",
+		loadConfig: func() (config.Config, error) {
+			return config.Default(), nil
+		},
+	}
+
+	err := app.Run(context.Background(), []string{"migrate", "status"}, &stdout, &stderr)
+	if err == nil {
+		t.Fatal("migrate without database url returned nil error")
+	}
+	if !strings.Contains(err.Error(), config.EnvDatabaseURL) {
+		t.Fatalf("error = %q, want database url env name", err.Error())
+	}
+}

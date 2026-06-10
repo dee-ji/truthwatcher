@@ -119,3 +119,11 @@ Decision:
 - Integration data is treated as evidence.
 - Adapters translate external data into assets, facts, relationships, and evidence.
 - The single-binary deployment goal remains intact.
+
+## ADR-011: PostgreSQL Driver Uses database/sql with lib/pq
+
+Decision: Use Go's standard `database/sql` package with `github.com/lib/pq` as the PostgreSQL driver.
+
+Reason: Truthwatcher needs a small PostgreSQL foundation without an ORM or query framework. `lib/pq` provides a focused `database/sql` driver with a small API surface, keeping early database code explicit and boring.
+
+Implication: Database access should stay behind internal packages. If later requirements need PostgreSQL-specific features that are awkward through `database/sql`, the driver choice can be revisited without changing the project architecture.

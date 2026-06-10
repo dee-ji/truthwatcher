@@ -1,2 +1,2 @@
-// Package db will own PostgreSQL connectivity and repositories.
+// Package db owns PostgreSQL connectivity and migration execution.
 package db

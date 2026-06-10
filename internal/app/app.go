@@ -14,7 +14,9 @@ import (
 
 	"truthwatcher/internal/api"
 	"truthwatcher/internal/config"
+	"truthwatcher/internal/db"
 	"truthwatcher/internal/logging"
+	"truthwatcher/migrations"
 )
 
 const (
@@ -57,6 +59,8 @@ func (a App) Run(ctx context.Context, args []string, stdout, stderr io.Writer) e
 		return a.runVersion(args[1:], stdout)
 	case "server":
 		return a.runServer(ctx, args[1:], stdout, stderr)
+	case "migrate":
+		return a.runMigrate(ctx, args[1:], stdout)
 	default:
 		printUsage(stderr)
 		return fmt.Errorf("unknown command %q", args[0])
@@ -116,6 +120,69 @@ func (a App) runServer(ctx context.Context, args []string, stdout, stderr io.Wri
 	return serve(ctx, cfg, logger, stdout)
 }
 
+func (a App) runMigrate(ctx context.Context, args []string, stdout io.Writer) error {
+	if len(args) != 1 {
+		return fmt.Errorf("usage: truthwatcher migrate up|status")
+	}
+
+	loadConfig := a.loadConfig
+	if loadConfig == nil {
+		loadConfig = config.Load
+	}
+
+	cfg, err := loadConfig()
+	if err != nil {
+		return err
+	}
+	if strings.TrimSpace(cfg.DatabaseURL) == "" {
+		return fmt.Errorf("%s is required for migrate", config.EnvDatabaseURL)
+	}
+
+	source, err := migrations.Embedded()
+	if err != nil {
+		return err
+	}
+
+	conn, err := db.Open(ctx, cfg.DatabaseURL)
+	if err != nil {
+		return err
+	}
+	defer conn.Close()
+
+	migrator := db.NewMigrator(conn, source)
+
+	switch args[0] {
+	case "up":
+		ran, err := migrator.Up(ctx)
+		if err != nil {
+			return err
+		}
+		if len(ran) == 0 {
+			fmt.Fprintln(stdout, "database already up to date")
+			return nil
+		}
+		for _, migration := range ran {
+			fmt.Fprintf(stdout, "applied %s\n", migration.ID)
+		}
+		return nil
+	case "status":
+		status, err := migrator.Status(ctx)
+		if err != nil {
+			return err
+		}
+		for _, item := range status {
+			state := "pending"
+			if item.Applied {
+				state = "applied"
+			}
+			fmt.Fprintf(stdout, "%s %s\n", item.Migration.ID, state)
+		}
+		return nil
+	default:
+		return fmt.Errorf("usage: truthwatcher migrate up|status")
+	}
+}
+
 func serveHTTP(ctx context.Context, cfg config.Config, logger *slog.Logger, stdout io.Writer) error {
 	if logger == nil {
 		logger = slog.New(slog.NewTextHandler(io.Discard, nil))
@@ -171,9 +238,12 @@ func printUsage(w io.Writer) {
 	fmt.Fprint(w, `Usage:
   truthwatcher version
   truthwatcher server [--addr 127.0.0.1:8080] [--config ./truthwatcher.yaml]
+  truthwatcher migrate up
+  truthwatcher migrate status
 
 Commands:
   version   Print the Truthwatcher version.
   server    Start the HTTP server skeleton.
+  migrate   Run or inspect database migrations.
 `)
 }
