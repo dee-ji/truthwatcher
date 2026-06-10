@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"truthwatcher/internal/discovery"
+	"truthwatcher/internal/evidence"
 )
 
 func TestHealthz(t *testing.T) {
@@ -298,6 +299,146 @@ func TestDiscoveryRunEndpointsReturnUnavailableWithoutRepository(t *testing.T) {
 
 	response := httptest.NewRecorder()
 	request := httptest.NewRequest(http.MethodGet, "/api/v1/discovery-runs", nil)
+	handler.ServeHTTP(response, request)
+
+	if response.Code != http.StatusServiceUnavailable {
+		t.Fatalf("status = %d, want %d", response.Code, http.StatusServiceUnavailable)
+	}
+}
+
+type fakeEvidenceRepository struct {
+	items []evidence.Evidence
+}
+
+func (f *fakeEvidenceRepository) CreateEvidence(ctx context.Context, params evidence.CreateEvidenceParams) (evidence.Evidence, error) {
+	return evidence.Evidence{}, nil
+}
+
+func (f *fakeEvidenceRepository) GetEvidence(ctx context.Context, id string) (evidence.Evidence, error) {
+	for _, item := range f.items {
+		if item.ID == id {
+			return item, nil
+		}
+	}
+	return evidence.Evidence{}, evidence.ErrNotFound
+}
+
+func (f *fakeEvidenceRepository) ListEvidenceByDiscoveryRun(ctx context.Context, discoveryRunID string) ([]evidence.Evidence, error) {
+	var result []evidence.Evidence
+	for _, item := range f.items {
+		if item.DiscoveryRunID == discoveryRunID {
+			result = append(result, item)
+		}
+	}
+	return result, nil
+}
+
+func TestListEvidenceByDiscoveryRun(t *testing.T) {
+	now := time.Date(2026, 6, 10, 12, 0, 0, 0, time.UTC)
+	repo := &fakeEvidenceRepository{
+		items: []evidence.Evidence{{
+			ID:             "22222222-2222-4222-8222-222222222222",
+			DiscoveryRunID: "11111111-1111-4111-8111-111111111111",
+			Target:         "router1",
+			Method:         "ssh",
+			CommandOrAPI:   "show version",
+			RawOutput:      "raw output",
+			RawOutputHash:  evidence.HashRawOutput("raw output"),
+			CollectedAt:    now,
+			Metadata:       json.RawMessage(`{}`),
+		}},
+	}
+	service := evidence.NewService(repo)
+	handler := NewHandler(Options{
+		Version:  "test-version",
+		Evidence: &service,
+	})
+
+	response := httptest.NewRecorder()
+	request := httptest.NewRequest(http.MethodGet, "/api/v1/discovery-runs/11111111-1111-4111-8111-111111111111/evidence", nil)
+	handler.ServeHTTP(response, request)
+
+	if response.Code != http.StatusOK {
+		t.Fatalf("status = %d, want %d", response.Code, http.StatusOK)
+	}
+
+	var body struct {
+		Evidence []evidence.Evidence `json:"evidence"`
+	}
+	if err := json.Unmarshal(response.Body.Bytes(), &body); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+	if len(body.Evidence) != 1 {
+		t.Fatalf("len = %d, want 1", len(body.Evidence))
+	}
+	if body.Evidence[0].RawOutputHash == "" {
+		t.Fatal("raw_output_hash is empty")
+	}
+}
+
+func TestGetEvidence(t *testing.T) {
+	now := time.Date(2026, 6, 10, 12, 0, 0, 0, time.UTC)
+	id := "22222222-2222-4222-8222-222222222222"
+	repo := &fakeEvidenceRepository{
+		items: []evidence.Evidence{{
+			ID:             id,
+			DiscoveryRunID: "11111111-1111-4111-8111-111111111111",
+			Target:         "router1",
+			Method:         "ssh",
+			CommandOrAPI:   "show version",
+			RawOutput:      "raw output",
+			RawOutputHash:  evidence.HashRawOutput("raw output"),
+			CollectedAt:    now,
+			Metadata:       json.RawMessage(`{}`),
+		}},
+	}
+	service := evidence.NewService(repo)
+	handler := NewHandler(Options{
+		Version:  "test-version",
+		Evidence: &service,
+	})
+
+	response := httptest.NewRecorder()
+	request := httptest.NewRequest(http.MethodGet, "/api/v1/evidence/"+id, nil)
+	handler.ServeHTTP(response, request)
+
+	if response.Code != http.StatusOK {
+		t.Fatalf("status = %d, want %d", response.Code, http.StatusOK)
+	}
+
+	var body struct {
+		Evidence evidence.Evidence `json:"evidence"`
+	}
+	if err := json.Unmarshal(response.Body.Bytes(), &body); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+	if body.Evidence.ID != id {
+		t.Fatalf("id = %q, want %q", body.Evidence.ID, id)
+	}
+}
+
+func TestGetEvidenceNotFound(t *testing.T) {
+	repo := &fakeEvidenceRepository{}
+	service := evidence.NewService(repo)
+	handler := NewHandler(Options{
+		Version:  "test-version",
+		Evidence: &service,
+	})
+
+	response := httptest.NewRecorder()
+	request := httptest.NewRequest(http.MethodGet, "/api/v1/evidence/missing", nil)
+	handler.ServeHTTP(response, request)
+
+	if response.Code != http.StatusNotFound {
+		t.Fatalf("status = %d, want %d", response.Code, http.StatusNotFound)
+	}
+}
+
+func TestEvidenceEndpointsReturnUnavailableWithoutRepository(t *testing.T) {
+	handler := NewHandler(Options{Version: "test-version"})
+
+	response := httptest.NewRecorder()
+	request := httptest.NewRequest(http.MethodGet, "/api/v1/evidence/22222222-2222-4222-8222-222222222222", nil)
 	handler.ServeHTTP(response, request)
 
 	if response.Code != http.StatusServiceUnavailable {

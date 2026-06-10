@@ -70,10 +70,11 @@ Goal: store raw discovery evidence before parsing.
 Completed:
 
 - DiscoveryRun product table, repository, service object, and API endpoints added.
+- Raw evidence table, repository, hashing service, and read API endpoints added.
 
 Next steps:
 
-- Execute `prompts/06_EVIDENCE_STORE.md` only when explicitly requested.
+- Execute `prompts/07_ASSETS_FACTS_RELATIONSHIPS.md` only when explicitly requested.
 
 Deliverables:
 

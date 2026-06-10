@@ -12,12 +12,14 @@ import (
 	"time"
 
 	"truthwatcher/internal/discovery"
+	"truthwatcher/internal/evidence"
 )
 
 type Options struct {
 	Version       string
 	Logger        *slog.Logger
 	DiscoveryRuns *discovery.Service
+	Evidence      *evidence.Service
 }
 
 type responseEnvelope map[string]any
@@ -36,6 +38,8 @@ func NewHandler(opts Options) http.Handler {
 	mux.HandleFunc("POST /api/v1/discovery-runs", handleCreateDiscoveryRun(opts.DiscoveryRuns))
 	mux.HandleFunc("GET /api/v1/discovery-runs", handleListDiscoveryRuns(opts.DiscoveryRuns))
 	mux.HandleFunc("GET /api/v1/discovery-runs/{id}", handleGetDiscoveryRun(opts.DiscoveryRuns))
+	mux.HandleFunc("GET /api/v1/discovery-runs/{id}/evidence", handleListEvidenceByDiscoveryRun(opts.Evidence))
+	mux.HandleFunc("GET /api/v1/evidence/{id}", handleGetEvidence(opts.Evidence))
 
 	return recoverPanic(opts.Logger, requestLog(opts.Logger, requestID(mux)))
 }
@@ -129,6 +133,44 @@ func handleGetDiscoveryRun(service *discovery.Service) http.HandlerFunc {
 		}
 
 		writeJSON(w, http.StatusOK, responseEnvelope{"discovery_run": run})
+	}
+}
+
+func handleListEvidenceByDiscoveryRun(service *evidence.Service) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if service == nil {
+			writeError(w, http.StatusServiceUnavailable, "evidence repository is not configured")
+			return
+		}
+
+		items, err := service.ListEvidenceByDiscoveryRun(r.Context(), r.PathValue("id"))
+		if err != nil {
+			writeError(w, http.StatusInternalServerError, err.Error())
+			return
+		}
+
+		writeJSON(w, http.StatusOK, responseEnvelope{"evidence": items})
+	}
+}
+
+func handleGetEvidence(service *evidence.Service) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if service == nil {
+			writeError(w, http.StatusServiceUnavailable, "evidence repository is not configured")
+			return
+		}
+
+		item, err := service.GetEvidence(r.Context(), r.PathValue("id"))
+		if errors.Is(err, evidence.ErrNotFound) {
+			writeError(w, http.StatusNotFound, "evidence not found")
+			return
+		}
+		if err != nil {
+			writeError(w, http.StatusInternalServerError, err.Error())
+			return
+		}
+
+		writeJSON(w, http.StatusOK, responseEnvelope{"evidence": item})
 	}
 }
 
