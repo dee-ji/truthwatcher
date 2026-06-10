@@ -2,12 +2,16 @@ package api
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
+
+	"truthwatcher/internal/discovery"
 )
 
 func TestHealthz(t *testing.T) {
@@ -129,5 +133,174 @@ func TestPanicRecoveryMiddleware(t *testing.T) {
 	}
 	if !strings.Contains(logs.String(), "http panic recovered") {
 		t.Fatalf("logs = %q, want panic recovery log", logs.String())
+	}
+}
+
+type fakeDiscoveryRunRepository struct {
+	runs []discovery.DiscoveryRun
+}
+
+func (f *fakeDiscoveryRunRepository) CreateDiscoveryRun(ctx context.Context, params discovery.CreateDiscoveryRunParams) (discovery.DiscoveryRun, error) {
+	now := time.Date(2026, 6, 10, 12, 0, 0, 0, time.UTC)
+	run := discovery.DiscoveryRun{
+		ID:        "11111111-1111-4111-8111-111111111111",
+		Status:    discovery.StatusPending,
+		SeedInput: params.SeedInput,
+		StartedAt: now,
+		CreatedAt: now,
+		UpdatedAt: now,
+	}
+	f.runs = append([]discovery.DiscoveryRun{run}, f.runs...)
+	return run, nil
+}
+
+func (f *fakeDiscoveryRunRepository) GetDiscoveryRun(ctx context.Context, id string) (discovery.DiscoveryRun, error) {
+	for _, run := range f.runs {
+		if run.ID == id {
+			return run, nil
+		}
+	}
+	return discovery.DiscoveryRun{}, discovery.ErrNotFound
+}
+
+func (f *fakeDiscoveryRunRepository) ListDiscoveryRuns(ctx context.Context) ([]discovery.DiscoveryRun, error) {
+	return f.runs, nil
+}
+
+func (f *fakeDiscoveryRunRepository) UpdateDiscoveryRunStatus(ctx context.Context, params discovery.UpdateDiscoveryRunStatusParams) (discovery.DiscoveryRun, error) {
+	return discovery.DiscoveryRun{}, nil
+}
+
+func TestCreateDiscoveryRun(t *testing.T) {
+	repo := &fakeDiscoveryRunRepository{}
+	service := discovery.NewService(repo)
+	handler := NewHandler(Options{
+		Version:       "test-version",
+		DiscoveryRuns: &service,
+	})
+
+	response := httptest.NewRecorder()
+	request := httptest.NewRequest(http.MethodPost, "/api/v1/discovery-runs", strings.NewReader(`{"seed_input":{"target":"router1"}}`))
+	handler.ServeHTTP(response, request)
+
+	if response.Code != http.StatusCreated {
+		t.Fatalf("status = %d, want %d; body=%s", response.Code, http.StatusCreated, response.Body.String())
+	}
+
+	var body struct {
+		DiscoveryRun discovery.DiscoveryRun `json:"discovery_run"`
+	}
+	if err := json.Unmarshal(response.Body.Bytes(), &body); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+	if body.DiscoveryRun.Status != discovery.StatusPending {
+		t.Fatalf("status = %q, want pending", body.DiscoveryRun.Status)
+	}
+	if !strings.Contains(string(body.DiscoveryRun.SeedInput), "router1") {
+		t.Fatalf("seed_input = %s, want router1", body.DiscoveryRun.SeedInput)
+	}
+}
+
+func TestListDiscoveryRuns(t *testing.T) {
+	now := time.Date(2026, 6, 10, 12, 0, 0, 0, time.UTC)
+	repo := &fakeDiscoveryRunRepository{
+		runs: []discovery.DiscoveryRun{{
+			ID:        "11111111-1111-4111-8111-111111111111",
+			Status:    discovery.StatusPending,
+			SeedInput: json.RawMessage(`{}`),
+			StartedAt: now,
+			CreatedAt: now,
+			UpdatedAt: now,
+		}},
+	}
+	service := discovery.NewService(repo)
+	handler := NewHandler(Options{
+		Version:       "test-version",
+		DiscoveryRuns: &service,
+	})
+
+	response := httptest.NewRecorder()
+	request := httptest.NewRequest(http.MethodGet, "/api/v1/discovery-runs", nil)
+	handler.ServeHTTP(response, request)
+
+	if response.Code != http.StatusOK {
+		t.Fatalf("status = %d, want %d", response.Code, http.StatusOK)
+	}
+
+	var body struct {
+		DiscoveryRuns []discovery.DiscoveryRun `json:"discovery_runs"`
+	}
+	if err := json.Unmarshal(response.Body.Bytes(), &body); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+	if len(body.DiscoveryRuns) != 1 {
+		t.Fatalf("len = %d, want 1", len(body.DiscoveryRuns))
+	}
+}
+
+func TestGetDiscoveryRun(t *testing.T) {
+	now := time.Date(2026, 6, 10, 12, 0, 0, 0, time.UTC)
+	id := "11111111-1111-4111-8111-111111111111"
+	repo := &fakeDiscoveryRunRepository{
+		runs: []discovery.DiscoveryRun{{
+			ID:        id,
+			Status:    discovery.StatusPending,
+			SeedInput: json.RawMessage(`{}`),
+			StartedAt: now,
+			CreatedAt: now,
+			UpdatedAt: now,
+		}},
+	}
+	service := discovery.NewService(repo)
+	handler := NewHandler(Options{
+		Version:       "test-version",
+		DiscoveryRuns: &service,
+	})
+
+	response := httptest.NewRecorder()
+	request := httptest.NewRequest(http.MethodGet, "/api/v1/discovery-runs/"+id, nil)
+	handler.ServeHTTP(response, request)
+
+	if response.Code != http.StatusOK {
+		t.Fatalf("status = %d, want %d", response.Code, http.StatusOK)
+	}
+
+	var body struct {
+		DiscoveryRun discovery.DiscoveryRun `json:"discovery_run"`
+	}
+	if err := json.Unmarshal(response.Body.Bytes(), &body); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+	if body.DiscoveryRun.ID != id {
+		t.Fatalf("id = %q, want %q", body.DiscoveryRun.ID, id)
+	}
+}
+
+func TestGetDiscoveryRunNotFound(t *testing.T) {
+	repo := &fakeDiscoveryRunRepository{}
+	service := discovery.NewService(repo)
+	handler := NewHandler(Options{
+		Version:       "test-version",
+		DiscoveryRuns: &service,
+	})
+
+	response := httptest.NewRecorder()
+	request := httptest.NewRequest(http.MethodGet, "/api/v1/discovery-runs/missing", nil)
+	handler.ServeHTTP(response, request)
+
+	if response.Code != http.StatusNotFound {
+		t.Fatalf("status = %d, want %d", response.Code, http.StatusNotFound)
+	}
+}
+
+func TestDiscoveryRunEndpointsReturnUnavailableWithoutRepository(t *testing.T) {
+	handler := NewHandler(Options{Version: "test-version"})
+
+	response := httptest.NewRecorder()
+	request := httptest.NewRequest(http.MethodGet, "/api/v1/discovery-runs", nil)
+	handler.ServeHTTP(response, request)
+
+	if response.Code != http.StatusServiceUnavailable {
+		t.Fatalf("status = %d, want %d", response.Code, http.StatusServiceUnavailable)
 	}
 }

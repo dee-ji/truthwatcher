@@ -67,6 +67,14 @@ Next steps:
 
 Goal: store raw discovery evidence before parsing.
 
+Completed:
+
+- DiscoveryRun product table, repository, service object, and API endpoints added.
+
+Next steps:
+
+- Execute `prompts/06_EVIDENCE_STORE.md` only when explicitly requested.
+
 Deliverables:
 
 - `discovery_runs` table.

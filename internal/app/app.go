@@ -15,6 +15,7 @@ import (
 	"truthwatcher/internal/api"
 	"truthwatcher/internal/config"
 	"truthwatcher/internal/db"
+	"truthwatcher/internal/discovery"
 	"truthwatcher/internal/logging"
 	"truthwatcher/migrations"
 )
@@ -188,6 +189,18 @@ func serveHTTP(ctx context.Context, cfg config.Config, logger *slog.Logger, stdo
 		logger = slog.New(slog.NewTextHandler(io.Discard, nil))
 	}
 
+	var discoveryRuns *discovery.Service
+	if strings.TrimSpace(cfg.DatabaseURL) != "" {
+		conn, err := db.Open(ctx, cfg.DatabaseURL)
+		if err != nil {
+			return err
+		}
+		defer conn.Close()
+
+		service := discovery.NewService(db.NewDiscoveryRunRepository(conn))
+		discoveryRuns = &service
+	}
+
 	listener, err := net.Listen("tcp", cfg.HTTPAddr)
 	if err != nil {
 		return fmt.Errorf("start server: %w", err)
@@ -196,8 +209,9 @@ func serveHTTP(ctx context.Context, cfg config.Config, logger *slog.Logger, stdo
 
 	server := &http.Server{
 		Handler: api.NewHandler(api.Options{
-			Version: Version,
-			Logger:  logger,
+			Version:       Version,
+			Logger:        logger,
+			DiscoveryRuns: discoveryRuns,
 		}),
 		ReadHeaderTimeout: 5 * time.Second,
 	}
