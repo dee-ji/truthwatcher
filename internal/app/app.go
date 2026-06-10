@@ -6,6 +6,7 @@ import (
 	"flag"
 	"fmt"
 	"io"
+	"log/slog"
 	"net"
 	"net/http"
 	"strings"
@@ -13,6 +14,7 @@ import (
 
 	"truthwatcher/internal/api"
 	"truthwatcher/internal/config"
+	"truthwatcher/internal/logging"
 )
 
 const (
@@ -21,14 +23,16 @@ const (
 )
 
 type App struct {
-	Version   string
-	serveHTTP func(context.Context, config.Config, io.Writer) error
+	Version    string
+	loadConfig func() (config.Config, error)
+	serveHTTP  func(context.Context, config.Config, *slog.Logger, io.Writer) error
 }
 
 func New() App {
 	return App{
-		Version:   Version,
-		serveHTTP: serveHTTP,
+		Version:    Version,
+		loadConfig: config.Load,
+		serveHTTP:  serveHTTP,
 	}
 }
 
@@ -74,7 +78,15 @@ func (a App) runVersion(args []string, stdout io.Writer) error {
 }
 
 func (a App) runServer(ctx context.Context, args []string, stdout, stderr io.Writer) error {
-	cfg := config.Default()
+	loadConfig := a.loadConfig
+	if loadConfig == nil {
+		loadConfig = config.Load
+	}
+
+	cfg, err := loadConfig()
+	if err != nil {
+		return err
+	}
 
 	flags := flag.NewFlagSet("server", flag.ContinueOnError)
 	flags.SetOutput(stderr)
@@ -91,15 +103,24 @@ func (a App) runServer(ctx context.Context, args []string, stdout, stderr io.Wri
 		return err
 	}
 
+	logger, err := logging.New(stderr, cfg.LogLevel, cfg.DevMode)
+	if err != nil {
+		return err
+	}
+
 	serve := a.serveHTTP
 	if serve == nil {
 		serve = serveHTTP
 	}
 
-	return serve(ctx, cfg, stdout)
+	return serve(ctx, cfg, logger, stdout)
 }
 
-func serveHTTP(ctx context.Context, cfg config.Config, stdout io.Writer) error {
+func serveHTTP(ctx context.Context, cfg config.Config, logger *slog.Logger, stdout io.Writer) error {
+	if logger == nil {
+		logger = slog.New(slog.NewTextHandler(io.Discard, nil))
+	}
+
 	listener, err := net.Listen("tcp", cfg.HTTPAddr)
 	if err != nil {
 		return fmt.Errorf("start server: %w", err)
@@ -117,9 +138,15 @@ func serveHTTP(ctx context.Context, cfg config.Config, stdout io.Writer) error {
 	}()
 
 	fmt.Fprintf(stdout, "%s server starting on http://%s\n", Name, listener.Addr().String())
+	logger.Info("server starting",
+		"addr", listener.Addr().String(),
+		"dev_mode", cfg.DevMode,
+		"database_configured", cfg.DatabaseURL != "",
+	)
 
 	select {
 	case <-ctx.Done():
+		logger.Info("server shutting down")
 		shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer cancel()
 
@@ -130,6 +157,7 @@ func serveHTTP(ctx context.Context, cfg config.Config, stdout io.Writer) error {
 		if err := <-errCh; err != nil && !errors.Is(err, http.ErrServerClosed) {
 			return fmt.Errorf("serve HTTP: %w", err)
 		}
+		logger.Info("server stopped")
 		return nil
 	case err := <-errCh:
 		if err != nil && !errors.Is(err, http.ErrServerClosed) {

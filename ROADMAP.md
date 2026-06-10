@@ -55,10 +55,11 @@ Completed:
 - Standard-library CLI supports `truthwatcher version` and `truthwatcher server`.
 - Internal package layout created for app, config, logging, API, DB, discovery, evidence, assets, policy, and audit.
 - Server starts without database, migrations, frontend, collectors, or agents.
+- Environment-based configuration and standard-library structured logging added for the server.
 
 Next steps:
 
-- Execute `prompts/02_CONFIG_AND_LOGGING.md` only when explicitly requested.
+- Execute `prompts/03_DATABASE_MIGRATIONS.md` only when explicitly requested.
 
 ## Phase 2: Evidence Store
 

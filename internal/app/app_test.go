@@ -5,6 +5,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"log/slog"
 	"strings"
 	"testing"
 
@@ -35,7 +36,13 @@ func TestServerCommandStartsAndStops(t *testing.T) {
 
 	app := App{
 		Version: "test-version",
-		serveHTTP: func(ctx context.Context, cfg config.Config, stdout io.Writer) error {
+		loadConfig: func() (config.Config, error) {
+			return config.Default(), nil
+		},
+		serveHTTP: func(ctx context.Context, cfg config.Config, logger *slog.Logger, stdout io.Writer) error {
+			if logger == nil {
+				t.Fatal("logger is nil")
+			}
 			gotConfig = cfg
 			fmt.Fprintln(stdout, "fake server started")
 			return nil
