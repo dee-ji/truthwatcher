@@ -1,0 +1,3 @@
+DROP TABLE IF EXISTS relationships;
+DROP TABLE IF EXISTS facts;
+DROP TABLE IF EXISTS assets;

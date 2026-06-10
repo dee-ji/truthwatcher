@@ -42,6 +42,13 @@ However, identity is complicated:
 
 TruthWatcher should allow multiple identity keys and track confidence.
 
+Implementation rule:
+
+- `identity_key` is a system-generated stable key, not a raw hostname or IP address.
+- Prefer keys derived from stronger evidence such as vendor plus serial, system MAC, asset tag, or another durable external identifier.
+- Hostnames and IP addresses may be stored as facts, but they must not be treated as globally unique asset identity.
+- When only weak identifiers are known, generate a provisional identity key and replace or merge it later when stronger evidence exists.
+
 ## Core Tables
 
 ### assets

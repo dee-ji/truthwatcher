@@ -97,6 +97,14 @@ Acceptance criteria:
 
 Goal: transform evidence into network knowledge.
 
+Completed:
+
+- Stable Asset, Fact, and Relationship tables, services, and repositories added.
+
+Next steps:
+
+- Execute `prompts/08_POLICY_ALLOWLIST.md` only when explicitly requested.
+
 Deliverables:
 
 - `assets` table.
