@@ -131,10 +131,11 @@ Completed:
 - Built-in Juniper Junos and Cisco IOS-XR discovery profiles added with read-only command mappings and parser hints.
 - Fake local collector added for fixture-backed evidence creation without network access.
 - Optional SSH collector boundary added behind the collector interface with read-only policy checks before command execution.
+- First evidence-first discovery execution workflow added for fake collector runs through service, CLI, and API paths.
 
 Next steps:
 
-- Wire SSH collection into an explicit operator-approved workflow only when requested.
+- Add parsing only after raw evidence workflow behavior is stable and explicitly requested.
 
 Deliverables:
 

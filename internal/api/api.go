@@ -8,11 +8,13 @@ import (
 	"net/http"
 	"runtime/debug"
 	"strconv"
+	"strings"
 	"sync/atomic"
 	"time"
 
 	"truthwatcher/internal/discovery"
 	"truthwatcher/internal/evidence"
+	"truthwatcher/internal/policy"
 )
 
 type Options struct {
@@ -36,6 +38,7 @@ func NewHandler(opts Options) http.Handler {
 	mux.HandleFunc("GET /readyz", handleReadyz)
 	mux.HandleFunc("GET /api/v1/version", handleVersion(opts.Version))
 	mux.HandleFunc("POST /api/v1/discovery-runs", handleCreateDiscoveryRun(opts.DiscoveryRuns))
+	mux.HandleFunc("POST /api/v1/discovery-runs/execute", handleExecuteDiscoveryRun(opts.DiscoveryRuns, opts.Evidence))
 	mux.HandleFunc("GET /api/v1/discovery-runs", handleListDiscoveryRuns(opts.DiscoveryRuns))
 	mux.HandleFunc("GET /api/v1/discovery-runs/{id}", handleGetDiscoveryRun(opts.DiscoveryRuns))
 	mux.HandleFunc("GET /api/v1/discovery-runs/{id}/evidence", handleListEvidenceByDiscoveryRun(opts.Evidence))
@@ -95,6 +98,97 @@ func handleCreateDiscoveryRun(service *discovery.Service) http.HandlerFunc {
 		}
 
 		writeJSON(w, http.StatusCreated, responseEnvelope{"discovery_run": run})
+	}
+}
+
+func handleExecuteDiscoveryRun(discoveryRuns *discovery.Service, evidenceStore *evidence.Service) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if discoveryRuns == nil {
+			writeError(w, http.StatusServiceUnavailable, "discovery run repository is not configured")
+			return
+		}
+		if evidenceStore == nil {
+			writeError(w, http.StatusServiceUnavailable, "evidence repository is not configured")
+			return
+		}
+
+		var request struct {
+			Collector   string        `json:"collector"`
+			Target      string        `json:"target"`
+			Profile     string        `json:"profile"`
+			Tasks       []policy.Task `json:"tasks"`
+			FixtureRoot string        `json:"fixture_root"`
+		}
+		decoder := json.NewDecoder(r.Body)
+		decoder.DisallowUnknownFields()
+		if err := decoder.Decode(&request); err != nil {
+			if errors.Is(err, io.EOF) {
+				writeError(w, http.StatusBadRequest, "request body is required")
+				return
+			}
+			writeError(w, http.StatusBadRequest, "invalid JSON request body")
+			return
+		}
+
+		collectorName := strings.TrimSpace(request.Collector)
+		if collectorName == "" {
+			collectorName = discovery.FakeMethod
+		}
+		if collectorName != discovery.FakeMethod {
+			writeError(w, http.StatusBadRequest, "only fake discovery execution is available through this endpoint")
+			return
+		}
+		target := strings.TrimSpace(request.Target)
+		if target == "" {
+			writeError(w, http.StatusBadRequest, "target is required")
+			return
+		}
+		profileName := strings.TrimSpace(request.Profile)
+		var err error
+		if profileName == "" {
+			profileName, err = discovery.InferFakeProfileName(target)
+			if err != nil {
+				writeError(w, http.StatusBadRequest, err.Error())
+				return
+			}
+		}
+		profile, ok := discovery.BuiltInProfile(profileName)
+		if !ok {
+			writeError(w, http.StatusBadRequest, "unknown discovery profile")
+			return
+		}
+		tasks := request.Tasks
+		if len(tasks) == 0 {
+			tasks = discovery.DefaultFakeTasks()
+		}
+
+		result, err := discoveryRuns.StartDiscoveryRun(r.Context(), discovery.StartDiscoveryRunParams{
+			Seed: discovery.DiscoverySeed{
+				Target: target,
+				Method: discovery.FakeMethod,
+			},
+			Profile:   profile,
+			Tasks:     tasks,
+			Collector: discovery.NewFakeCollector(request.FixtureRoot, policy.NewEngine()),
+			Evidence:  evidenceStore,
+			Policy:    policy.NewEngine(),
+		})
+		if err != nil {
+			status := http.StatusInternalServerError
+			if result.DiscoveryRun.ID == "" {
+				status = http.StatusBadRequest
+			}
+			writeJSON(w, status, responseEnvelope{
+				"error":         err.Error(),
+				"discovery_run": result.DiscoveryRun,
+			})
+			return
+		}
+
+		writeJSON(w, http.StatusCreated, responseEnvelope{
+			"discovery_run": result.DiscoveryRun,
+			"evidence":      result.Evidence,
+		})
 	}
 }
 

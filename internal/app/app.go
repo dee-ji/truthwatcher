@@ -2,7 +2,6 @@ package app
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"flag"
 	"fmt"
@@ -261,61 +260,27 @@ func (a App) runDiscoverFake(ctx context.Context, args []string, stdout, stderr 
 	runService := discovery.NewService(db.NewDiscoveryRunRepository(conn))
 	evidenceService := evidence.NewService(db.NewEvidenceRepository(conn))
 
-	seedInput, err := fakeSeedInput(target, profile, tasks)
-	if err != nil {
-		return err
-	}
-	run, err := runService.CreateDiscoveryRun(ctx, discovery.CreateDiscoveryRunParams{SeedInput: seedInput})
-	if err != nil {
-		return err
-	}
-	run, err = runService.UpdateDiscoveryRunStatus(ctx, discovery.UpdateDiscoveryRunStatusParams{
-		ID:     run.ID,
-		Status: discovery.StatusRunning,
-	})
-	if err != nil {
-		return err
-	}
-
 	collector := discovery.NewFakeCollector(fixtureRoot, policy.NewEngine())
-	outputs, err := collector.Collect(ctx, target, profile, tasks)
-	if err != nil {
-		markDiscoveryRunFailed(ctx, runService, run.ID, err)
-		return err
-	}
-
-	for _, output := range outputs {
-		metadata, err := collectedOutputMetadata(output)
-		if err != nil {
-			markDiscoveryRunFailed(ctx, runService, run.ID, err)
-			return err
-		}
-		created, err := evidenceService.CreateEvidence(ctx, evidence.CreateEvidenceParams{
-			DiscoveryRunID: run.ID,
-			Target:         output.Target,
-			Method:         output.Method,
-			CommandOrAPI:   output.Command,
-			RawOutput:      output.RawOutput,
-			Metadata:       metadata,
-		})
-		if err != nil {
-			markDiscoveryRunFailed(ctx, runService, run.ID, err)
-			return err
-		}
-		fmt.Fprintf(stdout, "stored evidence %s %q\n", created.ID, created.CommandOrAPI)
-	}
-
-	completedAt := time.Now().UTC()
-	run, err = runService.UpdateDiscoveryRunStatus(ctx, discovery.UpdateDiscoveryRunStatusParams{
-		ID:          run.ID,
-		Status:      discovery.StatusCompleted,
-		CompletedAt: &completedAt,
+	result, err := runService.StartDiscoveryRun(ctx, discovery.StartDiscoveryRunParams{
+		Seed: discovery.DiscoverySeed{
+			Target: target,
+			Method: discovery.FakeMethod,
+		},
+		Profile:   profile,
+		Tasks:     tasks,
+		Collector: collector,
+		Evidence:  evidenceService,
+		Policy:    policy.NewEngine(),
 	})
 	if err != nil {
 		return err
 	}
 
-	fmt.Fprintf(stdout, "completed discovery run %s with %d evidence records\n", run.ID, len(outputs))
+	for _, item := range result.Evidence {
+		fmt.Fprintf(stdout, "stored evidence %s %q\n", item.ID, item.CommandOrAPI)
+	}
+
+	fmt.Fprintf(stdout, "completed discovery run %s with %d evidence records\n", result.DiscoveryRun.ID, len(result.Evidence))
 	return nil
 }
 
@@ -409,54 +374,6 @@ func parseDiscoveryTasks(taskList string) ([]policy.Task, error) {
 		return nil, fmt.Errorf("at least one discovery task is required")
 	}
 	return tasks, nil
-}
-
-func fakeSeedInput(target string, profile discovery.Profile, tasks []policy.Task) (json.RawMessage, error) {
-	seed := struct {
-		Target  string        `json:"target"`
-		Method  string        `json:"method"`
-		Profile string        `json:"profile"`
-		Tasks   []policy.Task `json:"tasks"`
-	}{
-		Target:  target,
-		Method:  discovery.FakeMethod,
-		Profile: profile.Name,
-		Tasks:   tasks,
-	}
-	return json.Marshal(seed)
-}
-
-func collectedOutputMetadata(output discovery.CollectedOutput) (json.RawMessage, error) {
-	metadata := struct {
-		Collector   string      `json:"collector"`
-		Task        policy.Task `json:"task"`
-		Profile     string      `json:"profile"`
-		Platform    string      `json:"platform"`
-		Vendor      string      `json:"vendor"`
-		ParserHints []string    `json:"parser_hints"`
-	}{
-		Collector:   discovery.FakeMethod,
-		Task:        output.Task,
-		Profile:     output.ProfileName,
-		Platform:    output.Platform,
-		Vendor:      output.Vendor,
-		ParserHints: output.ParserHints,
-	}
-	return json.Marshal(metadata)
-}
-
-func markDiscoveryRunFailed(ctx context.Context, service discovery.Service, id string, cause error) {
-	if cause == nil {
-		return
-	}
-	message := cause.Error()
-	completedAt := time.Now().UTC()
-	_, _ = service.UpdateDiscoveryRunStatus(ctx, discovery.UpdateDiscoveryRunStatusParams{
-		ID:           id,
-		Status:       discovery.StatusFailed,
-		CompletedAt:  &completedAt,
-		ErrorMessage: &message,
-	})
 }
 
 func printUsage(w io.Writer) {

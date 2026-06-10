@@ -169,7 +169,16 @@ func (f *fakeDiscoveryRunRepository) ListDiscoveryRuns(ctx context.Context) ([]d
 }
 
 func (f *fakeDiscoveryRunRepository) UpdateDiscoveryRunStatus(ctx context.Context, params discovery.UpdateDiscoveryRunStatusParams) (discovery.DiscoveryRun, error) {
-	return discovery.DiscoveryRun{}, nil
+	for i := range f.runs {
+		if f.runs[i].ID == params.ID {
+			f.runs[i].Status = params.Status
+			f.runs[i].CompletedAt = params.CompletedAt
+			f.runs[i].ErrorMessage = params.ErrorMessage
+			f.runs[i].UpdatedAt = time.Date(2026, 6, 10, 12, 1, 0, 0, time.UTC)
+			return f.runs[i], nil
+		}
+	}
+	return discovery.DiscoveryRun{}, discovery.ErrNotFound
 }
 
 func TestCreateDiscoveryRun(t *testing.T) {
@@ -199,6 +208,49 @@ func TestCreateDiscoveryRun(t *testing.T) {
 	}
 	if !strings.Contains(string(body.DiscoveryRun.SeedInput), "router1") {
 		t.Fatalf("seed_input = %s, want router1", body.DiscoveryRun.SeedInput)
+	}
+}
+
+func TestExecuteDiscoveryRunWithFakeCollector(t *testing.T) {
+	runRepo := &fakeDiscoveryRunRepository{}
+	runService := discovery.NewService(runRepo)
+	evidenceRepo := &fakeEvidenceRepository{}
+	evidenceService := evidence.NewService(evidenceRepo)
+	handler := NewHandler(Options{
+		Version:       "test-version",
+		DiscoveryRuns: &runService,
+		Evidence:      &evidenceService,
+	})
+
+	requestBody := `{
+		"collector": "fake",
+		"target": "fixture://junos-mx",
+		"tasks": ["identify_device"],
+		"fixture_root": "../../examples/fixtures"
+	}`
+	response := httptest.NewRecorder()
+	request := httptest.NewRequest(http.MethodPost, "/api/v1/discovery-runs/execute", strings.NewReader(requestBody))
+	handler.ServeHTTP(response, request)
+
+	if response.Code != http.StatusCreated {
+		t.Fatalf("status = %d, want %d; body=%s", response.Code, http.StatusCreated, response.Body.String())
+	}
+
+	var body struct {
+		DiscoveryRun discovery.DiscoveryRun `json:"discovery_run"`
+		Evidence     []evidence.Evidence    `json:"evidence"`
+	}
+	if err := json.Unmarshal(response.Body.Bytes(), &body); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+	if body.DiscoveryRun.Status != discovery.StatusCompleted {
+		t.Fatalf("status = %q, want completed", body.DiscoveryRun.Status)
+	}
+	if got, want := len(body.Evidence), 1; got != want {
+		t.Fatalf("evidence count = %d, want %d", got, want)
+	}
+	if body.Evidence[0].CommandOrAPI != "show version" {
+		t.Fatalf("command = %q, want show version", body.Evidence[0].CommandOrAPI)
 	}
 }
 
@@ -311,7 +363,19 @@ type fakeEvidenceRepository struct {
 }
 
 func (f *fakeEvidenceRepository) CreateEvidence(ctx context.Context, params evidence.CreateEvidenceParams) (evidence.Evidence, error) {
-	return evidence.Evidence{}, nil
+	item := evidence.Evidence{
+		ID:             "22222222-2222-4222-8222-222222222222",
+		DiscoveryRunID: params.DiscoveryRunID,
+		Target:         params.Target,
+		Method:         params.Method,
+		CommandOrAPI:   params.CommandOrAPI,
+		RawOutput:      params.RawOutput,
+		RawOutputHash:  evidence.HashRawOutput(params.RawOutput),
+		CollectedAt:    time.Date(2026, 6, 10, 12, 2, 0, 0, time.UTC),
+		Metadata:       params.Metadata,
+	}
+	f.items = append(f.items, item)
+	return item, nil
 }
 
 func (f *fakeEvidenceRepository) GetEvidence(ctx context.Context, id string) (evidence.Evidence, error) {
