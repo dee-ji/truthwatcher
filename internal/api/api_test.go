@@ -28,10 +28,7 @@ func TestHealthz(t *testing.T) {
 		t.Fatalf("status = %d, want %d", response.Code, http.StatusOK)
 	}
 
-	var body map[string]string
-	if err := json.Unmarshal(response.Body.Bytes(), &body); err != nil {
-		t.Fatalf("decode response: %v", err)
-	}
+	body := decodeResponseData[map[string]string](t, response)
 	if body["status"] != "ok" {
 		t.Fatalf("status body = %q, want ok", body["status"])
 	}
@@ -48,10 +45,7 @@ func TestReadyz(t *testing.T) {
 		t.Fatalf("status = %d, want %d", response.Code, http.StatusOK)
 	}
 
-	var body map[string]string
-	if err := json.Unmarshal(response.Body.Bytes(), &body); err != nil {
-		t.Fatalf("decode response: %v", err)
-	}
+	body := decodeResponseData[map[string]string](t, response)
 	if body["status"] != "ready" {
 		t.Fatalf("status body = %q, want ready", body["status"])
 	}
@@ -68,10 +62,7 @@ func TestVersion(t *testing.T) {
 		t.Fatalf("status = %d, want %d", response.Code, http.StatusOK)
 	}
 
-	var body map[string]string
-	if err := json.Unmarshal(response.Body.Bytes(), &body); err != nil {
-		t.Fatalf("decode response: %v", err)
-	}
+	body := decodeResponseData[map[string]string](t, response)
 	if body["name"] != "truthwatcher" {
 		t.Fatalf("name = %q, want truthwatcher", body["name"])
 	}
@@ -139,6 +130,37 @@ func TestPanicRecoveryMiddleware(t *testing.T) {
 	}
 }
 
+func decodeResponseData[T any](t *testing.T, response *httptest.ResponseRecorder) T {
+	t.Helper()
+	var envelope struct {
+		Data     T              `json:"data"`
+		Error    *errorEnvelope `json:"error"`
+		Metadata map[string]any `json:"metadata"`
+	}
+	if err := json.Unmarshal(response.Body.Bytes(), &envelope); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+	if envelope.Error != nil {
+		t.Fatalf("unexpected error response: %s", envelope.Error.Message)
+	}
+	if envelope.Metadata == nil {
+		t.Fatal("metadata is nil")
+	}
+	return envelope.Data
+}
+
+func decodeResponseEnvelope(t *testing.T, response *httptest.ResponseRecorder) responseEnvelope {
+	t.Helper()
+	var envelope responseEnvelope
+	if err := json.Unmarshal(response.Body.Bytes(), &envelope); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+	if envelope.Metadata == nil {
+		t.Fatal("metadata is nil")
+	}
+	return envelope
+}
+
 type fakeDiscoveryRunRepository struct {
 	runs []discovery.DiscoveryRun
 }
@@ -199,12 +221,9 @@ func TestCreateDiscoveryRun(t *testing.T) {
 		t.Fatalf("status = %d, want %d; body=%s", response.Code, http.StatusCreated, response.Body.String())
 	}
 
-	var body struct {
+	body := decodeResponseData[struct {
 		DiscoveryRun discovery.DiscoveryRun `json:"discovery_run"`
-	}
-	if err := json.Unmarshal(response.Body.Bytes(), &body); err != nil {
-		t.Fatalf("decode response: %v", err)
-	}
+	}](t, response)
 	if body.DiscoveryRun.Status != discovery.StatusPending {
 		t.Fatalf("status = %q, want pending", body.DiscoveryRun.Status)
 	}
@@ -227,6 +246,7 @@ func TestExecuteDiscoveryRunWithFakeCollector(t *testing.T) {
 	requestBody := `{
 		"collector": "fake",
 		"target": "fixture://junos-mx",
+		"profile": "juniper_junos",
 		"tasks": ["identify_device"],
 		"fixture_root": "../../examples/fixtures"
 	}`
@@ -238,13 +258,10 @@ func TestExecuteDiscoveryRunWithFakeCollector(t *testing.T) {
 		t.Fatalf("status = %d, want %d; body=%s", response.Code, http.StatusCreated, response.Body.String())
 	}
 
-	var body struct {
+	body := decodeResponseData[struct {
 		DiscoveryRun discovery.DiscoveryRun `json:"discovery_run"`
 		Evidence     []evidence.Evidence    `json:"evidence"`
-	}
-	if err := json.Unmarshal(response.Body.Bytes(), &body); err != nil {
-		t.Fatalf("decode response: %v", err)
-	}
+	}](t, response)
 	if body.DiscoveryRun.Status != discovery.StatusCompleted {
 		t.Fatalf("status = %q, want completed", body.DiscoveryRun.Status)
 	}
@@ -253,6 +270,71 @@ func TestExecuteDiscoveryRunWithFakeCollector(t *testing.T) {
 	}
 	if body.Evidence[0].CommandOrAPI != "show version" {
 		t.Fatalf("command = %q, want show version", body.Evidence[0].CommandOrAPI)
+	}
+
+	envelope := decodeResponseEnvelope(t, response)
+	audit, ok := envelope.Metadata["audit"].(map[string]any)
+	if !ok {
+		t.Fatalf("audit metadata = %#v, want object", envelope.Metadata["audit"])
+	}
+	if audit["initiator"] != "api" {
+		t.Fatalf("initiator = %q, want api", audit["initiator"])
+	}
+	if audit["target"] != "fixture://junos-mx" {
+		t.Fatalf("target = %q, want fixture://junos-mx", audit["target"])
+	}
+}
+
+func TestExecuteDiscoveryRunRequiresExplicitProfileAndTasks(t *testing.T) {
+	runRepo := &fakeDiscoveryRunRepository{}
+	runService := discovery.NewService(runRepo)
+	evidenceRepo := &fakeEvidenceRepository{}
+	evidenceService := evidence.NewService(evidenceRepo)
+	handler := NewHandler(Options{
+		Version:       "test-version",
+		DiscoveryRuns: &runService,
+		Evidence:      &evidenceService,
+	})
+
+	response := httptest.NewRecorder()
+	request := httptest.NewRequest(http.MethodPost, "/api/v1/discovery-runs/execute", strings.NewReader(`{
+		"collector": "fake",
+		"target": "fixture://junos-mx"
+	}`))
+	handler.ServeHTTP(response, request)
+
+	if response.Code != http.StatusBadRequest {
+		t.Fatalf("status = %d, want %d", response.Code, http.StatusBadRequest)
+	}
+
+	envelope := decodeResponseEnvelope(t, response)
+	if envelope.Error == nil || envelope.Error.Message != "profile is required" {
+		t.Fatalf("error = %#v, want profile is required", envelope.Error)
+	}
+}
+
+func TestExecuteDiscoveryRunRejectsTaskNotInProfile(t *testing.T) {
+	runRepo := &fakeDiscoveryRunRepository{}
+	runService := discovery.NewService(runRepo)
+	evidenceRepo := &fakeEvidenceRepository{}
+	evidenceService := evidence.NewService(evidenceRepo)
+	handler := NewHandler(Options{
+		Version:       "test-version",
+		DiscoveryRuns: &runService,
+		Evidence:      &evidenceService,
+	})
+
+	response := httptest.NewRecorder()
+	request := httptest.NewRequest(http.MethodPost, "/api/v1/discovery-runs/execute", strings.NewReader(`{
+		"collector": "fake",
+		"target": "fixture://junos-mx",
+		"profile": "juniper_junos",
+		"tasks": ["not_allowed"]
+	}`))
+	handler.ServeHTTP(response, request)
+
+	if response.Code != http.StatusBadRequest {
+		t.Fatalf("status = %d, want %d", response.Code, http.StatusBadRequest)
 	}
 }
 
@@ -282,12 +364,9 @@ func TestListDiscoveryRuns(t *testing.T) {
 		t.Fatalf("status = %d, want %d", response.Code, http.StatusOK)
 	}
 
-	var body struct {
+	body := decodeResponseData[struct {
 		DiscoveryRuns []discovery.DiscoveryRun `json:"discovery_runs"`
-	}
-	if err := json.Unmarshal(response.Body.Bytes(), &body); err != nil {
-		t.Fatalf("decode response: %v", err)
-	}
+	}](t, response)
 	if len(body.DiscoveryRuns) != 1 {
 		t.Fatalf("len = %d, want 1", len(body.DiscoveryRuns))
 	}
@@ -320,12 +399,9 @@ func TestGetDiscoveryRun(t *testing.T) {
 		t.Fatalf("status = %d, want %d", response.Code, http.StatusOK)
 	}
 
-	var body struct {
+	body := decodeResponseData[struct {
 		DiscoveryRun discovery.DiscoveryRun `json:"discovery_run"`
-	}
-	if err := json.Unmarshal(response.Body.Bytes(), &body); err != nil {
-		t.Fatalf("decode response: %v", err)
-	}
+	}](t, response)
 	if body.DiscoveryRun.ID != id {
 		t.Fatalf("id = %q, want %q", body.DiscoveryRun.ID, id)
 	}
@@ -428,12 +504,9 @@ func TestListEvidenceByDiscoveryRun(t *testing.T) {
 		t.Fatalf("status = %d, want %d", response.Code, http.StatusOK)
 	}
 
-	var body struct {
+	body := decodeResponseData[struct {
 		Evidence []evidence.Evidence `json:"evidence"`
-	}
-	if err := json.Unmarshal(response.Body.Bytes(), &body); err != nil {
-		t.Fatalf("decode response: %v", err)
-	}
+	}](t, response)
 	if len(body.Evidence) != 1 {
 		t.Fatalf("len = %d, want 1", len(body.Evidence))
 	}
@@ -472,12 +545,9 @@ func TestGetEvidence(t *testing.T) {
 		t.Fatalf("status = %d, want %d", response.Code, http.StatusOK)
 	}
 
-	var body struct {
+	body := decodeResponseData[struct {
 		Evidence evidence.Evidence `json:"evidence"`
-	}
-	if err := json.Unmarshal(response.Body.Bytes(), &body); err != nil {
-		t.Fatalf("decode response: %v", err)
-	}
+	}](t, response)
 	if body.Evidence.ID != id {
 		t.Fatalf("id = %q, want %q", body.Evidence.ID, id)
 	}
@@ -549,12 +619,9 @@ func TestGetAssetGraph(t *testing.T) {
 		t.Fatalf("status = %d, want %d; body=%s", response.Code, http.StatusOK, response.Body.String())
 	}
 
-	var body struct {
+	body := decodeResponseData[struct {
 		Graph graph.Graph `json:"graph"`
-	}
-	if err := json.Unmarshal(response.Body.Bytes(), &body); err != nil {
-		t.Fatalf("decode response: %v", err)
-	}
+	}](t, response)
 	if got, want := len(body.Graph.Nodes), 2; got != want {
 		t.Fatalf("node count = %d, want %d", got, want)
 	}
@@ -597,12 +664,9 @@ func TestGetGraphNeighbors(t *testing.T) {
 		t.Fatalf("status = %d, want %d; body=%s", response.Code, http.StatusOK, response.Body.String())
 	}
 
-	var body struct {
+	body := decodeResponseData[struct {
 		Graph graph.Graph `json:"graph"`
-	}
-	if err := json.Unmarshal(response.Body.Bytes(), &body); err != nil {
-		t.Fatalf("decode response: %v", err)
-	}
+	}](t, response)
 	if got, want := body.Graph.Edges[0].RelationshipType, "lldp_neighbor"; got != want {
 		t.Fatalf("relationship_type = %q, want %q", got, want)
 	}

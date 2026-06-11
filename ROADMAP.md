@@ -132,10 +132,11 @@ Completed:
 - Fake local collector added for fixture-backed evidence creation without network access.
 - Optional SSH collector boundary added behind the collector interface with read-only policy checks before command execution.
 - First evidence-first discovery execution workflow added for fake collector runs through service, CLI, and API paths.
+- Discovery API responses formalized with consistent envelopes, explicit execution validation, audit metadata, and endpoint documentation.
 
 Next steps:
 
-- Add parsing only after raw evidence workflow behavior is stable and explicitly requested.
+- Wire parser outputs into persistence only when explicitly requested.
 
 Deliverables:
 

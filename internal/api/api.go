@@ -27,7 +27,15 @@ type Options struct {
 	Graph         *graph.Service
 }
 
-type responseEnvelope map[string]any
+type responseEnvelope struct {
+	Data     any            `json:"data"`
+	Error    *errorEnvelope `json:"error"`
+	Metadata map[string]any `json:"metadata"`
+}
+
+type errorEnvelope struct {
+	Message string `json:"message"`
+}
 
 var requestCounter uint64
 
@@ -53,20 +61,20 @@ func NewHandler(opts Options) http.Handler {
 }
 
 func handleHealthz(w http.ResponseWriter, r *http.Request) {
-	writeJSON(w, http.StatusOK, responseEnvelope{
+	writeData(w, http.StatusOK, map[string]string{
 		"status": "ok",
 	})
 }
 
 func handleReadyz(w http.ResponseWriter, r *http.Request) {
-	writeJSON(w, http.StatusOK, responseEnvelope{
+	writeData(w, http.StatusOK, map[string]string{
 		"status": "ready",
 	})
 }
 
 func handleVersion(version string) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		writeJSON(w, http.StatusOK, responseEnvelope{
+		writeData(w, http.StatusOK, map[string]string{
 			"name":    "truthwatcher",
 			"version": version,
 		})
@@ -102,7 +110,7 @@ func handleCreateDiscoveryRun(service *discovery.Service) http.HandlerFunc {
 			return
 		}
 
-		writeJSON(w, http.StatusCreated, responseEnvelope{"discovery_run": run})
+		writeData(w, http.StatusCreated, map[string]discovery.DiscoveryRun{"discovery_run": run})
 	}
 }
 
@@ -135,36 +143,10 @@ func handleExecuteDiscoveryRun(discoveryRuns *discovery.Service, evidenceStore *
 			return
 		}
 
-		collectorName := strings.TrimSpace(request.Collector)
-		if collectorName == "" {
-			collectorName = discovery.FakeMethod
-		}
-		if collectorName != discovery.FakeMethod {
-			writeError(w, http.StatusBadRequest, "only fake discovery execution is available through this endpoint")
+		collectorName, target, profile, tasks, err := validateDiscoveryExecutionRequest(request.Collector, request.Target, request.Profile, request.Tasks)
+		if err != nil {
+			writeError(w, http.StatusBadRequest, err.Error())
 			return
-		}
-		target := strings.TrimSpace(request.Target)
-		if target == "" {
-			writeError(w, http.StatusBadRequest, "target is required")
-			return
-		}
-		profileName := strings.TrimSpace(request.Profile)
-		var err error
-		if profileName == "" {
-			profileName, err = discovery.InferFakeProfileName(target)
-			if err != nil {
-				writeError(w, http.StatusBadRequest, err.Error())
-				return
-			}
-		}
-		profile, ok := discovery.BuiltInProfile(profileName)
-		if !ok {
-			writeError(w, http.StatusBadRequest, "unknown discovery profile")
-			return
-		}
-		tasks := request.Tasks
-		if len(tasks) == 0 {
-			tasks = discovery.DefaultFakeTasks()
 		}
 
 		result, err := discoveryRuns.StartDiscoveryRun(r.Context(), discovery.StartDiscoveryRunParams{
@@ -183,16 +165,22 @@ func handleExecuteDiscoveryRun(discoveryRuns *discovery.Service, evidenceStore *
 			if result.DiscoveryRun.ID == "" {
 				status = http.StatusBadRequest
 			}
-			writeJSON(w, status, responseEnvelope{
-				"error":         err.Error(),
-				"discovery_run": result.DiscoveryRun,
+			writeEnvelope(w, status, responseEnvelope{
+				Data: map[string]discovery.DiscoveryRun{
+					"discovery_run": result.DiscoveryRun,
+				},
+				Error:    &errorEnvelope{Message: err.Error()},
+				Metadata: discoveryExecutionMetadata(collectorName, target, profile.Name, tasks, result),
 			})
 			return
 		}
 
-		writeJSON(w, http.StatusCreated, responseEnvelope{
-			"discovery_run": result.DiscoveryRun,
-			"evidence":      result.Evidence,
+		writeEnvelope(w, http.StatusCreated, responseEnvelope{
+			Data: map[string]any{
+				"discovery_run": result.DiscoveryRun,
+				"evidence":      result.Evidence,
+			},
+			Metadata: discoveryExecutionMetadata(collectorName, target, profile.Name, tasks, result),
 		})
 	}
 }
@@ -210,7 +198,7 @@ func handleListDiscoveryRuns(service *discovery.Service) http.HandlerFunc {
 			return
 		}
 
-		writeJSON(w, http.StatusOK, responseEnvelope{"discovery_runs": runs})
+		writeData(w, http.StatusOK, map[string][]discovery.DiscoveryRun{"discovery_runs": runs})
 	}
 }
 
@@ -231,7 +219,7 @@ func handleGetDiscoveryRun(service *discovery.Service) http.HandlerFunc {
 			return
 		}
 
-		writeJSON(w, http.StatusOK, responseEnvelope{"discovery_run": run})
+		writeData(w, http.StatusOK, map[string]discovery.DiscoveryRun{"discovery_run": run})
 	}
 }
 
@@ -248,7 +236,7 @@ func handleListEvidenceByDiscoveryRun(service *evidence.Service) http.HandlerFun
 			return
 		}
 
-		writeJSON(w, http.StatusOK, responseEnvelope{"evidence": items})
+		writeData(w, http.StatusOK, map[string][]evidence.Evidence{"evidence": items})
 	}
 }
 
@@ -269,7 +257,7 @@ func handleGetEvidence(service *evidence.Service) http.HandlerFunc {
 			return
 		}
 
-		writeJSON(w, http.StatusOK, responseEnvelope{"evidence": item})
+		writeData(w, http.StatusOK, map[string]evidence.Evidence{"evidence": item})
 	}
 }
 
@@ -290,7 +278,7 @@ func handleGetAssetGraph(service *graph.Service) http.HandlerFunc {
 			return
 		}
 
-		writeJSON(w, http.StatusOK, responseEnvelope{"graph": result})
+		writeData(w, http.StatusOK, map[string]graph.Graph{"graph": result})
 	}
 }
 
@@ -317,11 +305,80 @@ func handleGetGraphNeighbors(service *graph.Service) http.HandlerFunc {
 			return
 		}
 
-		writeJSON(w, http.StatusOK, responseEnvelope{"graph": result})
+		writeData(w, http.StatusOK, map[string]graph.Graph{"graph": result})
 	}
 }
 
-func writeJSON(w http.ResponseWriter, status int, payload responseEnvelope) {
+func validateDiscoveryExecutionRequest(collector, target, profileName string, tasks []policy.Task) (string, string, discovery.Profile, []policy.Task, error) {
+	collector = strings.TrimSpace(collector)
+	if collector == "" {
+		return "", "", discovery.Profile{}, nil, errors.New("collector is required")
+	}
+	if collector != discovery.FakeMethod {
+		return "", "", discovery.Profile{}, nil, errors.New("only fake discovery execution is available through this endpoint")
+	}
+
+	target = strings.TrimSpace(target)
+	if target == "" {
+		return "", "", discovery.Profile{}, nil, errors.New("target is required")
+	}
+	if !strings.HasPrefix(target, "fixture://") {
+		return "", "", discovery.Profile{}, nil, errors.New("fake discovery target must use fixture://")
+	}
+
+	profileName = strings.TrimSpace(profileName)
+	if profileName == "" {
+		return "", "", discovery.Profile{}, nil, errors.New("profile is required")
+	}
+	profile, ok := discovery.BuiltInProfile(profileName)
+	if !ok {
+		return "", "", discovery.Profile{}, nil, errors.New("unknown discovery profile")
+	}
+
+	if len(tasks) == 0 {
+		return "", "", discovery.Profile{}, nil, errors.New("at least one discovery task is required")
+	}
+	engine := policy.NewEngine()
+	if err := profile.Validate(engine); err != nil {
+		return "", "", discovery.Profile{}, nil, err
+	}
+	for _, task := range tasks {
+		if err := engine.CheckTask(task); err != nil {
+			return "", "", discovery.Profile{}, nil, err
+		}
+		if _, err := profile.CommandsForTask(task); err != nil {
+			return "", "", discovery.Profile{}, nil, err
+		}
+	}
+
+	return collector, target, profile, tasks, nil
+}
+
+func discoveryExecutionMetadata(collector, target, profile string, tasks []policy.Task, result discovery.StartDiscoveryRunResult) map[string]any {
+	return map[string]any{
+		"audit": map[string]any{
+			"initiator":      "api",
+			"collector":      collector,
+			"target":         target,
+			"profile":        profile,
+			"tasks":          tasks,
+			"discovery_run":  result.DiscoveryRun.ID,
+			"run_status":     result.DiscoveryRun.Status,
+			"evidence_count": len(result.Evidence),
+		},
+	}
+}
+
+func writeData(w http.ResponseWriter, status int, data any) {
+	writeEnvelope(w, status, responseEnvelope{
+		Data: data,
+	})
+}
+
+func writeEnvelope(w http.ResponseWriter, status int, payload responseEnvelope) {
+	if payload.Metadata == nil {
+		payload.Metadata = map[string]any{}
+	}
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
 	if err := json.NewEncoder(w).Encode(payload); err != nil {
@@ -330,8 +387,8 @@ func writeJSON(w http.ResponseWriter, status int, payload responseEnvelope) {
 }
 
 func writeError(w http.ResponseWriter, status int, message string) {
-	writeJSON(w, status, responseEnvelope{
-		"error": message,
+	writeEnvelope(w, status, responseEnvelope{
+		Error: &errorEnvelope{Message: message},
 	})
 }
 
@@ -378,7 +435,7 @@ func recoverPanic(logger *slog.Logger, next http.Handler) http.Handler {
 					"request_id", w.Header().Get("X-Request-ID"),
 					"stack", string(debug.Stack()),
 				)
-				http.Error(w, "internal server error", http.StatusInternalServerError)
+				writeError(w, http.StatusInternalServerError, "internal server error")
 			}
 		}()
 
