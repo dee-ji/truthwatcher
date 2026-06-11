@@ -156,6 +156,28 @@ Confidence rules:
 - Conflicting facts should be stored with `state = 'conflicting'` and a reason pointing to the conflicting record or evidence.
 - `unknown` is preferable to inventing a low-confidence value.
 
+### Architecture Hints
+
+Architecture hints capture broad user-provided context that helps TruthWatcher plan safe discovery.
+
+Supported hint categories:
+
+- Organization or network type.
+- Known ASNs.
+- Known route reflectors.
+- Known vendors.
+- Known EMS systems.
+- Known services.
+- Known regions or markets.
+
+Implementation rules:
+
+- Architecture hints are stored under an `architecture_context` asset.
+- Each hint is stored as a fact with `source = 'user_seeded'` and `state = 'user_seeded'`.
+- Architecture hints are not proof that an ASN, route reflector, EMS, vendor, service, region, or market actually exists in the network.
+- Discovery planning may use hints to choose safer defaults, such as an initial vendor profile or a route-reflector-oriented read-only task.
+- Discovery execution still requires explicit human approval and policy validation.
+
 ### relationships
 
 Represents graph edges between assets.

@@ -233,10 +233,12 @@ Goal: begin solving “discover how to discover.”
 Completed:
 
 - Safe discovery planning API added with read-only suggested steps, explicit human approval requirement, and scope-expansion rejection.
+- Architecture seeding API added for user-seeded network type, ASN, route-reflector, vendor, EMS, service, and region/market hints; planner consumes hints without treating them as proof.
 
 Next steps:
 
 - Add UI for reviewing discovery plans only when explicitly requested.
+- Add UI for submitting architecture seed hints only when explicitly requested.
 
 Deliverables:
 

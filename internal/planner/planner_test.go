@@ -3,6 +3,7 @@ package planner
 import (
 	"context"
 	"encoding/json"
+	"strings"
 	"testing"
 	"time"
 
@@ -126,9 +127,45 @@ func TestCreatePlanRejectsDeniedTask(t *testing.T) {
 	}
 }
 
+func TestCreatePlanUsesArchitectureHints(t *testing.T) {
+	service := NewService(Options{Assets: graphWithArchitectureHints(), Policy: policy.NewEngine()})
+
+	plan, err := service.CreatePlan(context.Background(), Request{
+		Target: "rr1.example.net",
+		Method: "ssh",
+	})
+	if err != nil {
+		t.Fatalf("CreatePlan returned error: %v", err)
+	}
+
+	if len(plan.Steps) == 0 {
+		t.Fatal("plan has no steps")
+	}
+	if !containsTask(plan.Steps, policy.TaskGetBGPSummary) {
+		t.Fatalf("steps = %#v, want BGP summary for seeded route reflector", plan.Steps)
+	}
+	for _, step := range plan.Steps {
+		if step.Profile != discovery.ProfileJuniperJunos {
+			t.Fatalf("profile = %q, want inferred Junos profile", step.Profile)
+		}
+	}
+	if !containsWarning(plan.Warnings, "architecture seed hints are user-provided context") {
+		t.Fatalf("warnings = %#v, want seeded context warning", plan.Warnings)
+	}
+}
+
 func containsTask(steps []Step, task policy.Task) bool {
 	for _, step := range steps {
 		if step.Task == task {
+			return true
+		}
+	}
+	return false
+}
+
+func containsWarning(warnings []string, text string) bool {
+	for _, warning := range warnings {
+		if strings.Contains(warning, text) {
 			return true
 		}
 	}
@@ -164,6 +201,47 @@ func testGraph() fakeAssets {
 			CreatedAt:        now,
 		}},
 	}
+}
+
+func graphWithArchitectureHints() fakeAssets {
+	graph := testGraph()
+	now := time.Date(2026, 6, 11, 12, 0, 0, 0, time.UTC)
+	graph.assets = append(graph.assets, assets.Asset{
+		ID:               "asset-seed",
+		Type:             "architecture_context",
+		IdentityKey:      "architecture:seed:default",
+		Confidence:       0.45,
+		ConfidenceReason: "provided by user seed input; useful planning context but not proof",
+		State:            assets.StateUserSeeded,
+		Metadata:         json.RawMessage(`{}`),
+		CreatedAt:        now,
+		UpdatedAt:        now,
+	})
+	graph.facts = append(graph.facts,
+		assets.Fact{
+			ID:               "fact-vendors",
+			AssetID:          "asset-seed",
+			Name:             "known_vendors",
+			Value:            json.RawMessage(`["juniper"]`),
+			Source:           "user_seeded",
+			Confidence:       0.45,
+			ConfidenceReason: "provided by user seed input; useful planning context but not proof",
+			State:            assets.StateUserSeeded,
+			CreatedAt:        now,
+		},
+		assets.Fact{
+			ID:               "fact-rr",
+			AssetID:          "asset-seed",
+			Name:             "known_route_reflectors",
+			Value:            json.RawMessage(`["rr1.example.net"]`),
+			Source:           "user_seeded",
+			Confidence:       0.45,
+			ConfidenceReason: "provided by user seed input; useful planning context but not proof",
+			State:            assets.StateUserSeeded,
+			CreatedAt:        now,
+		},
+	)
+	return graph
 }
 
 func stringPtr(value string) *string {

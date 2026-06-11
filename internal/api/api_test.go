@@ -15,6 +15,7 @@ import (
 	"truthwatcher/internal/discovery"
 	"truthwatcher/internal/evidence"
 	"truthwatcher/internal/graph"
+	"truthwatcher/internal/seeding"
 )
 
 func TestHealthz(t *testing.T) {
@@ -283,6 +284,67 @@ func TestCreateDiscoveryPlanRejectsScopeExpansion(t *testing.T) {
 		"method": "ssh",
 		"profile": "juniper_junos"
 	}`))
+	handler.ServeHTTP(response, request)
+
+	if response.Code != http.StatusBadRequest {
+		t.Fatalf("status = %d, want %d", response.Code, http.StatusBadRequest)
+	}
+}
+
+func TestCreateArchitectureSeed(t *testing.T) {
+	assetService := assets.NewService(&fakeAssetRepository{})
+	handler := NewHandler(Options{
+		Version: "test-version",
+		Assets:  &assetService,
+	})
+
+	response := httptest.NewRecorder()
+	request := httptest.NewRequest(http.MethodPost, "/api/v1/architecture-seeds", strings.NewReader(`{
+		"organization_network_type": "service_provider",
+		"known_asns": ["65000"],
+		"known_route_reflectors": ["rr1.example.net"],
+		"known_vendors": ["juniper"],
+		"known_ems_systems": ["ems-a"],
+		"known_services": ["l3vpn"],
+		"known_regions_markets": ["nyc"]
+	}`))
+	handler.ServeHTTP(response, request)
+
+	if response.Code != http.StatusCreated {
+		t.Fatalf("status = %d, want %d; body=%s", response.Code, http.StatusCreated, response.Body.String())
+	}
+
+	body := decodeResponseData[struct {
+		ArchitectureSeed seeding.Result `json:"architecture_seed"`
+	}](t, response)
+	if body.ArchitectureSeed.Asset.State != assets.StateUserSeeded {
+		t.Fatalf("asset state = %q, want user_seeded", body.ArchitectureSeed.Asset.State)
+	}
+	if body.ArchitectureSeed.Warning == "" {
+		t.Fatal("seed warning is empty")
+	}
+	if got, want := len(body.ArchitectureSeed.Facts), 7; got != want {
+		t.Fatalf("fact count = %d, want %d", got, want)
+	}
+	for _, fact := range body.ArchitectureSeed.Facts {
+		if fact.Source != seeding.SeedSource {
+			t.Fatalf("fact source = %q, want user_seeded", fact.Source)
+		}
+		if fact.State != assets.StateUserSeeded {
+			t.Fatalf("fact state = %q, want user_seeded", fact.State)
+		}
+	}
+}
+
+func TestCreateArchitectureSeedRejectsEmptyHints(t *testing.T) {
+	assetService := assets.NewService(&fakeAssetRepository{})
+	handler := NewHandler(Options{
+		Version: "test-version",
+		Assets:  &assetService,
+	})
+
+	response := httptest.NewRecorder()
+	request := httptest.NewRequest(http.MethodPost, "/api/v1/architecture-seeds", strings.NewReader(`{}`))
 	handler.ServeHTTP(response, request)
 
 	if response.Code != http.StatusBadRequest {
@@ -825,7 +887,24 @@ type fakeAssetRepository struct {
 }
 
 func (f *fakeAssetRepository) CreateAsset(ctx context.Context, params assets.CreateAssetParams) (assets.Asset, error) {
-	return assets.Asset{}, nil
+	now := time.Date(2026, 6, 10, 12, 0, 0, 0, time.UTC)
+	item := assets.Asset{
+		ID:               "asset-created",
+		Type:             params.Type,
+		IdentityKey:      params.IdentityKey,
+		Vendor:           params.Vendor,
+		Model:            params.Model,
+		Serial:           params.Serial,
+		SystemMAC:        params.SystemMAC,
+		Confidence:       params.Confidence,
+		ConfidenceReason: params.ConfidenceReason,
+		State:            params.State,
+		Metadata:         params.Metadata,
+		CreatedAt:        now,
+		UpdatedAt:        now,
+	}
+	f.assets = append(f.assets, item)
+	return item, nil
 }
 
 func (f *fakeAssetRepository) GetAsset(ctx context.Context, id string) (assets.Asset, error) {
@@ -842,7 +921,20 @@ func (f *fakeAssetRepository) ListAssets(ctx context.Context) ([]assets.Asset, e
 }
 
 func (f *fakeAssetRepository) CreateFact(ctx context.Context, params assets.CreateFactParams) (assets.Fact, error) {
-	return assets.Fact{}, nil
+	item := assets.Fact{
+		ID:               "fact-created-" + params.Name,
+		AssetID:          params.AssetID,
+		Name:             params.Name,
+		Value:            params.Value,
+		Source:           params.Source,
+		Confidence:       params.Confidence,
+		ConfidenceReason: params.ConfidenceReason,
+		State:            params.State,
+		EvidenceID:       params.EvidenceID,
+		CreatedAt:        time.Date(2026, 6, 10, 12, 0, 0, 0, time.UTC),
+	}
+	f.facts = append(f.facts, item)
+	return item, nil
 }
 
 func (f *fakeAssetRepository) GetFact(ctx context.Context, id string) (assets.Fact, error) {
@@ -865,7 +957,21 @@ func (f *fakeAssetRepository) ListFactsByAsset(ctx context.Context, assetID stri
 }
 
 func (f *fakeAssetRepository) CreateRelationship(ctx context.Context, params assets.CreateRelationshipParams) (assets.Relationship, error) {
-	return assets.Relationship{}, nil
+	item := assets.Relationship{
+		ID:               "relationship-created",
+		SourceAssetID:    params.SourceAssetID,
+		TargetAssetID:    params.TargetAssetID,
+		RelationshipType: params.RelationshipType,
+		Confidence:       params.Confidence,
+		ConfidenceReason: params.ConfidenceReason,
+		State:            params.State,
+		EvidenceID:       params.EvidenceID,
+		Metadata:         params.Metadata,
+		CreatedAt:        time.Date(2026, 6, 10, 12, 0, 0, 0, time.UTC),
+		UpdatedAt:        time.Date(2026, 6, 10, 12, 0, 0, 0, time.UTC),
+	}
+	f.relationships = append(f.relationships, item)
+	return item, nil
 }
 
 func (f *fakeAssetRepository) GetRelationship(ctx context.Context, id string) (assets.Relationship, error) {

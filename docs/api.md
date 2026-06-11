@@ -42,6 +42,97 @@ Returns process readiness.
 
 Returns binary name and version.
 
+## Architecture Seeds
+
+Architecture seeds let a user provide planning context without claiming observed truth.
+
+Seeded hints are stored as facts with:
+
+- `source`: `user_seeded`
+- `state`: `user_seeded`
+- low deterministic confidence
+
+Seeded hints are not proof. They may guide discovery planning, but they do not authorize discovery execution and they do not replace observed evidence.
+
+### `POST /api/v1/architecture-seeds`
+
+Stores user-provided architecture hints.
+
+Request:
+
+```json
+{
+  "organization_network_type": "service_provider",
+  "known_asns": ["65000"],
+  "known_route_reflectors": ["rr1.example.net"],
+  "known_vendors": ["juniper"],
+  "known_ems_systems": ["ems-a"],
+  "known_services": ["l3vpn"],
+  "known_regions_markets": ["nyc"]
+}
+```
+
+Response `data`:
+
+```json
+{
+  "architecture_seed": {
+    "asset": {
+      "type": "architecture_context",
+      "identity_key": "architecture:seed:default",
+      "state": "user_seeded"
+    },
+    "facts": [],
+    "warning": "architecture hints are context only and must not be treated as observed network facts"
+  }
+}
+```
+
+## Discovery Plans
+
+Discovery plans suggest safe read-only next steps from current graph data and user seed input.
+
+Plans are not executable approvals:
+
+- `approval_required` is always `true`.
+- `execution_allowed` is always `false`.
+- Scope-expanding targets such as CIDRs, wildcards, and comma-separated lists are rejected.
+- Seeded architecture hints may inform suggested tasks or profile defaults, but they remain unobserved context.
+
+### `POST /api/v1/discovery-plans`
+
+Request:
+
+```json
+{
+  "target": "router-a",
+  "method": "ssh",
+  "profile": "juniper_junos"
+}
+```
+
+Response `data`:
+
+```json
+{
+  "discovery_plan": {
+    "approval_required": true,
+    "execution_allowed": false,
+    "steps": [
+      {
+        "target": "router-a",
+        "method": "ssh",
+        "profile": "juniper_junos",
+        "task": "get_neighbors",
+        "reason": "stored graph has no relationships for this asset",
+        "expected_evidence": "raw output from show lldp neighbors for get_neighbors",
+        "risk_level": "low_read_only"
+      }
+    ]
+  }
+}
+```
+
 ## Discovery Runs
 
 Discovery APIs are explicit and evidence-first. Discovery execution creates a discovery run, validates the requested profile and tasks against policy, collects fixture-backed outputs, stores raw evidence, and only then returns the completed run.

@@ -10,6 +10,7 @@ import (
 	"truthwatcher/internal/assets"
 	"truthwatcher/internal/discovery"
 	"truthwatcher/internal/policy"
+	"truthwatcher/internal/seeding"
 )
 
 type AssetReader interface {
@@ -55,6 +56,15 @@ type Step struct {
 	RiskLevel        string      `json:"risk_level"`
 }
 
+type architectureHints struct {
+	NetworkType     string
+	Vendors         []string
+	RouteReflectors []string
+	EMSSystems      []string
+	Services        []string
+	RegionsMarkets  []string
+}
+
 func NewService(opts Options) Service {
 	engine := opts.Policy
 	if len(engine.AllowedTasks()) == 0 {
@@ -82,7 +92,14 @@ func (s Service) CreatePlan(ctx context.Context, req Request) (Plan, error) {
 	if method != "ssh" && method != discovery.FakeMethod {
 		return Plan{}, fmt.Errorf("method must be ssh or fake")
 	}
+	hints, err := s.architectureHints(ctx)
+	if err != nil {
+		return Plan{}, err
+	}
 	profileName := firstNonEmpty(req.Profile, stringFromMap(seed, "profile"))
+	if profileName == "" {
+		profileName = profileFromHints(hints)
+	}
 	if profileName == "" {
 		return Plan{}, fmt.Errorf("profile is required")
 	}
@@ -98,7 +115,7 @@ func (s Service) CreatePlan(ctx context.Context, req Request) (Plan, error) {
 	if err != nil {
 		return Plan{}, err
 	}
-	tasks, err := s.recommendedTasks(ctx, asset, matched, req.Tasks)
+	tasks, err := s.recommendedTasks(ctx, asset, matched, req.Tasks, target, hints)
 	if err != nil {
 		return Plan{}, err
 	}
@@ -125,6 +142,12 @@ func (s Service) CreatePlan(ctx context.Context, req Request) (Plan, error) {
 	if !matched {
 		warnings = append(warnings, "target is not yet represented by a stored asset; plan is limited to the explicit seed target")
 	}
+	if !hints.empty() {
+		warnings = append(warnings, "architecture seed hints are user-provided context, not observed proof")
+	}
+	if len(hints.EMSSystems) > 0 {
+		warnings = append(warnings, "known EMS hints may inform future adapter planning but do not authorize EMS access")
+	}
 
 	return Plan{
 		Steps:            steps,
@@ -135,12 +158,16 @@ func (s Service) CreatePlan(ctx context.Context, req Request) (Plan, error) {
 	}, nil
 }
 
-func (s Service) recommendedTasks(ctx context.Context, asset assets.Asset, matched bool, requested []policy.Task) ([]policy.Task, error) {
+func (s Service) recommendedTasks(ctx context.Context, asset assets.Asset, matched bool, requested []policy.Task, target string, hints architectureHints) ([]policy.Task, error) {
 	if len(requested) > 0 {
 		return s.validateTasks(requested)
 	}
 	if !matched {
-		return []policy.Task{policy.TaskIdentifyDevice, policy.TaskGetInventory, policy.TaskGetNeighbors}, nil
+		tasks := []policy.Task{policy.TaskIdentifyDevice, policy.TaskGetInventory, policy.TaskGetNeighbors}
+		if hints.targetLooksLikeRouteReflector(target) {
+			tasks = append(tasks, policy.TaskGetBGPSummary)
+		}
+		return s.validateTasks(tasks)
 	}
 
 	facts, err := s.assets.ListFactsByAsset(ctx, asset.ID)
@@ -166,6 +193,9 @@ func (s Service) recommendedTasks(ctx context.Context, asset assets.Asset, match
 	if !hasFact(facts, "bgp_summary") {
 		add(policy.TaskGetBGPSummary)
 	}
+	if hints.targetLooksLikeRouteReflector(target) {
+		add(policy.TaskGetBGPSummary)
+	}
 	if len(seen) == 0 {
 		add(policy.TaskGetInterfaces)
 	}
@@ -175,6 +205,43 @@ func (s Service) recommendedTasks(ctx context.Context, asset assets.Asset, match
 		tasks = append(tasks, task)
 	}
 	return s.validateTasks(tasks)
+}
+
+func (s Service) architectureHints(ctx context.Context) (architectureHints, error) {
+	var hints architectureHints
+	items, err := s.assets.ListAssets(ctx)
+	if err != nil {
+		return hints, err
+	}
+	for _, item := range items {
+		if item.Type != seeding.ArchitectureAssetType && item.IdentityKey != seeding.ArchitectureIdentityKey {
+			continue
+		}
+		facts, err := s.assets.ListFactsByAsset(ctx, item.ID)
+		if err != nil {
+			return hints, err
+		}
+		for _, fact := range facts {
+			if fact.Source != seeding.SeedSource || fact.State != assets.StateUserSeeded {
+				continue
+			}
+			switch fact.Name {
+			case "organization_network_type":
+				hints.NetworkType = factValue(fact.Value)
+			case "known_vendors":
+				hints.Vendors = factStringList(fact.Value)
+			case "known_route_reflectors":
+				hints.RouteReflectors = factStringList(fact.Value)
+			case "known_ems_systems":
+				hints.EMSSystems = factStringList(fact.Value)
+			case "known_services":
+				hints.Services = factStringList(fact.Value)
+			case "known_regions_markets":
+				hints.RegionsMarkets = factStringList(fact.Value)
+			}
+		}
+	}
+	return hints, nil
 }
 
 func (s Service) validateTasks(tasks []policy.Task) ([]policy.Task, error) {
@@ -318,4 +385,53 @@ func factValue(raw json.RawMessage) string {
 		return text
 	}
 	return fmt.Sprint(value)
+}
+
+func factStringList(raw json.RawMessage) []string {
+	var values []string
+	if err := json.Unmarshal(raw, &values); err == nil {
+		return values
+	}
+	value := factValue(raw)
+	if strings.TrimSpace(value) == "" {
+		return nil
+	}
+	return []string{value}
+}
+
+func profileFromHints(hints architectureHints) string {
+	var profile string
+	for _, vendor := range hints.Vendors {
+		switch strings.ToLower(strings.TrimSpace(vendor)) {
+		case "juniper", "juniper networks", "junos":
+			if profile != "" && profile != discovery.ProfileJuniperJunos {
+				return ""
+			}
+			profile = discovery.ProfileJuniperJunos
+		case "cisco", "iosxr", "ios-xr", "cisco ios-xr":
+			if profile != "" && profile != discovery.ProfileCiscoIOSXR {
+				return ""
+			}
+			profile = discovery.ProfileCiscoIOSXR
+		}
+	}
+	return profile
+}
+
+func (h architectureHints) empty() bool {
+	return h.NetworkType == "" && len(h.Vendors) == 0 && len(h.RouteReflectors) == 0 && len(h.EMSSystems) == 0 && len(h.Services) == 0 && len(h.RegionsMarkets) == 0
+}
+
+func (h architectureHints) targetLooksLikeRouteReflector(target string) bool {
+	target = strings.ToLower(strings.TrimSpace(target))
+	if target == "" {
+		return false
+	}
+	for _, rr := range h.RouteReflectors {
+		rr = strings.ToLower(strings.TrimSpace(rr))
+		if rr != "" && rr == target {
+			return true
+		}
+	}
+	return false
 }
