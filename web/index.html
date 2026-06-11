@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Truthwatcher</title>
+    <link rel="stylesheet" href="/assets/app.css">
+  </head>
+  <body>
+    <header class="shell-header">
+      <a class="brand" href="/" aria-label="Truthwatcher home">
+        <span class="brand-mark">TW</span>
+        <span>
+          <strong>Truthwatcher</strong>
+          <small>Evidence-first network cartography</small>
+        </span>
+      </a>
+      <nav class="top-nav" aria-label="Primary navigation">
+        <a href="/" aria-current="page">Dashboard</a>
+        <a href="/api/v1/assets">Assets API</a>
+        <a href="/api/v1/discovery-runs">Discovery API</a>
+      </nav>
+    </header>
+
+    <main class="dashboard">
+      <section class="hero-panel">
+        <div>
+          <p class="eyebrow">Single binary UI foundation</p>
+          <h1>Network truth starts with evidence.</h1>
+          <p class="lede">
+            This embedded frontend is intentionally small. It confirms the server is alive and leaves room for assets,
+            evidence, and relationship views without pretending the product is finished.
+          </p>
+        </div>
+        <aside class="status-card" aria-live="polite">
+          <span class="status-dot" id="status-dot"></span>
+          <div>
+            <strong id="api-status">Checking API...</strong>
+            <small id="api-version">Version unavailable</small>
+          </div>
+        </aside>
+      </section>
+
+      <section class="grid">
+        <article class="card">
+          <span class="card-label">Evidence Kernel</span>
+          <h2>Raw evidence first</h2>
+          <p>Collectors store raw output before facts or relationships are created.</p>
+        </article>
+        <article class="card">
+          <span class="card-label">Knowledge Model</span>
+          <h2>Assets, facts, relationships</h2>
+          <p>The API exposes the stable relational graph that the UI will render next.</p>
+        </article>
+        <article class="card">
+          <span class="card-label">Safety</span>
+          <h2>Read-only by default</h2>
+          <p>Discovery execution stays policy-gated and allowlisted.</p>
+        </article>
+      </section>
+    </main>
+
+    <script src="/assets/app.js" defer></script>
+  </body>
+</html>

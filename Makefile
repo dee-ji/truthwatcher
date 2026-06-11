@@ -1,4 +1,4 @@
-.PHONY: fmt test lint build run
+.PHONY: fmt test lint build-ui build run
 
 BINARY := truthwatcher
 GOCACHE_DIR ?= $(CURDIR)/.gocache
@@ -15,7 +15,12 @@ test:
 lint:
 	@if [ -n "$(GO_PACKAGES)" ]; then $(GO) vet $(GO_PACKAGES); else echo "no Go packages to vet"; fi
 
-build:
+build-ui:
+	@test -f web/index.html
+	@test -f web/assets/app.css
+	@test -f web/assets/app.js
+
+build: build-ui
 	@mkdir -p bin
 	@$(GO) build -o bin/$(BINARY) ./cmd/truthwatcher
 

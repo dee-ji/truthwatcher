@@ -203,10 +203,11 @@ Goal: make the discovered knowledge visible.
 Completed:
 
 - Relational graph query service and graph JSON API endpoints added for asset neighborhood rendering.
+- Embedded static frontend foundation added with dashboard placeholder and API status indicator.
 
 Next steps:
 
-- Build embedded frontend views only when explicitly requested.
+- Add asset/evidence views only when explicitly requested.
 
 Deliverables:
 

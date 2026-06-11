@@ -17,6 +17,7 @@ import (
 	"truthwatcher/internal/evidence"
 	"truthwatcher/internal/graph"
 	"truthwatcher/internal/policy"
+	"truthwatcher/web"
 )
 
 type Options struct {
@@ -63,6 +64,8 @@ func NewHandler(opts Options) http.Handler {
 	mux.HandleFunc("GET /api/v1/facts/{id}/evidence", handleListFactEvidence(opts.Assets, opts.Evidence))
 	mux.HandleFunc("GET /api/v1/assets/{id}/graph", handleGetAssetGraph(opts.Graph))
 	mux.HandleFunc("GET /api/v1/graph/neighbors", handleGetGraphNeighbors(opts.Graph))
+	mux.HandleFunc("GET /api/", handleAPINotFound)
+	mux.Handle("GET /", web.Handler())
 
 	return recoverPanic(opts.Logger, requestLog(opts.Logger, requestID(mux)))
 }
@@ -86,6 +89,10 @@ func handleVersion(version string) http.HandlerFunc {
 			"version": version,
 		})
 	}
+}
+
+func handleAPINotFound(w http.ResponseWriter, r *http.Request) {
+	writeError(w, http.StatusNotFound, "api endpoint not found")
 }
 
 func handleCreateDiscoveryRun(service *discovery.Service) http.HandlerFunc {

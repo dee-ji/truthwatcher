@@ -71,6 +71,59 @@ func TestVersion(t *testing.T) {
 	}
 }
 
+func TestServesEmbeddedFrontend(t *testing.T) {
+	handler := NewHandler(Options{Version: "test-version"})
+
+	response := httptest.NewRecorder()
+	request := httptest.NewRequest(http.MethodGet, "/", nil)
+	handler.ServeHTTP(response, request)
+
+	if response.Code != http.StatusOK {
+		t.Fatalf("status = %d, want %d; body=%s", response.Code, http.StatusOK, response.Body.String())
+	}
+	if contentType := response.Header().Get("Content-Type"); !strings.Contains(contentType, "text/html") {
+		t.Fatalf("Content-Type = %q, want text/html", contentType)
+	}
+	if !strings.Contains(response.Body.String(), "Truthwatcher") {
+		t.Fatalf("body does not contain frontend shell: %s", response.Body.String())
+	}
+}
+
+func TestServesEmbeddedFrontendAsset(t *testing.T) {
+	handler := NewHandler(Options{Version: "test-version"})
+
+	response := httptest.NewRecorder()
+	request := httptest.NewRequest(http.MethodGet, "/assets/app.js", nil)
+	handler.ServeHTTP(response, request)
+
+	if response.Code != http.StatusOK {
+		t.Fatalf("status = %d, want %d; body=%s", response.Code, http.StatusOK, response.Body.String())
+	}
+	if contentType := response.Header().Get("Content-Type"); !strings.Contains(contentType, "javascript") {
+		t.Fatalf("Content-Type = %q, want javascript", contentType)
+	}
+	if !strings.Contains(response.Body.String(), "checkAPI") {
+		t.Fatalf("body does not contain app script: %s", response.Body.String())
+	}
+}
+
+func TestUnknownAPIPathDoesNotServeFrontend(t *testing.T) {
+	handler := NewHandler(Options{Version: "test-version"})
+
+	response := httptest.NewRecorder()
+	request := httptest.NewRequest(http.MethodGet, "/api/v1/not-real", nil)
+	handler.ServeHTTP(response, request)
+
+	if response.Code != http.StatusNotFound {
+		t.Fatalf("status = %d, want %d", response.Code, http.StatusNotFound)
+	}
+
+	envelope := decodeResponseEnvelope(t, response)
+	if envelope.Error == nil || envelope.Error.Message != "api endpoint not found" {
+		t.Fatalf("error = %#v, want api endpoint not found", envelope.Error)
+	}
+}
+
 func TestRequestIDMiddlewarePreservesIncomingID(t *testing.T) {
 	handler := NewHandler(Options{Version: "test-version"})
 
