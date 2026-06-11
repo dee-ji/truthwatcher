@@ -10,11 +10,20 @@ type fakeRepository struct {
 	assetParams        CreateAssetParams
 	factParams         CreateFactParams
 	relationshipParams CreateRelationshipParams
+	facts              []Fact
 }
 
 func (f *fakeRepository) CreateAsset(ctx context.Context, params CreateAssetParams) (Asset, error) {
 	f.assetParams = params
-	return Asset{ID: "asset-1", Type: params.Type, IdentityKey: params.IdentityKey, Metadata: params.Metadata}, nil
+	return Asset{
+		ID:               "asset-1",
+		Type:             params.Type,
+		IdentityKey:      params.IdentityKey,
+		Confidence:       params.Confidence,
+		ConfidenceReason: params.ConfidenceReason,
+		State:            params.State,
+		Metadata:         params.Metadata,
+	}, nil
 }
 
 func (f *fakeRepository) GetAsset(ctx context.Context, id string) (Asset, error) {
@@ -27,7 +36,15 @@ func (f *fakeRepository) ListAssets(ctx context.Context) ([]Asset, error) {
 
 func (f *fakeRepository) CreateFact(ctx context.Context, params CreateFactParams) (Fact, error) {
 	f.factParams = params
-	return Fact{ID: "fact-1", AssetID: params.AssetID, Name: params.Name, Value: params.Value}, nil
+	return Fact{
+		ID:               "fact-1",
+		AssetID:          params.AssetID,
+		Name:             params.Name,
+		Value:            params.Value,
+		Confidence:       params.Confidence,
+		ConfidenceReason: params.ConfidenceReason,
+		State:            params.State,
+	}, nil
 }
 
 func (f *fakeRepository) GetFact(ctx context.Context, id string) (Fact, error) {
@@ -35,12 +52,20 @@ func (f *fakeRepository) GetFact(ctx context.Context, id string) (Fact, error) {
 }
 
 func (f *fakeRepository) ListFactsByAsset(ctx context.Context, assetID string) ([]Fact, error) {
+	if f.facts != nil {
+		return f.facts, nil
+	}
 	return []Fact{{ID: "fact-1", AssetID: assetID}}, nil
 }
 
 func (f *fakeRepository) CreateRelationship(ctx context.Context, params CreateRelationshipParams) (Relationship, error) {
 	f.relationshipParams = params
-	return Relationship{ID: "relationship-1", RelationshipType: params.RelationshipType}, nil
+	return Relationship{
+		ID:               "relationship-1",
+		RelationshipType: params.RelationshipType,
+		ConfidenceReason: params.ConfidenceReason,
+		State:            params.State,
+	}, nil
 }
 
 func (f *fakeRepository) GetRelationship(ctx context.Context, id string) (Relationship, error) {
@@ -79,6 +104,15 @@ func TestCreateAssetNormalizesIdentityAndDefaultsMetadata(t *testing.T) {
 	if got, want := string(repo.assetParams.Metadata), "{}"; got != want {
 		t.Fatalf("Metadata = %q, want %q", got, want)
 	}
+	if got, want := repo.assetParams.Confidence, 0.5; got != want {
+		t.Fatalf("Confidence = %v, want %v", got, want)
+	}
+	if got, want := repo.assetParams.State, StateInferred; got != want {
+		t.Fatalf("State = %q, want %q", got, want)
+	}
+	if got, want := repo.assetParams.ConfidenceReason, "deterministically inferred without direct evidence"; got != want {
+		t.Fatalf("ConfidenceReason = %q, want %q", got, want)
+	}
 }
 
 func TestCreateFactValidatesJSONAndConfidence(t *testing.T) {
@@ -105,6 +139,60 @@ func TestCreateFactValidatesJSONAndConfidence(t *testing.T) {
 	}
 }
 
+func TestCreateFactDefaultsObservedStateWithEvidence(t *testing.T) {
+	repo := &fakeRepository{facts: []Fact{}}
+	evidenceID := "evidence-1"
+
+	result, err := NewService(repo).CreateFact(context.Background(), CreateFactParams{
+		AssetID:    "asset-1",
+		Name:       "software_version",
+		Value:      json.RawMessage(`"1.0"`),
+		Source:     "parser",
+		Confidence: 0.9,
+		EvidenceID: &evidenceID,
+	})
+	if err != nil {
+		t.Fatalf("CreateFact returned error: %v", err)
+	}
+
+	if result.State != StateObserved {
+		t.Fatalf("state = %q, want %q", result.State, StateObserved)
+	}
+	if repo.factParams.ConfidenceReason != "directly observed from evidence" {
+		t.Fatalf("confidence reason = %q, want observed default", repo.factParams.ConfidenceReason)
+	}
+}
+
+func TestCreateFactMarksConflictingValue(t *testing.T) {
+	repo := &fakeRepository{
+		facts: []Fact{{
+			ID:      "fact-existing",
+			AssetID: "asset-1",
+			Name:    "software_version",
+			Value:   json.RawMessage(`"1.0"`),
+			State:   StateObserved,
+		}},
+	}
+
+	result, err := NewService(repo).CreateFact(context.Background(), CreateFactParams{
+		AssetID:    "asset-1",
+		Name:       "software_version",
+		Value:      json.RawMessage(`"2.0"`),
+		Source:     "parser",
+		Confidence: 0.9,
+	})
+	if err != nil {
+		t.Fatalf("CreateFact returned error: %v", err)
+	}
+
+	if result.State != StateConflicting {
+		t.Fatalf("state = %q, want %q", result.State, StateConflicting)
+	}
+	if repo.factParams.ConfidenceReason != "conflicts with existing fact fact-existing" {
+		t.Fatalf("confidence reason = %q, want conflict reason", repo.factParams.ConfidenceReason)
+	}
+}
+
 func TestCreateRelationshipDefaultsMetadata(t *testing.T) {
 	repo := &fakeRepository{}
 
@@ -123,5 +211,11 @@ func TestCreateRelationshipDefaultsMetadata(t *testing.T) {
 	}
 	if got, want := string(repo.relationshipParams.Metadata), "{}"; got != want {
 		t.Fatalf("Metadata = %q, want %q", got, want)
+	}
+	if got, want := repo.relationshipParams.State, StateInferred; got != want {
+		t.Fatalf("State = %q, want %q", got, want)
+	}
+	if got, want := repo.relationshipParams.ConfidenceReason, "deterministically inferred without direct evidence"; got != want {
+		t.Fatalf("ConfidenceReason = %q, want %q", got, want)
 	}
 }

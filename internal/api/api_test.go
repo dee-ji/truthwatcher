@@ -746,6 +746,15 @@ func TestListAssetFacts(t *testing.T) {
 	if got, want := len(body.Facts), 1; got != want {
 		t.Fatalf("fact count = %d, want %d", got, want)
 	}
+	if body.Facts[0].State != assets.StateObserved {
+		t.Fatalf("fact state = %q, want %q", body.Facts[0].State, assets.StateObserved)
+	}
+	if body.Facts[0].ConfidenceReason == "" {
+		t.Fatal("fact confidence_reason is empty")
+	}
+	if body.Facts[0].EvidenceID == nil {
+		t.Fatal("fact evidence_id is nil")
+	}
 }
 
 func TestListAssetRelationships(t *testing.T) {
@@ -768,6 +777,12 @@ func TestListAssetRelationships(t *testing.T) {
 	}](t, response)
 	if got, want := len(body.Relationships), 1; got != want {
 		t.Fatalf("relationship count = %d, want %d", got, want)
+	}
+	if body.Relationships[0].State != assets.StateObserved {
+		t.Fatalf("relationship state = %q, want %q", body.Relationships[0].State, assets.StateObserved)
+	}
+	if body.Relationships[0].EvidenceID == nil {
+		t.Fatal("relationship evidence_id is nil")
 	}
 }
 
@@ -854,44 +869,55 @@ func testAssetRepository() *fakeAssetRepository {
 	return &fakeAssetRepository{
 		assets: []assets.Asset{
 			{
-				ID:          "asset-a",
-				Type:        "device",
-				IdentityKey: "device:serial:aaa",
-				Vendor:      stringPtr("juniper"),
-				Serial:      stringPtr("aaa"),
-				Metadata:    json.RawMessage(`{}`),
-				CreatedAt:   now,
-				UpdatedAt:   now,
+				ID:               "asset-a",
+				Type:             "device",
+				IdentityKey:      "device:serial:aaa",
+				Vendor:           stringPtr("juniper"),
+				Serial:           stringPtr("aaa"),
+				Confidence:       0.9,
+				ConfidenceReason: "directly observed from evidence",
+				State:            assets.StateObserved,
+				Metadata:         json.RawMessage(`{}`),
+				CreatedAt:        now,
+				UpdatedAt:        now,
 			},
 			{
-				ID:          "asset-b",
-				Type:        "device",
-				IdentityKey: "device:serial:bbb",
-				Vendor:      stringPtr("juniper"),
-				Serial:      stringPtr("bbb"),
-				Metadata:    json.RawMessage(`{}`),
-				CreatedAt:   now,
-				UpdatedAt:   now,
+				ID:               "asset-b",
+				Type:             "device",
+				IdentityKey:      "device:serial:bbb",
+				Vendor:           stringPtr("juniper"),
+				Serial:           stringPtr("bbb"),
+				Confidence:       0.8,
+				ConfidenceReason: "directly observed from evidence",
+				State:            assets.StateObserved,
+				Metadata:         json.RawMessage(`{}`),
+				CreatedAt:        now,
+				UpdatedAt:        now,
 			},
 			{
-				ID:          "asset-c",
-				Type:        "site",
-				IdentityKey: "site:code:nyc",
-				Vendor:      stringPtr("internal"),
-				Metadata:    json.RawMessage(`{}`),
-				CreatedAt:   now,
-				UpdatedAt:   now,
+				ID:               "asset-c",
+				Type:             "site",
+				IdentityKey:      "site:code:nyc",
+				Vendor:           stringPtr("internal"),
+				Confidence:       0.5,
+				ConfidenceReason: "deterministically inferred without direct evidence",
+				State:            assets.StateInferred,
+				Metadata:         json.RawMessage(`{}`),
+				CreatedAt:        now,
+				UpdatedAt:        now,
 			},
 		},
 		facts: []assets.Fact{{
-			ID:         "fact-a",
-			AssetID:    "asset-a",
-			Name:       "hostname",
-			Value:      json.RawMessage(`"router-a"`),
-			Source:     "parser",
-			Confidence: 0.95,
-			EvidenceID: &evidenceA,
-			CreatedAt:  now,
+			ID:               "fact-a",
+			AssetID:          "asset-a",
+			Name:             "hostname",
+			Value:            json.RawMessage(`"router-a"`),
+			Source:           "parser",
+			Confidence:       0.95,
+			ConfidenceReason: "directly observed from evidence",
+			State:            assets.StateObserved,
+			EvidenceID:       &evidenceA,
+			CreatedAt:        now,
 		}},
 		relationships: []assets.Relationship{{
 			ID:               "relationship-a",
@@ -899,6 +925,8 @@ func testAssetRepository() *fakeAssetRepository {
 			TargetAssetID:    "asset-b",
 			RelationshipType: "lldp_neighbor",
 			Confidence:       0.9,
+			ConfidenceReason: "directly observed from evidence",
+			State:            assets.StateObserved,
 			EvidenceID:       &evidenceB,
 			Metadata:         json.RawMessage(`{}`),
 			CreatedAt:        now,

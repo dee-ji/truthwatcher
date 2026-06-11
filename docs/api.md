@@ -182,6 +182,13 @@ Response `data`:
 
 ## Assets, Facts, and Relationships
 
+Assets, facts, and relationships expose uncertainty fields:
+
+- `confidence`: deterministic score from `0` to `1`.
+- `confidence_reason`: why the score/state was assigned.
+- `state`: one of `observed`, `inferred`, `user_seeded`, `conflicting`, or `unknown`.
+- `evidence_id`: present on facts and relationships when linked to raw evidence.
+
 List endpoints support offset pagination:
 
 - `limit`: optional, default `100`, maximum `500`.

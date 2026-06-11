@@ -101,6 +101,7 @@ Completed:
 
 - Stable Asset, Fact, and Relationship tables, services, and repositories added.
 - Asset, fact, relationship, and evidence read APIs added with filters, pagination, and response-shape tests.
+- Uncertainty fields and deterministic confidence states added for assets, facts, and relationships.
 
 Next steps:
 

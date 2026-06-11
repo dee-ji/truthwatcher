@@ -5,34 +5,50 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"reflect"
 	"strings"
 	"time"
 )
 
 var ErrNotFound = errors.New("asset model record not found")
 
+type ConfidenceState string
+
+const (
+	StateObserved    ConfidenceState = "observed"
+	StateInferred    ConfidenceState = "inferred"
+	StateUserSeeded  ConfidenceState = "user_seeded"
+	StateConflicting ConfidenceState = "conflicting"
+	StateUnknown     ConfidenceState = "unknown"
+)
+
 type Asset struct {
-	ID          string          `json:"id"`
-	Type        string          `json:"type"`
-	IdentityKey string          `json:"identity_key"`
-	Vendor      *string         `json:"vendor,omitempty"`
-	Model       *string         `json:"model,omitempty"`
-	Serial      *string         `json:"serial,omitempty"`
-	SystemMAC   *string         `json:"system_mac,omitempty"`
-	Metadata    json.RawMessage `json:"metadata"`
-	CreatedAt   time.Time       `json:"created_at"`
-	UpdatedAt   time.Time       `json:"updated_at"`
+	ID               string          `json:"id"`
+	Type             string          `json:"type"`
+	IdentityKey      string          `json:"identity_key"`
+	Vendor           *string         `json:"vendor,omitempty"`
+	Model            *string         `json:"model,omitempty"`
+	Serial           *string         `json:"serial,omitempty"`
+	SystemMAC        *string         `json:"system_mac,omitempty"`
+	Confidence       float64         `json:"confidence"`
+	ConfidenceReason string          `json:"confidence_reason"`
+	State            ConfidenceState `json:"state"`
+	Metadata         json.RawMessage `json:"metadata"`
+	CreatedAt        time.Time       `json:"created_at"`
+	UpdatedAt        time.Time       `json:"updated_at"`
 }
 
 type Fact struct {
-	ID         string          `json:"id"`
-	AssetID    string          `json:"asset_id"`
-	Name       string          `json:"name"`
-	Value      json.RawMessage `json:"value"`
-	Source     string          `json:"source"`
-	Confidence float64         `json:"confidence"`
-	EvidenceID *string         `json:"evidence_id,omitempty"`
-	CreatedAt  time.Time       `json:"created_at"`
+	ID               string          `json:"id"`
+	AssetID          string          `json:"asset_id"`
+	Name             string          `json:"name"`
+	Value            json.RawMessage `json:"value"`
+	Source           string          `json:"source"`
+	Confidence       float64         `json:"confidence"`
+	ConfidenceReason string          `json:"confidence_reason"`
+	State            ConfidenceState `json:"state"`
+	EvidenceID       *string         `json:"evidence_id,omitempty"`
+	CreatedAt        time.Time       `json:"created_at"`
 }
 
 type Relationship struct {
@@ -41,6 +57,8 @@ type Relationship struct {
 	TargetAssetID    string          `json:"target_asset_id"`
 	RelationshipType string          `json:"relationship_type"`
 	Confidence       float64         `json:"confidence"`
+	ConfidenceReason string          `json:"confidence_reason"`
+	State            ConfidenceState `json:"state"`
 	EvidenceID       *string         `json:"evidence_id,omitempty"`
 	Metadata         json.RawMessage `json:"metadata"`
 	CreatedAt        time.Time       `json:"created_at"`
@@ -48,22 +66,27 @@ type Relationship struct {
 }
 
 type CreateAssetParams struct {
-	Type        string
-	IdentityKey string
-	Vendor      *string
-	Model       *string
-	Serial      *string
-	SystemMAC   *string
-	Metadata    json.RawMessage
+	Type             string
+	IdentityKey      string
+	Vendor           *string
+	Model            *string
+	Serial           *string
+	SystemMAC        *string
+	Confidence       float64
+	ConfidenceReason string
+	State            ConfidenceState
+	Metadata         json.RawMessage
 }
 
 type CreateFactParams struct {
-	AssetID    string
-	Name       string
-	Value      json.RawMessage
-	Source     string
-	Confidence float64
-	EvidenceID *string
+	AssetID          string
+	Name             string
+	Value            json.RawMessage
+	Source           string
+	Confidence       float64
+	ConfidenceReason string
+	State            ConfidenceState
+	EvidenceID       *string
 }
 
 type CreateRelationshipParams struct {
@@ -71,6 +94,8 @@ type CreateRelationshipParams struct {
 	TargetAssetID    string
 	RelationshipType string
 	Confidence       float64
+	ConfidenceReason string
+	State            ConfidenceState
 	EvidenceID       *string
 	Metadata         json.RawMessage
 }
@@ -108,6 +133,17 @@ func (s Service) CreateAsset(ctx context.Context, params CreateAssetParams) (Ass
 
 	params.Type = normalizeToken(params.Type)
 	params.IdentityKey = NormalizeIdentityKey(params.IdentityKey)
+	if params.Confidence == 0 && strings.TrimSpace(string(params.State)) == "" {
+		params.Confidence = 0.5
+	}
+	if !validConfidence(params.Confidence) {
+		return Asset{}, fmt.Errorf("confidence must be between 0 and 1")
+	}
+	params.State = defaultConfidenceState(params.State, nil)
+	if !params.State.Valid() {
+		return Asset{}, fmt.Errorf("invalid confidence state %q", params.State)
+	}
+	params.ConfidenceReason = defaultConfidenceReason(params.ConfidenceReason, params.State)
 	params.Metadata = defaultJSON(params.Metadata)
 	if !json.Valid(params.Metadata) {
 		return Asset{}, fmt.Errorf("metadata must be valid JSON")
@@ -152,11 +188,24 @@ func (s Service) CreateFact(ctx context.Context, params CreateFactParams) (Fact,
 
 	params.Name = normalizeToken(params.Name)
 	params.Source = strings.TrimSpace(params.Source)
+	params.State = defaultConfidenceState(params.State, params.EvidenceID)
+	if !params.State.Valid() {
+		return Fact{}, fmt.Errorf("invalid confidence state %q", params.State)
+	}
+	params.ConfidenceReason = defaultConfidenceReason(params.ConfidenceReason, params.State)
 	if len(params.Value) == 0 {
 		return Fact{}, fmt.Errorf("fact value is required")
 	}
 	if !json.Valid(params.Value) {
 		return Fact{}, fmt.Errorf("fact value must be valid JSON")
+	}
+	existing, err := s.repo.ListFactsByAsset(ctx, params.AssetID)
+	if err != nil {
+		return Fact{}, err
+	}
+	if conflict := conflictingFact(existing, params); conflict != nil {
+		params.State = StateConflicting
+		params.ConfidenceReason = fmt.Sprintf("conflicts with existing fact %s", conflict.ID)
 	}
 
 	return s.repo.CreateFact(ctx, params)
@@ -200,6 +249,11 @@ func (s Service) CreateRelationship(ctx context.Context, params CreateRelationsh
 	}
 
 	params.RelationshipType = normalizeToken(params.RelationshipType)
+	params.State = defaultConfidenceState(params.State, params.EvidenceID)
+	if !params.State.Valid() {
+		return Relationship{}, fmt.Errorf("invalid confidence state %q", params.State)
+	}
+	params.ConfidenceReason = defaultConfidenceReason(params.ConfidenceReason, params.State)
 	params.Metadata = defaultJSON(params.Metadata)
 	if !json.Valid(params.Metadata) {
 		return Relationship{}, fmt.Errorf("metadata must be valid JSON")
@@ -250,4 +304,71 @@ func normalizeToken(value string) string {
 
 func validConfidence(value float64) bool {
 	return value >= 0 && value <= 1
+}
+
+func (s ConfidenceState) Valid() bool {
+	switch s {
+	case StateObserved, StateInferred, StateUserSeeded, StateConflicting, StateUnknown:
+		return true
+	default:
+		return false
+	}
+}
+
+func defaultConfidenceState(state ConfidenceState, evidenceID *string) ConfidenceState {
+	if strings.TrimSpace(string(state)) != "" {
+		return ConfidenceState(normalizeToken(string(state)))
+	}
+	if evidenceID != nil && strings.TrimSpace(*evidenceID) != "" {
+		return StateObserved
+	}
+	return StateInferred
+}
+
+func defaultConfidenceReason(reason string, state ConfidenceState) string {
+	reason = strings.TrimSpace(reason)
+	if reason != "" {
+		return reason
+	}
+	switch state {
+	case StateObserved:
+		return "directly observed from evidence"
+	case StateInferred:
+		return "deterministically inferred without direct evidence"
+	case StateUserSeeded:
+		return "provided by user seed input"
+	case StateConflicting:
+		return "conflicts with another recorded fact"
+	case StateUnknown:
+		return "unknown or insufficient evidence"
+	default:
+		return ""
+	}
+}
+
+func conflictingFact(existing []Fact, params CreateFactParams) *Fact {
+	for i := range existing {
+		if existing[i].Name != params.Name {
+			continue
+		}
+		if existing[i].State == StateConflicting {
+			continue
+		}
+		if !jsonEqual(existing[i].Value, params.Value) {
+			return &existing[i]
+		}
+	}
+	return nil
+}
+
+func jsonEqual(left json.RawMessage, right json.RawMessage) bool {
+	var leftValue any
+	var rightValue any
+	if err := json.Unmarshal(left, &leftValue); err != nil {
+		return string(left) == string(right)
+	}
+	if err := json.Unmarshal(right, &rightValue); err != nil {
+		return string(left) == string(right)
+	}
+	return reflect.DeepEqual(leftValue, rightValue)
 }

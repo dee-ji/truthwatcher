@@ -29,9 +29,9 @@ func (r AssetRepository) CreateAsset(ctx context.Context, params assets.CreateAs
 	}
 
 	result, err := scanAsset(r.db.QueryRowContext(ctx, `
-INSERT INTO assets (id, asset_type, identity_key, vendor, model, serial, system_mac, metadata)
-VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-RETURNING id, asset_type, identity_key, vendor, model, serial, system_mac, metadata, created_at, updated_at
+INSERT INTO assets (id, asset_type, identity_key, vendor, model, serial, system_mac, confidence, confidence_reason, state, metadata)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+RETURNING id, asset_type, identity_key, vendor, model, serial, system_mac, confidence, confidence_reason, state, metadata, created_at, updated_at
 `,
 		id,
 		params.Type,
@@ -40,6 +40,9 @@ RETURNING id, asset_type, identity_key, vendor, model, serial, system_mac, metad
 		params.Model,
 		params.Serial,
 		params.SystemMAC,
+		params.Confidence,
+		params.ConfidenceReason,
+		params.State,
 		params.Metadata,
 	))
 	if err != nil {
@@ -55,7 +58,7 @@ func (r AssetRepository) GetAsset(ctx context.Context, id string) (assets.Asset,
 	}
 
 	result, err := scanAsset(r.db.QueryRowContext(ctx, `
-SELECT id, asset_type, identity_key, vendor, model, serial, system_mac, metadata, created_at, updated_at
+SELECT id, asset_type, identity_key, vendor, model, serial, system_mac, confidence, confidence_reason, state, metadata, created_at, updated_at
 FROM assets
 WHERE id = $1
 `, id))
@@ -75,7 +78,7 @@ func (r AssetRepository) ListAssets(ctx context.Context) ([]assets.Asset, error)
 	}
 
 	rows, err := r.db.QueryContext(ctx, `
-SELECT id, asset_type, identity_key, vendor, model, serial, system_mac, metadata, created_at, updated_at
+SELECT id, asset_type, identity_key, vendor, model, serial, system_mac, confidence, confidence_reason, state, metadata, created_at, updated_at
 FROM assets
 ORDER BY created_at DESC, id DESC
 `)
@@ -110,10 +113,10 @@ func (r AssetRepository) CreateFact(ctx context.Context, params assets.CreateFac
 	}
 
 	result, err := scanFact(r.db.QueryRowContext(ctx, `
-INSERT INTO facts (id, asset_id, name, value, source, confidence, evidence_id)
-VALUES ($1, $2, $3, $4, $5, $6, $7)
-RETURNING id, asset_id, name, value, source, confidence, evidence_id, created_at
-`, id, params.AssetID, params.Name, params.Value, params.Source, params.Confidence, params.EvidenceID))
+INSERT INTO facts (id, asset_id, name, value, source, confidence, confidence_reason, state, evidence_id)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+RETURNING id, asset_id, name, value, source, confidence, confidence_reason, state, evidence_id, created_at
+`, id, params.AssetID, params.Name, params.Value, params.Source, params.Confidence, params.ConfidenceReason, params.State, params.EvidenceID))
 	if err != nil {
 		return assets.Fact{}, fmt.Errorf("create fact: %w", err)
 	}
@@ -127,7 +130,7 @@ func (r AssetRepository) GetFact(ctx context.Context, id string) (assets.Fact, e
 	}
 
 	result, err := scanFact(r.db.QueryRowContext(ctx, `
-SELECT id, asset_id, name, value, source, confidence, evidence_id, created_at
+SELECT id, asset_id, name, value, source, confidence, confidence_reason, state, evidence_id, created_at
 FROM facts
 WHERE id = $1
 `, id))
@@ -147,7 +150,7 @@ func (r AssetRepository) ListFactsByAsset(ctx context.Context, assetID string) (
 	}
 
 	rows, err := r.db.QueryContext(ctx, `
-SELECT id, asset_id, name, value, source, confidence, evidence_id, created_at
+SELECT id, asset_id, name, value, source, confidence, confidence_reason, state, evidence_id, created_at
 FROM facts
 WHERE asset_id = $1
 ORDER BY created_at DESC, id DESC
@@ -183,10 +186,10 @@ func (r AssetRepository) CreateRelationship(ctx context.Context, params assets.C
 	}
 
 	result, err := scanRelationship(r.db.QueryRowContext(ctx, `
-INSERT INTO relationships (id, source_asset_id, target_asset_id, relationship_type, confidence, evidence_id, metadata)
-VALUES ($1, $2, $3, $4, $5, $6, $7)
-RETURNING id, source_asset_id, target_asset_id, relationship_type, confidence, evidence_id, metadata, created_at, updated_at
-`, id, params.SourceAssetID, params.TargetAssetID, params.RelationshipType, params.Confidence, params.EvidenceID, params.Metadata))
+INSERT INTO relationships (id, source_asset_id, target_asset_id, relationship_type, confidence, confidence_reason, state, evidence_id, metadata)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+RETURNING id, source_asset_id, target_asset_id, relationship_type, confidence, confidence_reason, state, evidence_id, metadata, created_at, updated_at
+`, id, params.SourceAssetID, params.TargetAssetID, params.RelationshipType, params.Confidence, params.ConfidenceReason, params.State, params.EvidenceID, params.Metadata))
 	if err != nil {
 		return assets.Relationship{}, fmt.Errorf("create relationship: %w", err)
 	}
@@ -200,7 +203,7 @@ func (r AssetRepository) GetRelationship(ctx context.Context, id string) (assets
 	}
 
 	result, err := scanRelationship(r.db.QueryRowContext(ctx, `
-SELECT id, source_asset_id, target_asset_id, relationship_type, confidence, evidence_id, metadata, created_at, updated_at
+SELECT id, source_asset_id, target_asset_id, relationship_type, confidence, confidence_reason, state, evidence_id, metadata, created_at, updated_at
 FROM relationships
 WHERE id = $1
 `, id))
@@ -220,7 +223,7 @@ func (r AssetRepository) ListRelationships(ctx context.Context) ([]assets.Relati
 	}
 
 	rows, err := r.db.QueryContext(ctx, `
-SELECT id, source_asset_id, target_asset_id, relationship_type, confidence, evidence_id, metadata, created_at, updated_at
+SELECT id, source_asset_id, target_asset_id, relationship_type, confidence, confidence_reason, state, evidence_id, metadata, created_at, updated_at
 FROM relationships
 ORDER BY created_at DESC, id DESC
 `)
@@ -259,6 +262,9 @@ func scanAsset(s scanner) (assets.Asset, error) {
 		&model,
 		&serial,
 		&systemMAC,
+		&item.Confidence,
+		&item.ConfidenceReason,
+		&item.State,
 		&item.Metadata,
 		&item.CreatedAt,
 		&item.UpdatedAt,
@@ -284,6 +290,8 @@ func scanFact(s scanner) (assets.Fact, error) {
 		&item.Value,
 		&item.Source,
 		&item.Confidence,
+		&item.ConfidenceReason,
+		&item.State,
 		&evidenceID,
 		&item.CreatedAt,
 	); err != nil {
@@ -304,6 +312,8 @@ func scanRelationship(s scanner) (assets.Relationship, error) {
 		&item.TargetAssetID,
 		&item.RelationshipType,
 		&item.Confidence,
+		&item.ConfidenceReason,
+		&item.State,
 		&evidenceID,
 		&item.Metadata,
 		&item.CreatedAt,

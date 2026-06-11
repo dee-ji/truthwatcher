@@ -86,6 +86,8 @@ serial_number text,
 system_mac text,
 status text,
 confidence numeric,
+confidence_reason text,
+state text,
 metadata jsonb not null default '{}',
 created_at timestamptz not null default now(),
 updated_at timestamptz not null default now()
@@ -112,6 +114,8 @@ fact_name text not null,
 fact_value jsonb not null,
 fact_source text not null,
 confidence numeric not null,
+confidence_reason text not null,
+state text not null,
 evidence_id uuid references evidence(id),
 valid_from timestamptz,
 valid_to timestamptz,
@@ -131,6 +135,27 @@ Examples:
 - optic_wavelength.
 - route_reflector_client_count.
 
+### Confidence and uncertainty
+
+TruthWatcher treats uncertainty as first-class model data.
+
+Allowed confidence states:
+
+- `observed`: directly supported by evidence.
+- `inferred`: deterministically derived from other model data.
+- `user_seeded`: provided by a human or seed input.
+- `conflicting`: disagrees with another recorded fact.
+- `unknown`: explicitly unknown or insufficient evidence.
+
+Confidence rules:
+
+- `confidence` is a deterministic score from `0` to `1`.
+- `confidence_reason` explains why the score/state was assigned.
+- `evidence_id` should be present for `observed` facts and relationships when possible.
+- Facts with the same asset and name but different values must not overwrite each other silently.
+- Conflicting facts should be stored with `state = 'conflicting'` and a reason pointing to the conflicting record or evidence.
+- `unknown` is preferable to inventing a low-confidence value.
+
 ### relationships
 
 Represents graph edges between assets.
@@ -143,6 +168,8 @@ source_asset_id uuid not null references assets(id),
 target_asset_id uuid not null references assets(id),
 relationship_type text not null,
 confidence numeric not null,
+confidence_reason text not null,
+state text not null,
 evidence_id uuid references evidence(id),
 metadata jsonb not null default '{}',
 created_at timestamptz not null default now(),

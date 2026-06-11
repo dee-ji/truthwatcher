@@ -29,26 +29,31 @@ type Graph struct {
 }
 
 type Node struct {
-	ID          string          `json:"id"`
-	Type        string          `json:"type"`
-	Label       string          `json:"label"`
-	IdentityKey string          `json:"identity_key"`
-	Vendor      *string         `json:"vendor,omitempty"`
-	Model       *string         `json:"model,omitempty"`
-	Serial      *string         `json:"serial,omitempty"`
-	SystemMAC   *string         `json:"system_mac,omitempty"`
-	Metadata    json.RawMessage `json:"metadata"`
-	Facts       []assets.Fact   `json:"facts,omitempty"`
+	ID               string                 `json:"id"`
+	Type             string                 `json:"type"`
+	Label            string                 `json:"label"`
+	IdentityKey      string                 `json:"identity_key"`
+	Vendor           *string                `json:"vendor,omitempty"`
+	Model            *string                `json:"model,omitempty"`
+	Serial           *string                `json:"serial,omitempty"`
+	SystemMAC        *string                `json:"system_mac,omitempty"`
+	Confidence       float64                `json:"confidence"`
+	ConfidenceReason string                 `json:"confidence_reason"`
+	State            assets.ConfidenceState `json:"state"`
+	Metadata         json.RawMessage        `json:"metadata"`
+	Facts            []assets.Fact          `json:"facts,omitempty"`
 }
 
 type Edge struct {
-	ID               string          `json:"id"`
-	Source           string          `json:"source"`
-	Target           string          `json:"target"`
-	RelationshipType string          `json:"relationship_type"`
-	Confidence       float64         `json:"confidence"`
-	EvidenceID       *string         `json:"evidence_id,omitempty"`
-	Metadata         json.RawMessage `json:"metadata"`
+	ID               string                 `json:"id"`
+	Source           string                 `json:"source"`
+	Target           string                 `json:"target"`
+	RelationshipType string                 `json:"relationship_type"`
+	Confidence       float64                `json:"confidence"`
+	ConfidenceReason string                 `json:"confidence_reason"`
+	State            assets.ConfidenceState `json:"state"`
+	EvidenceID       *string                `json:"evidence_id,omitempty"`
+	Metadata         json.RawMessage        `json:"metadata"`
 }
 
 type PathCandidate struct {
@@ -137,16 +142,19 @@ func (s Service) PathCandidates(ctx context.Context, assetID string) ([]PathCand
 
 func nodeFromAsset(asset assets.Asset, facts []assets.Fact) Node {
 	return Node{
-		ID:          asset.ID,
-		Type:        asset.Type,
-		Label:       labelForAsset(asset, facts),
-		IdentityKey: asset.IdentityKey,
-		Vendor:      asset.Vendor,
-		Model:       asset.Model,
-		Serial:      asset.Serial,
-		SystemMAC:   asset.SystemMAC,
-		Metadata:    asset.Metadata,
-		Facts:       facts,
+		ID:               asset.ID,
+		Type:             asset.Type,
+		Label:            labelForAsset(asset, facts),
+		IdentityKey:      asset.IdentityKey,
+		Vendor:           asset.Vendor,
+		Model:            asset.Model,
+		Serial:           asset.Serial,
+		SystemMAC:        asset.SystemMAC,
+		Confidence:       asset.Confidence,
+		ConfidenceReason: asset.ConfidenceReason,
+		State:            asset.State,
+		Metadata:         asset.Metadata,
+		Facts:            facts,
 	}
 }
 
@@ -157,6 +165,8 @@ func edgeFromRelationship(relationship assets.Relationship) Edge {
 		Target:           relationship.TargetAssetID,
 		RelationshipType: relationship.RelationshipType,
 		Confidence:       relationship.Confidence,
+		ConfidenceReason: relationship.ConfidenceReason,
+		State:            relationship.State,
 		EvidenceID:       relationship.EvidenceID,
 		Metadata:         relationship.Metadata,
 	}
