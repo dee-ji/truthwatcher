@@ -172,10 +172,11 @@ Goal: normalize raw evidence into facts.
 Completed:
 
 - Parser interface, normalized parse output model, registry, and no-op fallback parser added.
+- First fixture-driven Junos and IOS-XR parsers added for version, inventory, and LLDP neighbor evidence.
 
 Next steps:
 
-- Add narrow sample-driven parsers for one command at a time when explicitly requested.
+- Wire parser outputs into asset, fact, and relationship persistence only when explicitly requested.
 
 Deliverables:
 
