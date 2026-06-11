@@ -121,6 +121,15 @@ func TestServesEmbeddedFrontendAsset(t *testing.T) {
 	if !strings.Contains(body, "renderGraph") {
 		t.Fatalf("body does not contain graph renderer: %s", body)
 	}
+	if !strings.Contains(body, "/api/v1/evidence/${encodeURIComponent(evidenceID)}") {
+		t.Fatalf("body does not contain evidence API fetch path: %s", body)
+	}
+	if !strings.Contains(body, "Evidence is read-only") {
+		t.Fatalf("body does not label evidence as read-only: %s", body)
+	}
+	if !strings.Contains(body, "copyEvidenceRawOutput") {
+		t.Fatalf("body does not contain raw output copy helper: %s", body)
+	}
 }
 
 func TestUnknownAPIPathDoesNotServeFrontend(t *testing.T) {

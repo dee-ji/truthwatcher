@@ -375,6 +375,19 @@ async function renderGraphView() {
         <div class="empty-state">Click a node to show asset details.</div>
       </aside>
     </section>
+    <div class="drawer-backdrop hidden" id="evidence-drawer-backdrop"></div>
+    <aside class="evidence-drawer hidden" id="evidence-drawer" aria-label="Evidence drawer" aria-live="polite">
+      <div class="drawer-header">
+        <div>
+          <p class="eyebrow">Read-only evidence</p>
+          <h2>Evidence</h2>
+        </div>
+        <button class="secondary" type="button" id="close-evidence-drawer">Close</button>
+      </div>
+      <div id="evidence-drawer-body" class="drawer-body">
+        <div class="empty-state">Open evidence from a fact or relationship.</div>
+      </div>
+    </aside>
   `;
 
   document.getElementById("graph-form").addEventListener("submit", submitGraphForm);
@@ -384,6 +397,7 @@ async function renderGraphView() {
       document.getElementById("asset-id").value = selectedID;
     }
   });
+  setupEvidenceDrawer();
   await loadAssetOptions();
 }
 
@@ -526,6 +540,7 @@ function selectGraphNode(node, edges) {
   }
   const detail = document.getElementById("graph-detail");
   const relatedEdges = edges.filter((edge) => edge.source === node.id || edge.target === node.id);
+  const facts = node.facts || [];
   detail.innerHTML = `
     <p class="eyebrow">Selected asset</p>
     <h2>${escapeHTML(assetLabel(node))}</h2>
@@ -545,6 +560,19 @@ function selectGraphNode(node, edges) {
     </div>
     <span class="code-block-label">Identity key</span>
     <pre class="code-block">${escapeHTML(node.identity_key || node.id)}</pre>
+    <span class="code-block-label">Facts</span>
+    ${facts.length === 0 ? `<p class="muted">No facts included in this graph response.</p>` : `
+      <ul class="edge-list">
+        ${facts.map((fact) => `
+          <li>
+            <strong>${escapeHTML(fact.name || "fact")}</strong>
+            <span>${escapeHTML(factValueLabel(fact.value))}</span>
+            <small>${escapeHTML(confidenceLabel(fact))}</small>
+            ${evidenceButton(fact.evidence_id)}
+          </li>
+        `).join("")}
+      </ul>
+    `}
     <span class="code-block-label">Relationships</span>
     ${relatedEdges.length === 0 ? `<p class="muted">No relationships in this graph.</p>` : `
       <ul class="edge-list">
@@ -553,11 +581,139 @@ function selectGraphNode(node, edges) {
             <strong>${escapeHTML(edge.relationship_type || "related")}</strong>
             <span>${escapeHTML(edge.source)} -> ${escapeHTML(edge.target)}</span>
             <small>${escapeHTML(confidenceLabel(edge))}</small>
+            ${evidenceButton(edge.evidence_id)}
           </li>
         `).join("")}
       </ul>
     `}
   `;
+  attachEvidenceButtons(detail);
+}
+
+function setupEvidenceDrawer() {
+  const drawer = document.getElementById("evidence-drawer");
+  const backdrop = document.getElementById("evidence-drawer-backdrop");
+  const close = document.getElementById("close-evidence-drawer");
+  if (!drawer || !backdrop || !close) {
+    return;
+  }
+  close.addEventListener("click", closeEvidenceDrawer);
+  backdrop.addEventListener("click", closeEvidenceDrawer);
+  window.addEventListener("keydown", (event) => {
+    if (event.key === "Escape" && !drawer.classList.contains("hidden")) {
+      closeEvidenceDrawer();
+    }
+  });
+}
+
+function attachEvidenceButtons(scope) {
+  for (const button of scope.querySelectorAll("[data-evidence-id]")) {
+    button.addEventListener("click", () => openEvidenceDrawer(button.dataset.evidenceId));
+  }
+}
+
+async function openEvidenceDrawer(evidenceID) {
+  const drawer = document.getElementById("evidence-drawer");
+  const backdrop = document.getElementById("evidence-drawer-backdrop");
+  const body = document.getElementById("evidence-drawer-body");
+  if (!drawer || !backdrop || !body || !evidenceID) {
+    return;
+  }
+
+  drawer.classList.remove("hidden");
+  backdrop.classList.remove("hidden");
+  body.innerHTML = `<div class="empty-state">Loading evidence...</div>`;
+
+  try {
+    const payload = await apiGet(`/api/v1/evidence/${encodeURIComponent(evidenceID)}`);
+    const evidence = payload?.data?.evidence;
+    renderEvidenceDrawer(evidence);
+  } catch (error) {
+    body.innerHTML = `<div class="error-state">${escapeHTML(error.message)}</div>`;
+  }
+}
+
+function closeEvidenceDrawer() {
+  document.getElementById("evidence-drawer")?.classList.add("hidden");
+  document.getElementById("evidence-drawer-backdrop")?.classList.add("hidden");
+}
+
+function renderEvidenceDrawer(evidence) {
+  const body = document.getElementById("evidence-drawer-body");
+  if (!body || !evidence) {
+    return;
+  }
+  body.innerHTML = `
+    <p class="readonly-note">Evidence is read-only. Raw output is preserved exactly as stored.</p>
+    <div class="detail-grid compact">
+      <div class="metric">
+        <small>Method</small>
+        <strong>${escapeHTML(evidence.method || "unknown")}</strong>
+      </div>
+      <div class="metric">
+        <small>Target</small>
+        <strong>${escapeHTML(evidence.target || "unknown")}</strong>
+      </div>
+      <div class="metric">
+        <small>Command/API</small>
+        <strong>${escapeHTML(evidence.command_or_api || "unknown")}</strong>
+      </div>
+      <div class="metric">
+        <small>Timestamp</small>
+        <strong>${escapeHTML(formatDate(evidence.collected_at))}</strong>
+      </div>
+      <div class="metric">
+        <small>Hash</small>
+        <strong>${escapeHTML(evidence.raw_output_hash || "missing")}</strong>
+      </div>
+    </div>
+    <div class="drawer-actions">
+      <button type="button" id="copy-evidence-output">Copy raw output</button>
+      <span class="muted" id="copy-evidence-message">Copies the stored raw output only.</span>
+    </div>
+    <span class="code-block-label">Raw output</span>
+    <pre class="code-block raw-output" id="evidence-raw-output">${escapeHTML(evidence.raw_output || "")}</pre>
+  `;
+  document.getElementById("copy-evidence-output").addEventListener("click", () => copyEvidenceRawOutput(evidence.raw_output || ""));
+}
+
+async function copyEvidenceRawOutput(rawOutput) {
+  const message = document.getElementById("copy-evidence-message");
+  try {
+    if (navigator.clipboard?.writeText) {
+      await navigator.clipboard.writeText(rawOutput);
+    } else {
+      const textArea = document.createElement("textarea");
+      textArea.value = rawOutput;
+      textArea.setAttribute("readonly", "");
+      textArea.style.position = "fixed";
+      textArea.style.left = "-9999px";
+      document.body.appendChild(textArea);
+      textArea.select();
+      document.execCommand("copy");
+      document.body.removeChild(textArea);
+    }
+    message.textContent = "Raw output copied.";
+  } catch (error) {
+    message.textContent = "Copy failed.";
+  }
+}
+
+function evidenceButton(evidenceID) {
+  if (!evidenceID) {
+    return `<small>No evidence reference</small>`;
+  }
+  return `<button class="secondary evidence-link" type="button" data-evidence-id="${escapeHTML(evidenceID)}">Open evidence</button>`;
+}
+
+function factValueLabel(value) {
+  if (value === undefined || value === null) {
+    return "null";
+  }
+  if (typeof value === "string") {
+    return value;
+  }
+  return JSON.stringify(value);
 }
 
 async function evidenceCountForRun(id) {

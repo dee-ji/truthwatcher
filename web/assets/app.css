@@ -577,6 +577,80 @@ button:disabled {
   overflow-wrap: anywhere;
 }
 
+.evidence-link {
+  justify-self: start;
+  padding: .45rem .7rem;
+  font-size: .82rem;
+}
+
+.drawer-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 20;
+  background: rgb(16 32 39 / 32%);
+  backdrop-filter: blur(3px);
+}
+
+.evidence-drawer {
+  position: fixed;
+  top: 0;
+  right: 0;
+  z-index: 30;
+  display: grid;
+  grid-template-rows: auto 1fr;
+  width: min(680px, 100vw);
+  height: 100vh;
+  border-left: 1px solid var(--line);
+  background:
+    linear-gradient(145deg, rgb(255 250 241 / 98%), rgb(244 239 230 / 96%)),
+    radial-gradient(circle at 16% 12%, rgb(196 85 45 / 16%), transparent 20rem);
+  box-shadow: -24px 0 60px rgb(16 32 39 / 22%);
+}
+
+.hidden {
+  display: none;
+}
+
+.drawer-header {
+  display: flex;
+  align-items: start;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 1.2rem;
+  border-bottom: 1px solid rgb(16 32 39 / 10%);
+}
+
+.drawer-header h2 {
+  margin-bottom: 0;
+  letter-spacing: -.04em;
+}
+
+.drawer-body {
+  overflow: auto;
+  padding: 1.2rem;
+}
+
+.readonly-note {
+  padding: .85rem 1rem;
+  border: 1px solid rgb(47 125 85 / 24%);
+  border-radius: 18px;
+  color: var(--ok);
+  font-weight: 800;
+  background: rgb(47 125 85 / 8%);
+}
+
+.drawer-actions {
+  display: flex;
+  align-items: center;
+  gap: .8rem;
+  margin: 1rem 0;
+}
+
+.raw-output {
+  min-height: 260px;
+  white-space: pre-wrap;
+}
+
 @media (max-width: 780px) {
   .shell-header,
   .hero-panel {
@@ -618,5 +692,9 @@ button:disabled {
   .graph-panel,
   .graph-svg {
     min-height: 420px;
+  }
+
+  .evidence-drawer {
+    width: 100vw;
   }
 }

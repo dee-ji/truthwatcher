@@ -206,6 +206,7 @@ Completed:
 - Embedded static frontend foundation added with dashboard placeholder and API status indicator.
 - Discovery run UI added with run list, detail view, evidence counts, and fake discovery form.
 - Basic graph view added with API-backed node/edge rendering, asset click details, and edge confidence labels.
+- Evidence drawer added for graph facts and relationships with read-only raw output display and copy support.
 
 Next steps:
 
