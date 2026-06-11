@@ -55,6 +55,11 @@ async function renderRoute() {
     return;
   }
 
+  if (route === "/graph") {
+    await renderGraphView();
+    return;
+  }
+
   app.innerHTML = `<section class="panel error-state">Page not found.</section>`;
 }
 
@@ -63,9 +68,13 @@ function setActiveNav(route) {
     link.classList.remove("active");
     link.removeAttribute("aria-current");
   }
-  const active = route.startsWith("/discovery-runs")
-    ? document.querySelector('[data-nav="discovery-runs"]')
-    : document.querySelector('[data-nav="dashboard"]');
+  let active = document.querySelector('[data-nav="dashboard"]');
+  if (route.startsWith("/discovery-runs")) {
+    active = document.querySelector('[data-nav="discovery-runs"]');
+  }
+  if (route === "/graph") {
+    active = document.querySelector('[data-nav="graph"]');
+  }
   if (active) {
     active.classList.add("active");
     active.setAttribute("aria-current", "page");
@@ -107,6 +116,11 @@ async function renderDashboard() {
         <span class="card-label">Evidence First</span>
         <h2>Raw output remains primary</h2>
         <p>Every run stores evidence before model facts are created.</p>
+      </article>
+      <article class="card">
+        <span class="card-label">Graph</span>
+        <h2>Inspect relationships</h2>
+        <p>Render a small asset neighborhood with confidence visible on every edge.</p>
       </article>
     </section>
   `;
@@ -325,6 +339,227 @@ async function renderDiscoveryRunDetail(id) {
   }
 }
 
+async function renderGraphView() {
+  app.innerHTML = `
+    <section class="section-header">
+      <div>
+        <p class="eyebrow">Graph</p>
+        <h1>Asset graph</h1>
+        <p>Load a small asset neighborhood from the API, inspect relationships, and review edge confidence.</p>
+      </div>
+      <a class="button secondary" href="#/">Back to dashboard</a>
+    </section>
+    <form class="form-panel" id="graph-form">
+      <div class="form-grid">
+        <div class="field">
+          <label for="asset-select">Known assets</label>
+          <select id="asset-select" name="asset_select">
+            <option value="">Loading assets...</option>
+          </select>
+        </div>
+        <div class="field">
+          <label for="asset-id">Asset ID</label>
+          <input id="asset-id" name="asset_id" placeholder="asset UUID or ID" required>
+        </div>
+      </div>
+      <div class="form-actions">
+        <button type="submit">Load graph</button>
+        <span class="muted" id="graph-message">Choose an asset or paste an asset ID.</span>
+      </div>
+    </form>
+    <section class="graph-layout">
+      <div class="graph-panel" id="graph-canvas">
+        <div class="empty-state">Select an asset to render its graph.</div>
+      </div>
+      <aside class="detail-panel graph-detail" id="graph-detail">
+        <div class="empty-state">Click a node to show asset details.</div>
+      </aside>
+    </section>
+  `;
+
+  document.getElementById("graph-form").addEventListener("submit", submitGraphForm);
+  document.getElementById("asset-select").addEventListener("change", (event) => {
+    const selectedID = event.currentTarget.value;
+    if (selectedID) {
+      document.getElementById("asset-id").value = selectedID;
+    }
+  });
+  await loadAssetOptions();
+}
+
+async function loadAssetOptions() {
+  const select = document.getElementById("asset-select");
+  const input = document.getElementById("asset-id");
+  const message = document.getElementById("graph-message");
+  try {
+    const payload = await apiGet("/api/v1/assets?limit=100");
+    const assets = payload?.data?.assets || [];
+    if (assets.length === 0) {
+      select.innerHTML = `<option value="">No assets available</option>`;
+      message.textContent = "Create or persist assets before loading a graph.";
+      return;
+    }
+    select.innerHTML = `
+      <option value="">Select an asset...</option>
+      ${assets.map((asset) => `
+        <option value="${escapeHTML(asset.id)}">${escapeHTML(assetLabel(asset))}</option>
+      `).join("")}
+    `;
+    input.value = assets[0].id;
+    await loadGraph(assets[0].id);
+  } catch (error) {
+    select.innerHTML = `<option value="">Asset list unavailable</option>`;
+    message.textContent = error.message;
+  }
+}
+
+async function submitGraphForm(event) {
+  event.preventDefault();
+  const formData = new FormData(event.currentTarget);
+  const assetID = String(formData.get("asset_id") || "").trim();
+  if (!assetID) {
+    document.getElementById("graph-message").textContent = "Asset ID is required.";
+    return;
+  }
+  await loadGraph(assetID);
+}
+
+async function loadGraph(assetID) {
+  const canvas = document.getElementById("graph-canvas");
+  const detail = document.getElementById("graph-detail");
+  const message = document.getElementById("graph-message");
+  canvas.innerHTML = `<div class="empty-state">Loading graph...</div>`;
+  detail.innerHTML = `<div class="empty-state">Click a node to show asset details.</div>`;
+  message.textContent = `Loading graph for ${assetID}...`;
+
+  try {
+    const payload = await apiGet(`/api/v1/assets/${encodeURIComponent(assetID)}/graph`);
+    const graph = payload?.data?.graph || { nodes: [], edges: [] };
+    renderGraph(graph);
+    message.textContent = `${graph.nodes?.length || 0} nodes, ${graph.edges?.length || 0} edges loaded.`;
+  } catch (error) {
+    canvas.innerHTML = `<div class="error-state">${escapeHTML(error.message)}</div>`;
+    message.textContent = error.message;
+  }
+}
+
+function renderGraph(graph) {
+  const canvas = document.getElementById("graph-canvas");
+  const detail = document.getElementById("graph-detail");
+  const nodes = graph.nodes || [];
+  const edges = graph.edges || [];
+  if (nodes.length === 0) {
+    canvas.innerHTML = `<div class="empty-state">Graph has no nodes.</div>`;
+    return;
+  }
+
+  const width = 860;
+  const height = 520;
+  const centerX = width / 2;
+  const centerY = height / 2;
+  const radius = Math.min(width, height) * 0.32;
+  const positions = new Map();
+  nodes.forEach((node, index) => {
+    if (index === 0) {
+      positions.set(node.id, { x: centerX, y: centerY });
+      return;
+    }
+    const angle = ((index - 1) / Math.max(nodes.length - 1, 1)) * Math.PI * 2 - Math.PI / 2;
+    positions.set(node.id, {
+      x: centerX + Math.cos(angle) * radius,
+      y: centerY + Math.sin(angle) * radius,
+    });
+  });
+
+  const edgeMarkup = edges.map((edge) => {
+    const source = positions.get(edge.source);
+    const target = positions.get(edge.target);
+    if (!source || !target) {
+      return "";
+    }
+    const midX = (source.x + target.x) / 2;
+    const midY = (source.y + target.y) / 2;
+    return `
+      <g class="graph-edge">
+        <line x1="${source.x}" y1="${source.y}" x2="${target.x}" y2="${target.y}"></line>
+        <text x="${midX}" y="${midY - 8}">${escapeHTML(edge.relationship_type || "related")}</text>
+        <text class="edge-confidence" x="${midX}" y="${midY + 12}">${escapeHTML(confidenceLabel(edge))}</text>
+      </g>
+    `;
+  }).join("");
+
+  const nodeMarkup = nodes.map((node, index) => {
+    const position = positions.get(node.id);
+    const rootClass = index === 0 ? " root" : "";
+    return `
+      <g class="graph-node${rootClass}" data-node-id="${escapeHTML(node.id)}" tabindex="0" role="button" aria-label="${escapeHTML(assetLabel(node))}">
+        <circle cx="${position.x}" cy="${position.y}" r="${index === 0 ? 42 : 34}"></circle>
+        <text x="${position.x}" y="${position.y - 2}">${escapeHTML(truncate(assetLabel(node), 18))}</text>
+        <text class="node-type" x="${position.x}" y="${position.y + 16}">${escapeHTML(node.type || "asset")}</text>
+      </g>
+    `;
+  }).join("");
+
+  canvas.innerHTML = `
+    <svg class="graph-svg" viewBox="0 0 ${width} ${height}" role="img" aria-label="Asset relationship graph">
+      ${edgeMarkup}
+      ${nodeMarkup}
+    </svg>
+  `;
+
+  const nodesByID = new Map(nodes.map((node) => [node.id, node]));
+  for (const element of canvas.querySelectorAll(".graph-node")) {
+    element.addEventListener("click", () => selectGraphNode(nodesByID.get(element.dataset.nodeId), edges));
+    element.addEventListener("keydown", (event) => {
+      if (event.key === "Enter" || event.key === " ") {
+        event.preventDefault();
+        selectGraphNode(nodesByID.get(element.dataset.nodeId), edges);
+      }
+    });
+  }
+  selectGraphNode(nodes[0], edges);
+}
+
+function selectGraphNode(node, edges) {
+  if (!node) {
+    return;
+  }
+  const detail = document.getElementById("graph-detail");
+  const relatedEdges = edges.filter((edge) => edge.source === node.id || edge.target === node.id);
+  detail.innerHTML = `
+    <p class="eyebrow">Selected asset</p>
+    <h2>${escapeHTML(assetLabel(node))}</h2>
+    <div class="detail-grid compact">
+      <div class="metric">
+        <small>Type</small>
+        <strong>${escapeHTML(node.type || "unknown")}</strong>
+      </div>
+      <div class="metric">
+        <small>State</small>
+        <strong>${escapeHTML(node.state || "unknown")}</strong>
+      </div>
+      <div class="metric">
+        <small>Confidence</small>
+        <strong>${escapeHTML(confidenceLabel(node))}</strong>
+      </div>
+    </div>
+    <span class="code-block-label">Identity key</span>
+    <pre class="code-block">${escapeHTML(node.identity_key || node.id)}</pre>
+    <span class="code-block-label">Relationships</span>
+    ${relatedEdges.length === 0 ? `<p class="muted">No relationships in this graph.</p>` : `
+      <ul class="edge-list">
+        ${relatedEdges.map((edge) => `
+          <li>
+            <strong>${escapeHTML(edge.relationship_type || "related")}</strong>
+            <span>${escapeHTML(edge.source)} -> ${escapeHTML(edge.target)}</span>
+            <small>${escapeHTML(confidenceLabel(edge))}</small>
+          </li>
+        `).join("")}
+      </ul>
+    `}
+  `;
+}
+
 async function evidenceCountForRun(id) {
   try {
     const payload = await apiGet(`/api/v1/discovery-runs/${encodeURIComponent(id)}/evidence`);
@@ -362,6 +597,30 @@ function shortID(id) {
     return "unknown";
   }
   return String(id).slice(0, 8);
+}
+
+function assetLabel(asset) {
+  if (!asset) {
+    return "unknown asset";
+  }
+  return asset.label || asset.identity_key || asset.serial || asset.id || "unknown asset";
+}
+
+function confidenceLabel(item) {
+  if (!item || item.confidence === undefined || item.confidence === null) {
+    return "confidence unknown";
+  }
+  const percent = Math.round(Number(item.confidence) * 100);
+  const state = item.state ? ` ${item.state}` : "";
+  return `${percent}%${state}`;
+}
+
+function truncate(value, length) {
+  const text = String(value || "");
+  if (text.length <= length) {
+    return text;
+  }
+  return `${text.slice(0, length - 1)}...`;
 }
 
 function escapeHTML(value) {

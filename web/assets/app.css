@@ -459,6 +459,124 @@ button:disabled {
   font: .9rem ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
 }
 
+.graph-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 360px;
+  gap: 1rem;
+  align-items: stretch;
+}
+
+.graph-panel {
+  min-height: 560px;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 28px;
+  background:
+    linear-gradient(145deg, rgb(255 250 241 / 82%), rgb(255 250 241 / 58%)),
+    radial-gradient(circle at 30% 20%, rgb(196 85 45 / 10%), transparent 18rem);
+  box-shadow: var(--shadow);
+}
+
+.graph-svg {
+  display: block;
+  width: 100%;
+  min-height: 560px;
+}
+
+.graph-edge line {
+  stroke: rgb(16 32 39 / 34%);
+  stroke-width: 2;
+}
+
+.graph-edge text {
+  fill: var(--muted);
+  font-size: 13px;
+  font-weight: 800;
+  paint-order: stroke;
+  stroke: rgb(255 250 241 / 88%);
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 5px;
+  text-anchor: middle;
+}
+
+.graph-edge .edge-confidence {
+  fill: var(--accent-dark);
+  font-size: 12px;
+}
+
+.graph-node {
+  cursor: pointer;
+  outline: none;
+}
+
+.graph-node circle {
+  fill: var(--panel);
+  stroke: var(--ink);
+  stroke-width: 2;
+  filter: drop-shadow(0 10px 18px rgb(16 32 39 / 16%));
+}
+
+.graph-node.root circle {
+  fill: #f5d0bd;
+  stroke: var(--accent-dark);
+  stroke-width: 3;
+}
+
+.graph-node:hover circle,
+.graph-node:focus circle {
+  stroke: var(--accent);
+  stroke-width: 4;
+}
+
+.graph-node text {
+  fill: var(--ink);
+  font-size: 13px;
+  font-weight: 900;
+  pointer-events: none;
+  text-anchor: middle;
+}
+
+.graph-node .node-type {
+  fill: var(--muted);
+  font-size: 11px;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.graph-detail h2 {
+  margin-bottom: 1rem;
+  letter-spacing: -.04em;
+}
+
+.detail-grid.compact {
+  grid-template-columns: 1fr;
+}
+
+.edge-list {
+  display: grid;
+  gap: .6rem;
+  padding: 0;
+  margin: 0;
+  list-style: none;
+}
+
+.edge-list li {
+  display: grid;
+  gap: .2rem;
+  padding: .75rem;
+  border: 1px solid rgb(16 32 39 / 9%);
+  border-radius: 16px;
+  background: rgb(255 250 241 / 68%);
+}
+
+.edge-list span,
+.edge-list small {
+  color: var(--muted);
+  font-size: .82rem;
+  overflow-wrap: anywhere;
+}
+
 @media (max-width: 780px) {
   .shell-header,
   .hero-panel {
@@ -491,5 +609,14 @@ button:disabled {
 
   .table {
     min-width: 760px;
+  }
+
+  .graph-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .graph-panel,
+  .graph-svg {
+    min-height: 420px;
   }
 }
