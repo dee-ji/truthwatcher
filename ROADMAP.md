@@ -197,6 +197,14 @@ Acceptance criteria:
 
 Goal: make the discovered knowledge visible.
 
+Completed:
+
+- Relational graph query service and graph JSON API endpoints added for asset neighborhood rendering.
+
+Next steps:
+
+- Build embedded frontend views only when explicitly requested.
+
 Deliverables:
 
 - Embedded frontend.

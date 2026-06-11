@@ -11,8 +11,10 @@ import (
 	"testing"
 	"time"
 
+	"truthwatcher/internal/assets"
 	"truthwatcher/internal/discovery"
 	"truthwatcher/internal/evidence"
+	"truthwatcher/internal/graph"
 )
 
 func TestHealthz(t *testing.T) {
@@ -507,5 +509,158 @@ func TestEvidenceEndpointsReturnUnavailableWithoutRepository(t *testing.T) {
 
 	if response.Code != http.StatusServiceUnavailable {
 		t.Fatalf("status = %d, want %d", response.Code, http.StatusServiceUnavailable)
+	}
+}
+
+type fakeGraphAssetReader struct {
+	assets        map[string]assets.Asset
+	facts         map[string][]assets.Fact
+	relationships []assets.Relationship
+}
+
+func (f fakeGraphAssetReader) GetAsset(ctx context.Context, id string) (assets.Asset, error) {
+	item, ok := f.assets[id]
+	if !ok {
+		return assets.Asset{}, assets.ErrNotFound
+	}
+	return item, nil
+}
+
+func (f fakeGraphAssetReader) ListFactsByAsset(ctx context.Context, assetID string) ([]assets.Fact, error) {
+	return f.facts[assetID], nil
+}
+
+func (f fakeGraphAssetReader) ListRelationships(ctx context.Context) ([]assets.Relationship, error) {
+	return f.relationships, nil
+}
+
+func TestGetAssetGraph(t *testing.T) {
+	service := graph.NewService(testGraphAssetReader())
+	handler := NewHandler(Options{
+		Version: "test-version",
+		Graph:   &service,
+	})
+
+	response := httptest.NewRecorder()
+	request := httptest.NewRequest(http.MethodGet, "/api/v1/assets/asset-a/graph", nil)
+	handler.ServeHTTP(response, request)
+
+	if response.Code != http.StatusOK {
+		t.Fatalf("status = %d, want %d; body=%s", response.Code, http.StatusOK, response.Body.String())
+	}
+
+	var body struct {
+		Graph graph.Graph `json:"graph"`
+	}
+	if err := json.Unmarshal(response.Body.Bytes(), &body); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+	if got, want := len(body.Graph.Nodes), 2; got != want {
+		t.Fatalf("node count = %d, want %d", got, want)
+	}
+	if got, want := len(body.Graph.Edges), 1; got != want {
+		t.Fatalf("edge count = %d, want %d", got, want)
+	}
+	if body.Graph.Nodes[0].Label != "router-a" {
+		t.Fatalf("root label = %q, want router-a", body.Graph.Nodes[0].Label)
+	}
+}
+
+func TestGetGraphNeighborsRequiresAssetID(t *testing.T) {
+	service := graph.NewService(testGraphAssetReader())
+	handler := NewHandler(Options{
+		Version: "test-version",
+		Graph:   &service,
+	})
+
+	response := httptest.NewRecorder()
+	request := httptest.NewRequest(http.MethodGet, "/api/v1/graph/neighbors", nil)
+	handler.ServeHTTP(response, request)
+
+	if response.Code != http.StatusBadRequest {
+		t.Fatalf("status = %d, want %d", response.Code, http.StatusBadRequest)
+	}
+}
+
+func TestGetGraphNeighbors(t *testing.T) {
+	service := graph.NewService(testGraphAssetReader())
+	handler := NewHandler(Options{
+		Version: "test-version",
+		Graph:   &service,
+	})
+
+	response := httptest.NewRecorder()
+	request := httptest.NewRequest(http.MethodGet, "/api/v1/graph/neighbors?asset_id=asset-a", nil)
+	handler.ServeHTTP(response, request)
+
+	if response.Code != http.StatusOK {
+		t.Fatalf("status = %d, want %d; body=%s", response.Code, http.StatusOK, response.Body.String())
+	}
+
+	var body struct {
+		Graph graph.Graph `json:"graph"`
+	}
+	if err := json.Unmarshal(response.Body.Bytes(), &body); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+	if got, want := body.Graph.Edges[0].RelationshipType, "lldp_neighbor"; got != want {
+		t.Fatalf("relationship_type = %q, want %q", got, want)
+	}
+}
+
+func TestGraphEndpointsReturnUnavailableWithoutRepository(t *testing.T) {
+	handler := NewHandler(Options{Version: "test-version"})
+
+	response := httptest.NewRecorder()
+	request := httptest.NewRequest(http.MethodGet, "/api/v1/assets/asset-a/graph", nil)
+	handler.ServeHTTP(response, request)
+
+	if response.Code != http.StatusServiceUnavailable {
+		t.Fatalf("status = %d, want %d", response.Code, http.StatusServiceUnavailable)
+	}
+}
+
+func testGraphAssetReader() fakeGraphAssetReader {
+	now := time.Date(2026, 6, 10, 12, 0, 0, 0, time.UTC)
+	return fakeGraphAssetReader{
+		assets: map[string]assets.Asset{
+			"asset-a": {
+				ID:          "asset-a",
+				Type:        "device",
+				IdentityKey: "device:serial:aaa",
+				Metadata:    json.RawMessage(`{}`),
+				CreatedAt:   now,
+				UpdatedAt:   now,
+			},
+			"asset-b": {
+				ID:          "asset-b",
+				Type:        "device",
+				IdentityKey: "device:serial:bbb",
+				Metadata:    json.RawMessage(`{}`),
+				CreatedAt:   now,
+				UpdatedAt:   now,
+			},
+		},
+		facts: map[string][]assets.Fact{
+			"asset-a": {{
+				ID:         "fact-a",
+				AssetID:    "asset-a",
+				Name:       "hostname",
+				Value:      json.RawMessage(`"router-a"`),
+				Source:     "parser",
+				Confidence: 0.95,
+				CreatedAt:  now,
+			}},
+		},
+		relationships: []assets.Relationship{{
+			ID:               "rel-a-b",
+			SourceAssetID:    "asset-a",
+			TargetAssetID:    "asset-b",
+			RelationshipType: "lldp_neighbor",
+			Confidence:       0.9,
+			Metadata:         json.RawMessage(`{}`),
+			CreatedAt:        now,
+			UpdatedAt:        now,
+		}},
 	}
 }

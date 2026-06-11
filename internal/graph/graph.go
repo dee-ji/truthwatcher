@@ -1,0 +1,190 @@
+package graph
+
+import (
+	"context"
+	"encoding/json"
+	"fmt"
+	"strings"
+
+	"truthwatcher/internal/assets"
+)
+
+type AssetReader interface {
+	GetAsset(context.Context, string) (assets.Asset, error)
+	ListFactsByAsset(context.Context, string) ([]assets.Fact, error)
+	ListRelationships(context.Context) ([]assets.Relationship, error)
+}
+
+type Service struct {
+	reader AssetReader
+}
+
+func NewService(reader AssetReader) Service {
+	return Service{reader: reader}
+}
+
+type Graph struct {
+	Nodes []Node `json:"nodes"`
+	Edges []Edge `json:"edges"`
+}
+
+type Node struct {
+	ID          string          `json:"id"`
+	Type        string          `json:"type"`
+	Label       string          `json:"label"`
+	IdentityKey string          `json:"identity_key"`
+	Vendor      *string         `json:"vendor,omitempty"`
+	Model       *string         `json:"model,omitempty"`
+	Serial      *string         `json:"serial,omitempty"`
+	SystemMAC   *string         `json:"system_mac,omitempty"`
+	Metadata    json.RawMessage `json:"metadata"`
+	Facts       []assets.Fact   `json:"facts,omitempty"`
+}
+
+type Edge struct {
+	ID               string          `json:"id"`
+	Source           string          `json:"source"`
+	Target           string          `json:"target"`
+	RelationshipType string          `json:"relationship_type"`
+	Confidence       float64         `json:"confidence"`
+	EvidenceID       *string         `json:"evidence_id,omitempty"`
+	Metadata         json.RawMessage `json:"metadata"`
+}
+
+type PathCandidate struct {
+	Nodes []Node `json:"nodes"`
+	Edges []Edge `json:"edges"`
+}
+
+func (s Service) GetAssetGraph(ctx context.Context, assetID string) (Graph, error) {
+	if strings.TrimSpace(assetID) == "" {
+		return Graph{}, fmt.Errorf("asset_id is required")
+	}
+	if s.reader == nil {
+		return Graph{}, fmt.Errorf("asset reader is required")
+	}
+
+	root, err := s.reader.GetAsset(ctx, assetID)
+	if err != nil {
+		return Graph{}, err
+	}
+	facts, err := s.reader.ListFactsByAsset(ctx, assetID)
+	if err != nil {
+		return Graph{}, err
+	}
+
+	graph := Graph{
+		Nodes: []Node{nodeFromAsset(root, facts)},
+	}
+	seenNodes := map[string]struct{}{root.ID: {}}
+
+	relationships, err := s.reader.ListRelationships(ctx)
+	if err != nil {
+		return Graph{}, err
+	}
+	for _, relationship := range relationships {
+		if !touchesAsset(relationship, assetID) {
+			continue
+		}
+
+		neighborID := otherAssetID(relationship, assetID)
+		if _, ok := seenNodes[neighborID]; !ok {
+			neighbor, err := s.reader.GetAsset(ctx, neighborID)
+			if err != nil {
+				return Graph{}, err
+			}
+			graph.Nodes = append(graph.Nodes, nodeFromAsset(neighbor, nil))
+			seenNodes[neighborID] = struct{}{}
+		}
+		graph.Edges = append(graph.Edges, edgeFromRelationship(relationship))
+	}
+
+	return graph, nil
+}
+
+func (s Service) GetNeighbors(ctx context.Context, assetID string) (Graph, error) {
+	return s.GetAssetGraph(ctx, assetID)
+}
+
+func (s Service) PathCandidates(ctx context.Context, assetID string) ([]PathCandidate, error) {
+	graph, err := s.GetAssetGraph(ctx, assetID)
+	if err != nil {
+		return nil, err
+	}
+
+	nodesByID := make(map[string]Node, len(graph.Nodes))
+	for _, node := range graph.Nodes {
+		nodesByID[node.ID] = node
+	}
+
+	candidates := make([]PathCandidate, 0, len(graph.Edges))
+	for _, edge := range graph.Edges {
+		source, ok := nodesByID[edge.Source]
+		if !ok {
+			continue
+		}
+		target, ok := nodesByID[edge.Target]
+		if !ok {
+			continue
+		}
+		candidates = append(candidates, PathCandidate{
+			Nodes: []Node{source, target},
+			Edges: []Edge{edge},
+		})
+	}
+	return candidates, nil
+}
+
+func nodeFromAsset(asset assets.Asset, facts []assets.Fact) Node {
+	return Node{
+		ID:          asset.ID,
+		Type:        asset.Type,
+		Label:       labelForAsset(asset, facts),
+		IdentityKey: asset.IdentityKey,
+		Vendor:      asset.Vendor,
+		Model:       asset.Model,
+		Serial:      asset.Serial,
+		SystemMAC:   asset.SystemMAC,
+		Metadata:    asset.Metadata,
+		Facts:       facts,
+	}
+}
+
+func edgeFromRelationship(relationship assets.Relationship) Edge {
+	return Edge{
+		ID:               relationship.ID,
+		Source:           relationship.SourceAssetID,
+		Target:           relationship.TargetAssetID,
+		RelationshipType: relationship.RelationshipType,
+		Confidence:       relationship.Confidence,
+		EvidenceID:       relationship.EvidenceID,
+		Metadata:         relationship.Metadata,
+	}
+}
+
+func touchesAsset(relationship assets.Relationship, assetID string) bool {
+	return relationship.SourceAssetID == assetID || relationship.TargetAssetID == assetID
+}
+
+func otherAssetID(relationship assets.Relationship, assetID string) string {
+	if relationship.SourceAssetID == assetID {
+		return relationship.TargetAssetID
+	}
+	return relationship.SourceAssetID
+}
+
+func labelForAsset(asset assets.Asset, facts []assets.Fact) string {
+	for _, fact := range facts {
+		if fact.Name != "hostname" {
+			continue
+		}
+		var hostname string
+		if err := json.Unmarshal(fact.Value, &hostname); err == nil && strings.TrimSpace(hostname) != "" {
+			return strings.TrimSpace(hostname)
+		}
+	}
+	if strings.TrimSpace(asset.IdentityKey) != "" {
+		return asset.IdentityKey
+	}
+	return asset.ID
+}

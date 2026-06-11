@@ -12,8 +12,10 @@ import (
 	"sync/atomic"
 	"time"
 
+	"truthwatcher/internal/assets"
 	"truthwatcher/internal/discovery"
 	"truthwatcher/internal/evidence"
+	"truthwatcher/internal/graph"
 	"truthwatcher/internal/policy"
 )
 
@@ -22,6 +24,7 @@ type Options struct {
 	Logger        *slog.Logger
 	DiscoveryRuns *discovery.Service
 	Evidence      *evidence.Service
+	Graph         *graph.Service
 }
 
 type responseEnvelope map[string]any
@@ -43,6 +46,8 @@ func NewHandler(opts Options) http.Handler {
 	mux.HandleFunc("GET /api/v1/discovery-runs/{id}", handleGetDiscoveryRun(opts.DiscoveryRuns))
 	mux.HandleFunc("GET /api/v1/discovery-runs/{id}/evidence", handleListEvidenceByDiscoveryRun(opts.Evidence))
 	mux.HandleFunc("GET /api/v1/evidence/{id}", handleGetEvidence(opts.Evidence))
+	mux.HandleFunc("GET /api/v1/assets/{id}/graph", handleGetAssetGraph(opts.Graph))
+	mux.HandleFunc("GET /api/v1/graph/neighbors", handleGetGraphNeighbors(opts.Graph))
 
 	return recoverPanic(opts.Logger, requestLog(opts.Logger, requestID(mux)))
 }
@@ -265,6 +270,54 @@ func handleGetEvidence(service *evidence.Service) http.HandlerFunc {
 		}
 
 		writeJSON(w, http.StatusOK, responseEnvelope{"evidence": item})
+	}
+}
+
+func handleGetAssetGraph(service *graph.Service) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if service == nil {
+			writeError(w, http.StatusServiceUnavailable, "graph repository is not configured")
+			return
+		}
+
+		result, err := service.GetAssetGraph(r.Context(), r.PathValue("id"))
+		if errors.Is(err, assets.ErrNotFound) {
+			writeError(w, http.StatusNotFound, "asset not found")
+			return
+		}
+		if err != nil {
+			writeError(w, http.StatusInternalServerError, err.Error())
+			return
+		}
+
+		writeJSON(w, http.StatusOK, responseEnvelope{"graph": result})
+	}
+}
+
+func handleGetGraphNeighbors(service *graph.Service) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if service == nil {
+			writeError(w, http.StatusServiceUnavailable, "graph repository is not configured")
+			return
+		}
+
+		assetID := strings.TrimSpace(r.URL.Query().Get("asset_id"))
+		if assetID == "" {
+			writeError(w, http.StatusBadRequest, "asset_id is required")
+			return
+		}
+
+		result, err := service.GetNeighbors(r.Context(), assetID)
+		if errors.Is(err, assets.ErrNotFound) {
+			writeError(w, http.StatusNotFound, "asset not found")
+			return
+		}
+		if err != nil {
+			writeError(w, http.StatusInternalServerError, err.Error())
+			return
+		}
+
+		writeJSON(w, http.StatusOK, responseEnvelope{"graph": result})
 	}
 }
 
