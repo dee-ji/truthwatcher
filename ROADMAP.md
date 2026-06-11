@@ -169,6 +169,14 @@ Acceptance criteria:
 
 Goal: normalize raw evidence into facts.
 
+Completed:
+
+- Parser interface, normalized parse output model, registry, and no-op fallback parser added.
+
+Next steps:
+
+- Add narrow sample-driven parsers for one command at a time when explicitly requested.
+
 Deliverables:
 
 - Parser interface.
