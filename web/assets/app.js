@@ -8,6 +8,8 @@ const discoveryTasks = [
   "get_bgp_summary",
 ];
 
+const agentHistoryKey = "truthwatcher.agent.history";
+
 window.addEventListener("hashchange", renderRoute);
 window.addEventListener("DOMContentLoaded", renderRoute);
 
@@ -60,6 +62,11 @@ async function renderRoute() {
     return;
   }
 
+  if (route === "/ask") {
+    renderAskView();
+    return;
+  }
+
   app.innerHTML = `<section class="panel error-state">Page not found.</section>`;
 }
 
@@ -74,6 +81,9 @@ function setActiveNav(route) {
   }
   if (route === "/graph") {
     active = document.querySelector('[data-nav="graph"]');
+  }
+  if (route === "/ask") {
+    active = document.querySelector('[data-nav="ask"]');
   }
   if (active) {
     active.classList.add("active");
@@ -121,6 +131,11 @@ async function renderDashboard() {
         <span class="card-label">Graph</span>
         <h2>Inspect relationships</h2>
         <p>Render a small asset neighborhood with confidence visible on every edge.</p>
+      </article>
+      <article class="card">
+        <span class="card-label">Ask Truthwatcher</span>
+        <h2>Deterministic workspace</h2>
+        <p>Ask canned read-only questions without external LLM calls or network actions.</p>
       </article>
     </section>
   `;
@@ -675,6 +690,136 @@ function renderEvidenceDrawer(evidence) {
     <pre class="code-block raw-output" id="evidence-raw-output">${escapeHTML(evidence.raw_output || "")}</pre>
   `;
   document.getElementById("copy-evidence-output").addEventListener("click", () => copyEvidenceRawOutput(evidence.raw_output || ""));
+}
+
+function renderAskView() {
+  app.innerHTML = `
+    <section class="section-header">
+      <div>
+        <p class="eyebrow">Ask Truthwatcher</p>
+        <h1>Read-only agent shell</h1>
+        <p>Ask deterministic questions about known assets, asset evidence, or discovery runs. This shell does not call an external LLM and cannot execute discovery.</p>
+      </div>
+      <a class="button secondary" href="#/">Back to dashboard</a>
+    </section>
+    <section class="ask-layout">
+      <div class="chat-panel">
+        <div class="readonly-note">
+          Deterministic canned responses only. No network actions, discovery execution, or external model calls.
+        </div>
+        <div class="prompt-chips" aria-label="Example prompts">
+          <button class="secondary" type="button" data-agent-prompt="list known assets">List known assets</button>
+          <button class="secondary" type="button" data-agent-prompt="explain asset evidence">Explain asset evidence</button>
+          <button class="secondary" type="button" data-agent-prompt="summarize discovery run">Summarize discovery run</button>
+        </div>
+        <div class="chat-history" id="chat-history" aria-live="polite"></div>
+        <form class="chat-form" id="agent-form">
+          <label class="sr-only" for="agent-message">Message</label>
+          <textarea id="agent-message" name="message" rows="3" placeholder="Try: list known assets"></textarea>
+          <button type="submit">Ask</button>
+        </form>
+      </div>
+      <aside class="detail-panel">
+        <p class="eyebrow">Capabilities</p>
+        <ul class="capability-list">
+          <li>list known assets</li>
+          <li>explain asset evidence</li>
+          <li>summarize discovery run</li>
+        </ul>
+        <p class="muted">Conversation history is stored in this browser only.</p>
+      </aside>
+    </section>
+  `;
+
+  document.getElementById("agent-form").addEventListener("submit", submitAgentMessage);
+  for (const button of document.querySelectorAll("[data-agent-prompt]")) {
+    button.addEventListener("click", () => {
+      document.getElementById("agent-message").value = button.dataset.agentPrompt;
+      document.getElementById("agent-message").focus();
+    });
+  }
+  renderAgentHistory();
+}
+
+async function submitAgentMessage(event) {
+  event.preventDefault();
+  const form = event.currentTarget;
+  const button = form.querySelector("button");
+  const input = document.getElementById("agent-message");
+  const message = input.value.trim();
+  if (!message) {
+    return;
+  }
+
+  appendAgentHistory({ role: "user", message, at: new Date().toISOString() });
+  input.value = "";
+  button.disabled = true;
+  renderAgentHistory("Thinking deterministically...");
+
+  try {
+    const payload = await apiPost("/api/v1/agent/messages", { message });
+    const response = payload?.data?.agent_message;
+    appendAgentHistory({
+      role: "truthwatcher",
+      message: response?.message || "No response.",
+      intent: response?.intent || "unknown",
+      read_only: response?.read_only === true,
+      actions: response?.actions || [],
+      at: new Date().toISOString(),
+    });
+  } catch (error) {
+    appendAgentHistory({
+      role: "truthwatcher",
+      message: error.message,
+      intent: "error",
+      read_only: true,
+      actions: [],
+      at: new Date().toISOString(),
+    });
+  } finally {
+    button.disabled = false;
+    renderAgentHistory();
+  }
+}
+
+function renderAgentHistory(statusMessage = "") {
+  const historyPanel = document.getElementById("chat-history");
+  if (!historyPanel) {
+    return;
+  }
+  const history = loadAgentHistory();
+  const messages = history.map((item) => `
+    <article class="chat-message ${escapeHTML(item.role)}">
+      <small>${escapeHTML(item.role)}${item.intent ? ` / ${escapeHTML(item.intent)}` : ""}</small>
+      <pre>${escapeHTML(item.message)}</pre>
+      ${item.read_only ? `<span class="readonly-badge">read-only</span>` : ""}
+      ${item.actions?.length ? `<p class="muted">Actions: ${escapeHTML(item.actions.join(", "))}</p>` : ""}
+    </article>
+  `).join("");
+  historyPanel.innerHTML = `
+    ${messages || `<div class="empty-state">No local conversation yet.</div>`}
+    ${statusMessage ? `<div class="empty-state">${escapeHTML(statusMessage)}</div>` : ""}
+  `;
+  historyPanel.scrollTop = historyPanel.scrollHeight;
+}
+
+function appendAgentHistory(item) {
+  const history = loadAgentHistory();
+  history.push(item);
+  localStorage.setItem(agentHistoryKey, JSON.stringify(history.slice(-30)));
+}
+
+function loadAgentHistory() {
+  try {
+    const raw = localStorage.getItem(agentHistoryKey);
+    if (!raw) {
+      return [];
+    }
+    const history = JSON.parse(raw);
+    return Array.isArray(history) ? history : [];
+  } catch (error) {
+    return [];
+  }
 }
 
 async function copyEvidenceRawOutput(rawOutput) {

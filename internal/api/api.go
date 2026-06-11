@@ -12,6 +12,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"truthwatcher/internal/agent"
 	"truthwatcher/internal/assets"
 	"truthwatcher/internal/discovery"
 	"truthwatcher/internal/evidence"
@@ -64,6 +65,7 @@ func NewHandler(opts Options) http.Handler {
 	mux.HandleFunc("GET /api/v1/facts/{id}/evidence", handleListFactEvidence(opts.Assets, opts.Evidence))
 	mux.HandleFunc("GET /api/v1/assets/{id}/graph", handleGetAssetGraph(opts.Graph))
 	mux.HandleFunc("GET /api/v1/graph/neighbors", handleGetGraphNeighbors(opts.Graph))
+	mux.HandleFunc("POST /api/v1/agent/messages", handleAgentMessage(opts.Assets, opts.DiscoveryRuns, opts.Evidence))
 	mux.HandleFunc("GET /api/", handleAPINotFound)
 	mux.Handle("GET /", web.Handler())
 
@@ -88,6 +90,48 @@ func handleVersion(version string) http.HandlerFunc {
 			"name":    "truthwatcher",
 			"version": version,
 		})
+	}
+}
+
+func handleAgentMessage(assetService *assets.Service, discoveryService *discovery.Service, evidenceService *evidence.Service) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if assetService == nil {
+			writeError(w, http.StatusServiceUnavailable, "asset repository is not configured")
+			return
+		}
+		if discoveryService == nil {
+			writeError(w, http.StatusServiceUnavailable, "discovery run repository is not configured")
+			return
+		}
+		if evidenceService == nil {
+			writeError(w, http.StatusServiceUnavailable, "evidence repository is not configured")
+			return
+		}
+
+		var request agent.Request
+		decoder := json.NewDecoder(r.Body)
+		decoder.DisallowUnknownFields()
+		if err := decoder.Decode(&request); err != nil {
+			if errors.Is(err, io.EOF) {
+				writeError(w, http.StatusBadRequest, "request body is required")
+				return
+			}
+			writeError(w, http.StatusBadRequest, "invalid JSON request body")
+			return
+		}
+
+		service := agent.NewService(agent.Options{
+			Assets:    assetService,
+			Discovery: discoveryService,
+			Evidence:  evidenceService,
+		})
+		response, err := service.Reply(r.Context(), request)
+		if err != nil {
+			writeError(w, http.StatusBadRequest, err.Error())
+			return
+		}
+
+		writeData(w, http.StatusOK, map[string]agent.Response{"agent_message": response})
 	}
 }
 

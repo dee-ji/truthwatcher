@@ -251,6 +251,14 @@ Acceptance criteria:
 
 Goal: add a controlled agent that plans but does not directly execute unsafe actions.
 
+Completed:
+
+- Deterministic Ask Truthwatcher shell added with read-only canned responses and browser-local conversation history.
+
+Next steps:
+
+- Add policy-gated task proposal models only when explicitly requested.
+
 Rules:
 
 - Agent never receives raw credentials.

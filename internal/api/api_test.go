@@ -93,6 +93,9 @@ func TestServesEmbeddedFrontend(t *testing.T) {
 	if !strings.Contains(response.Body.String(), "#/graph") {
 		t.Fatalf("body does not contain graph navigation: %s", response.Body.String())
 	}
+	if !strings.Contains(response.Body.String(), "#/ask") {
+		t.Fatalf("body does not contain ask navigation: %s", response.Body.String())
+	}
 }
 
 func TestServesEmbeddedFrontendAsset(t *testing.T) {
@@ -129,6 +132,90 @@ func TestServesEmbeddedFrontendAsset(t *testing.T) {
 	}
 	if !strings.Contains(body, "copyEvidenceRawOutput") {
 		t.Fatalf("body does not contain raw output copy helper: %s", body)
+	}
+	if !strings.Contains(body, "/api/v1/agent/messages") {
+		t.Fatalf("body does not contain agent message endpoint: %s", body)
+	}
+	if !strings.Contains(body, "Deterministic canned responses only") {
+		t.Fatalf("body does not label agent shell as deterministic: %s", body)
+	}
+}
+
+func TestAgentMessageListsKnownAssets(t *testing.T) {
+	assetService := assets.NewService(testAssetRepository())
+	discoveryService := discovery.NewService(&fakeDiscoveryRunRepository{
+		runs: []discovery.DiscoveryRun{{
+			ID:        "11111111-1111-4111-8111-111111111111",
+			Status:    discovery.StatusCompleted,
+			SeedInput: json.RawMessage(`{"target":"fixture://junos-mx"}`),
+			StartedAt: time.Date(2026, 6, 10, 12, 0, 0, 0, time.UTC),
+			CreatedAt: time.Date(2026, 6, 10, 12, 0, 0, 0, time.UTC),
+			UpdatedAt: time.Date(2026, 6, 10, 12, 0, 0, 0, time.UTC),
+		}},
+	})
+	evidenceService := evidence.NewService(&fakeEvidenceRepository{items: []evidence.Evidence{
+		testEvidence("evidence-a"),
+		testEvidence("evidence-b"),
+	}})
+	handler := NewHandler(Options{
+		Version:       "test-version",
+		Assets:        &assetService,
+		DiscoveryRuns: &discoveryService,
+		Evidence:      &evidenceService,
+	})
+
+	response := httptest.NewRecorder()
+	request := httptest.NewRequest(http.MethodPost, "/api/v1/agent/messages", strings.NewReader(`{"message":"list known assets"}`))
+	handler.ServeHTTP(response, request)
+
+	if response.Code != http.StatusOK {
+		t.Fatalf("status = %d, want %d; body=%s", response.Code, http.StatusOK, response.Body.String())
+	}
+
+	body := decodeResponseData[struct {
+		AgentMessage struct {
+			Message  string   `json:"message"`
+			Intent   string   `json:"intent"`
+			ReadOnly bool     `json:"read_only"`
+			Actions  []string `json:"actions"`
+		} `json:"agent_message"`
+	}](t, response)
+	if body.AgentMessage.Intent != "list_known_assets" {
+		t.Fatalf("intent = %q, want list_known_assets", body.AgentMessage.Intent)
+	}
+	if !body.AgentMessage.ReadOnly {
+		t.Fatal("agent response is not marked read_only")
+	}
+	if !strings.Contains(body.AgentMessage.Message, "Known assets: 3") {
+		t.Fatalf("message = %q, want known asset count", body.AgentMessage.Message)
+	}
+	if strings.Contains(strings.Join(body.AgentMessage.Actions, ","), "execute") {
+		t.Fatalf("actions include execution: %#v", body.AgentMessage.Actions)
+	}
+}
+
+func TestAgentMessageRequiresMessage(t *testing.T) {
+	assetService := assets.NewService(testAssetRepository())
+	discoveryService := discovery.NewService(&fakeDiscoveryRunRepository{})
+	evidenceService := evidence.NewService(&fakeEvidenceRepository{})
+	handler := NewHandler(Options{
+		Version:       "test-version",
+		Assets:        &assetService,
+		DiscoveryRuns: &discoveryService,
+		Evidence:      &evidenceService,
+	})
+
+	response := httptest.NewRecorder()
+	request := httptest.NewRequest(http.MethodPost, "/api/v1/agent/messages", strings.NewReader(`{"message":""}`))
+	handler.ServeHTTP(response, request)
+
+	if response.Code != http.StatusBadRequest {
+		t.Fatalf("status = %d, want %d", response.Code, http.StatusBadRequest)
+	}
+
+	envelope := decodeResponseEnvelope(t, response)
+	if envelope.Error == nil || envelope.Error.Message != "message is required" {
+		t.Fatalf("error = %#v, want message is required", envelope.Error)
 	}
 }
 
