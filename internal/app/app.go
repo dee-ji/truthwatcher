@@ -293,6 +293,7 @@ func serveHTTP(ctx context.Context, cfg config.Config, logger *slog.Logger, stdo
 
 	var discoveryRuns *discovery.Service
 	var evidenceStore *evidence.Service
+	var assetStore *assets.Service
 	var graphStore *graph.Service
 	if strings.TrimSpace(cfg.DatabaseURL) != "" {
 		conn, err := db.Open(ctx, cfg.DatabaseURL)
@@ -306,6 +307,7 @@ func serveHTTP(ctx context.Context, cfg config.Config, logger *slog.Logger, stdo
 		evidenceService := evidence.NewService(db.NewEvidenceRepository(conn))
 		evidenceStore = &evidenceService
 		assetService := assets.NewService(db.NewAssetRepository(conn))
+		assetStore = &assetService
 		graphService := graph.NewService(assetService)
 		graphStore = &graphService
 	}
@@ -322,6 +324,7 @@ func serveHTTP(ctx context.Context, cfg config.Config, logger *slog.Logger, stdo
 			Logger:        logger,
 			DiscoveryRuns: discoveryRuns,
 			Evidence:      evidenceStore,
+			Assets:        assetStore,
 			Graph:         graphStore,
 		}),
 		ReadHeaderTimeout: 5 * time.Second,

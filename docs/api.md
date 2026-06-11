@@ -180,6 +180,116 @@ Response `data`:
 }
 ```
 
+## Assets, Facts, and Relationships
+
+List endpoints support offset pagination:
+
+- `limit`: optional, default `100`, maximum `500`.
+- `offset`: optional, default `0`.
+
+Pagination metadata is returned in `metadata.pagination`:
+
+```json
+{
+  "limit": 100,
+  "offset": 0,
+  "count": 1,
+  "total": 1,
+  "has_next": false
+}
+```
+
+### `GET /api/v1/assets`
+
+Lists assets.
+
+Supported exact-match filters:
+
+- `type`
+- `vendor`
+- `serial`
+- `identity_key`
+
+Example:
+
+```text
+GET /api/v1/assets?type=device&vendor=juniper&limit=50&offset=0
+```
+
+Response `data`:
+
+```json
+{
+  "assets": []
+}
+```
+
+### `GET /api/v1/assets/{id}`
+
+Returns one asset.
+
+Response `data`:
+
+```json
+{
+  "asset": {
+    "id": "asset-a",
+    "type": "device",
+    "identity_key": "device:serial:aaa"
+  }
+}
+```
+
+### `GET /api/v1/assets/{id}/facts`
+
+Lists facts for one asset.
+
+Response `data`:
+
+```json
+{
+  "facts": []
+}
+```
+
+### `GET /api/v1/assets/{id}/relationships`
+
+Lists relationships where the asset is either the source or target.
+
+Response `data`:
+
+```json
+{
+  "relationships": []
+}
+```
+
+### `GET /api/v1/assets/{id}/evidence`
+
+Lists evidence linked to facts or relationships for one asset.
+
+This endpoint does not infer evidence from target strings or hostnames. Evidence must be linked through `evidence_id` on facts or relationships.
+
+Response `data`:
+
+```json
+{
+  "evidence": []
+}
+```
+
+### `GET /api/v1/facts/{id}/evidence`
+
+Lists evidence linked to one fact. A fact currently links to at most one evidence record.
+
+Response `data`:
+
+```json
+{
+  "evidence": []
+}
+```
+
 ## Graph
 
 ### `GET /api/v1/assets/{id}/graph`

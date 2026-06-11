@@ -24,6 +24,7 @@ type Options struct {
 	Logger        *slog.Logger
 	DiscoveryRuns *discovery.Service
 	Evidence      *evidence.Service
+	Assets        *assets.Service
 	Graph         *graph.Service
 }
 
@@ -54,6 +55,12 @@ func NewHandler(opts Options) http.Handler {
 	mux.HandleFunc("GET /api/v1/discovery-runs/{id}", handleGetDiscoveryRun(opts.DiscoveryRuns))
 	mux.HandleFunc("GET /api/v1/discovery-runs/{id}/evidence", handleListEvidenceByDiscoveryRun(opts.Evidence))
 	mux.HandleFunc("GET /api/v1/evidence/{id}", handleGetEvidence(opts.Evidence))
+	mux.HandleFunc("GET /api/v1/assets", handleListAssets(opts.Assets))
+	mux.HandleFunc("GET /api/v1/assets/{id}", handleGetAsset(opts.Assets))
+	mux.HandleFunc("GET /api/v1/assets/{id}/facts", handleListAssetFacts(opts.Assets))
+	mux.HandleFunc("GET /api/v1/assets/{id}/relationships", handleListAssetRelationships(opts.Assets))
+	mux.HandleFunc("GET /api/v1/assets/{id}/evidence", handleListAssetEvidence(opts.Assets, opts.Evidence))
+	mux.HandleFunc("GET /api/v1/facts/{id}/evidence", handleListFactEvidence(opts.Assets, opts.Evidence))
 	mux.HandleFunc("GET /api/v1/assets/{id}/graph", handleGetAssetGraph(opts.Graph))
 	mux.HandleFunc("GET /api/v1/graph/neighbors", handleGetGraphNeighbors(opts.Graph))
 
@@ -372,6 +379,13 @@ func discoveryExecutionMetadata(collector, target, profile string, tasks []polic
 func writeData(w http.ResponseWriter, status int, data any) {
 	writeEnvelope(w, status, responseEnvelope{
 		Data: data,
+	})
+}
+
+func writeDataWithMetadata(w http.ResponseWriter, status int, data any, metadata map[string]any) {
+	writeEnvelope(w, status, responseEnvelope{
+		Data:     data,
+		Metadata: metadata,
 	})
 }
 

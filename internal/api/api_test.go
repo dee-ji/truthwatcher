@@ -582,10 +582,347 @@ func TestEvidenceEndpointsReturnUnavailableWithoutRepository(t *testing.T) {
 	}
 }
 
+type fakeAssetRepository struct {
+	assets        []assets.Asset
+	facts         []assets.Fact
+	relationships []assets.Relationship
+}
+
+func (f *fakeAssetRepository) CreateAsset(ctx context.Context, params assets.CreateAssetParams) (assets.Asset, error) {
+	return assets.Asset{}, nil
+}
+
+func (f *fakeAssetRepository) GetAsset(ctx context.Context, id string) (assets.Asset, error) {
+	for _, item := range f.assets {
+		if item.ID == id {
+			return item, nil
+		}
+	}
+	return assets.Asset{}, assets.ErrNotFound
+}
+
+func (f *fakeAssetRepository) ListAssets(ctx context.Context) ([]assets.Asset, error) {
+	return f.assets, nil
+}
+
+func (f *fakeAssetRepository) CreateFact(ctx context.Context, params assets.CreateFactParams) (assets.Fact, error) {
+	return assets.Fact{}, nil
+}
+
+func (f *fakeAssetRepository) GetFact(ctx context.Context, id string) (assets.Fact, error) {
+	for _, item := range f.facts {
+		if item.ID == id {
+			return item, nil
+		}
+	}
+	return assets.Fact{}, assets.ErrNotFound
+}
+
+func (f *fakeAssetRepository) ListFactsByAsset(ctx context.Context, assetID string) ([]assets.Fact, error) {
+	var result []assets.Fact
+	for _, item := range f.facts {
+		if item.AssetID == assetID {
+			result = append(result, item)
+		}
+	}
+	return result, nil
+}
+
+func (f *fakeAssetRepository) CreateRelationship(ctx context.Context, params assets.CreateRelationshipParams) (assets.Relationship, error) {
+	return assets.Relationship{}, nil
+}
+
+func (f *fakeAssetRepository) GetRelationship(ctx context.Context, id string) (assets.Relationship, error) {
+	for _, item := range f.relationships {
+		if item.ID == id {
+			return item, nil
+		}
+	}
+	return assets.Relationship{}, assets.ErrNotFound
+}
+
+func (f *fakeAssetRepository) ListRelationships(ctx context.Context) ([]assets.Relationship, error) {
+	return f.relationships, nil
+}
+
+func TestListAssetsWithFiltersAndPagination(t *testing.T) {
+	service := assets.NewService(testAssetRepository())
+	handler := NewHandler(Options{
+		Version: "test-version",
+		Assets:  &service,
+	})
+
+	response := httptest.NewRecorder()
+	request := httptest.NewRequest(http.MethodGet, "/api/v1/assets?type=device&vendor=juniper&limit=1&offset=0", nil)
+	handler.ServeHTTP(response, request)
+
+	if response.Code != http.StatusOK {
+		t.Fatalf("status = %d, want %d; body=%s", response.Code, http.StatusOK, response.Body.String())
+	}
+
+	body := decodeResponseData[struct {
+		Assets []assets.Asset `json:"assets"`
+	}](t, response)
+	if got, want := len(body.Assets), 1; got != want {
+		t.Fatalf("asset count = %d, want %d", got, want)
+	}
+	if body.Assets[0].ID != "asset-a" {
+		t.Fatalf("asset id = %q, want asset-a", body.Assets[0].ID)
+	}
+
+	envelope := decodeResponseEnvelope(t, response)
+	pagination, ok := envelope.Metadata["pagination"].(map[string]any)
+	if !ok {
+		t.Fatalf("pagination metadata = %#v, want object", envelope.Metadata["pagination"])
+	}
+	if pagination["limit"] != float64(1) {
+		t.Fatalf("limit = %#v, want 1", pagination["limit"])
+	}
+	if pagination["total"] != float64(2) {
+		t.Fatalf("total = %#v, want 2", pagination["total"])
+	}
+	if pagination["has_next"] != true {
+		t.Fatalf("has_next = %#v, want true", pagination["has_next"])
+	}
+}
+
+func TestListAssetsRejectsInvalidPagination(t *testing.T) {
+	service := assets.NewService(testAssetRepository())
+	handler := NewHandler(Options{
+		Version: "test-version",
+		Assets:  &service,
+	})
+
+	response := httptest.NewRecorder()
+	request := httptest.NewRequest(http.MethodGet, "/api/v1/assets?limit=-1", nil)
+	handler.ServeHTTP(response, request)
+
+	if response.Code != http.StatusBadRequest {
+		t.Fatalf("status = %d, want %d", response.Code, http.StatusBadRequest)
+	}
+}
+
+func TestGetAsset(t *testing.T) {
+	service := assets.NewService(testAssetRepository())
+	handler := NewHandler(Options{
+		Version: "test-version",
+		Assets:  &service,
+	})
+
+	response := httptest.NewRecorder()
+	request := httptest.NewRequest(http.MethodGet, "/api/v1/assets/asset-a", nil)
+	handler.ServeHTTP(response, request)
+
+	if response.Code != http.StatusOK {
+		t.Fatalf("status = %d, want %d; body=%s", response.Code, http.StatusOK, response.Body.String())
+	}
+
+	body := decodeResponseData[struct {
+		Asset assets.Asset `json:"asset"`
+	}](t, response)
+	if body.Asset.IdentityKey != "device:serial:aaa" {
+		t.Fatalf("identity_key = %q, want device:serial:aaa", body.Asset.IdentityKey)
+	}
+}
+
+func TestListAssetFacts(t *testing.T) {
+	service := assets.NewService(testAssetRepository())
+	handler := NewHandler(Options{
+		Version: "test-version",
+		Assets:  &service,
+	})
+
+	response := httptest.NewRecorder()
+	request := httptest.NewRequest(http.MethodGet, "/api/v1/assets/asset-a/facts", nil)
+	handler.ServeHTTP(response, request)
+
+	if response.Code != http.StatusOK {
+		t.Fatalf("status = %d, want %d; body=%s", response.Code, http.StatusOK, response.Body.String())
+	}
+
+	body := decodeResponseData[struct {
+		Facts []assets.Fact `json:"facts"`
+	}](t, response)
+	if got, want := len(body.Facts), 1; got != want {
+		t.Fatalf("fact count = %d, want %d", got, want)
+	}
+}
+
+func TestListAssetRelationships(t *testing.T) {
+	service := assets.NewService(testAssetRepository())
+	handler := NewHandler(Options{
+		Version: "test-version",
+		Assets:  &service,
+	})
+
+	response := httptest.NewRecorder()
+	request := httptest.NewRequest(http.MethodGet, "/api/v1/assets/asset-a/relationships", nil)
+	handler.ServeHTTP(response, request)
+
+	if response.Code != http.StatusOK {
+		t.Fatalf("status = %d, want %d; body=%s", response.Code, http.StatusOK, response.Body.String())
+	}
+
+	body := decodeResponseData[struct {
+		Relationships []assets.Relationship `json:"relationships"`
+	}](t, response)
+	if got, want := len(body.Relationships), 1; got != want {
+		t.Fatalf("relationship count = %d, want %d", got, want)
+	}
+}
+
+func TestListAssetEvidence(t *testing.T) {
+	assetService := assets.NewService(testAssetRepository())
+	evidenceService := evidence.NewService(&fakeEvidenceRepository{items: []evidence.Evidence{
+		testEvidence("evidence-a"),
+		testEvidence("evidence-b"),
+	}})
+	handler := NewHandler(Options{
+		Version:  "test-version",
+		Assets:   &assetService,
+		Evidence: &evidenceService,
+	})
+
+	response := httptest.NewRecorder()
+	request := httptest.NewRequest(http.MethodGet, "/api/v1/assets/asset-a/evidence?limit=1", nil)
+	handler.ServeHTTP(response, request)
+
+	if response.Code != http.StatusOK {
+		t.Fatalf("status = %d, want %d; body=%s", response.Code, http.StatusOK, response.Body.String())
+	}
+
+	body := decodeResponseData[struct {
+		Evidence []evidence.Evidence `json:"evidence"`
+	}](t, response)
+	if got, want := len(body.Evidence), 1; got != want {
+		t.Fatalf("evidence count = %d, want %d", got, want)
+	}
+}
+
+func TestListFactEvidence(t *testing.T) {
+	assetService := assets.NewService(testAssetRepository())
+	evidenceService := evidence.NewService(&fakeEvidenceRepository{items: []evidence.Evidence{
+		testEvidence("evidence-a"),
+	}})
+	handler := NewHandler(Options{
+		Version:  "test-version",
+		Assets:   &assetService,
+		Evidence: &evidenceService,
+	})
+
+	response := httptest.NewRecorder()
+	request := httptest.NewRequest(http.MethodGet, "/api/v1/facts/fact-a/evidence", nil)
+	handler.ServeHTTP(response, request)
+
+	if response.Code != http.StatusOK {
+		t.Fatalf("status = %d, want %d; body=%s", response.Code, http.StatusOK, response.Body.String())
+	}
+
+	body := decodeResponseData[struct {
+		Evidence []evidence.Evidence `json:"evidence"`
+	}](t, response)
+	if got, want := len(body.Evidence), 1; got != want {
+		t.Fatalf("evidence count = %d, want %d", got, want)
+	}
+	if body.Evidence[0].ID != "evidence-a" {
+		t.Fatalf("evidence id = %q, want evidence-a", body.Evidence[0].ID)
+	}
+}
+
+func TestAssetEndpointsReturnUnavailableWithoutRepository(t *testing.T) {
+	handler := NewHandler(Options{Version: "test-version"})
+
+	response := httptest.NewRecorder()
+	request := httptest.NewRequest(http.MethodGet, "/api/v1/assets", nil)
+	handler.ServeHTTP(response, request)
+
+	if response.Code != http.StatusServiceUnavailable {
+		t.Fatalf("status = %d, want %d", response.Code, http.StatusServiceUnavailable)
+	}
+}
+
 type fakeGraphAssetReader struct {
 	assets        map[string]assets.Asset
 	facts         map[string][]assets.Fact
 	relationships []assets.Relationship
+}
+
+func testAssetRepository() *fakeAssetRepository {
+	now := time.Date(2026, 6, 10, 12, 0, 0, 0, time.UTC)
+	evidenceA := "evidence-a"
+	evidenceB := "evidence-b"
+	return &fakeAssetRepository{
+		assets: []assets.Asset{
+			{
+				ID:          "asset-a",
+				Type:        "device",
+				IdentityKey: "device:serial:aaa",
+				Vendor:      stringPtr("juniper"),
+				Serial:      stringPtr("aaa"),
+				Metadata:    json.RawMessage(`{}`),
+				CreatedAt:   now,
+				UpdatedAt:   now,
+			},
+			{
+				ID:          "asset-b",
+				Type:        "device",
+				IdentityKey: "device:serial:bbb",
+				Vendor:      stringPtr("juniper"),
+				Serial:      stringPtr("bbb"),
+				Metadata:    json.RawMessage(`{}`),
+				CreatedAt:   now,
+				UpdatedAt:   now,
+			},
+			{
+				ID:          "asset-c",
+				Type:        "site",
+				IdentityKey: "site:code:nyc",
+				Vendor:      stringPtr("internal"),
+				Metadata:    json.RawMessage(`{}`),
+				CreatedAt:   now,
+				UpdatedAt:   now,
+			},
+		},
+		facts: []assets.Fact{{
+			ID:         "fact-a",
+			AssetID:    "asset-a",
+			Name:       "hostname",
+			Value:      json.RawMessage(`"router-a"`),
+			Source:     "parser",
+			Confidence: 0.95,
+			EvidenceID: &evidenceA,
+			CreatedAt:  now,
+		}},
+		relationships: []assets.Relationship{{
+			ID:               "relationship-a",
+			SourceAssetID:    "asset-a",
+			TargetAssetID:    "asset-b",
+			RelationshipType: "lldp_neighbor",
+			Confidence:       0.9,
+			EvidenceID:       &evidenceB,
+			Metadata:         json.RawMessage(`{}`),
+			CreatedAt:        now,
+			UpdatedAt:        now,
+		}},
+	}
+}
+
+func testEvidence(id string) evidence.Evidence {
+	return evidence.Evidence{
+		ID:             id,
+		DiscoveryRunID: "11111111-1111-4111-8111-111111111111",
+		Target:         "router1",
+		Method:         "ssh",
+		CommandOrAPI:   "show version",
+		RawOutput:      "raw output",
+		RawOutputHash:  evidence.HashRawOutput("raw output"),
+		CollectedAt:    time.Date(2026, 6, 10, 12, 0, 0, 0, time.UTC),
+		Metadata:       json.RawMessage(`{}`),
+	}
+}
+
+func stringPtr(value string) *string {
+	return &value
 }
 
 func (f fakeGraphAssetReader) GetAsset(ctx context.Context, id string) (assets.Asset, error) {

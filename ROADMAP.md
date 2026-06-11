@@ -100,10 +100,11 @@ Goal: transform evidence into network knowledge.
 Completed:
 
 - Stable Asset, Fact, and Relationship tables, services, and repositories added.
+- Asset, fact, relationship, and evidence read APIs added with filters, pagination, and response-shape tests.
 
 Next steps:
 
-- Execute `prompts/08_POLICY_ALLOWLIST.md` only when explicitly requested.
+- Wire parser outputs into asset, fact, and relationship persistence only when explicitly requested.
 
 Deliverables:
 
