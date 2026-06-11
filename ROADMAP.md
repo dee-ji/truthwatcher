@@ -230,6 +230,14 @@ The UI should help engineers understand evidence and relationships, not force th
 
 Goal: begin solving “discover how to discover.”
 
+Completed:
+
+- Safe discovery planning API added with read-only suggested steps, explicit human approval requirement, and scope-expansion rejection.
+
+Next steps:
+
+- Add UI for reviewing discovery plans only when explicitly requested.
+
 Deliverables:
 
 - Seed questionnaire.

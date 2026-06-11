@@ -219,6 +219,77 @@ func TestAgentMessageRequiresMessage(t *testing.T) {
 	}
 }
 
+func TestCreateDiscoveryPlan(t *testing.T) {
+	assetService := assets.NewService(testAssetRepository())
+	handler := NewHandler(Options{
+		Version: "test-version",
+		Assets:  &assetService,
+	})
+
+	response := httptest.NewRecorder()
+	request := httptest.NewRequest(http.MethodPost, "/api/v1/discovery-plans", strings.NewReader(`{
+		"target": "router-a",
+		"method": "ssh",
+		"profile": "juniper_junos"
+	}`))
+	handler.ServeHTTP(response, request)
+
+	if response.Code != http.StatusOK {
+		t.Fatalf("status = %d, want %d; body=%s", response.Code, http.StatusOK, response.Body.String())
+	}
+
+	body := decodeResponseData[struct {
+		DiscoveryPlan struct {
+			ApprovalRequired bool `json:"approval_required"`
+			ExecutionAllowed bool `json:"execution_allowed"`
+			Steps            []struct {
+				Target           string `json:"target"`
+				Method           string `json:"method"`
+				Profile          string `json:"profile"`
+				Task             string `json:"task"`
+				Reason           string `json:"reason"`
+				ExpectedEvidence string `json:"expected_evidence"`
+				RiskLevel        string `json:"risk_level"`
+			} `json:"steps"`
+		} `json:"discovery_plan"`
+	}](t, response)
+	if !body.DiscoveryPlan.ApprovalRequired {
+		t.Fatal("approval_required = false, want true")
+	}
+	if body.DiscoveryPlan.ExecutionAllowed {
+		t.Fatal("execution_allowed = true, want false")
+	}
+	if len(body.DiscoveryPlan.Steps) == 0 {
+		t.Fatal("plan steps are empty")
+	}
+	if body.DiscoveryPlan.Steps[0].Target != "router-a" {
+		t.Fatalf("target = %q, want router-a", body.DiscoveryPlan.Steps[0].Target)
+	}
+	if body.DiscoveryPlan.Steps[0].RiskLevel != "low_read_only" {
+		t.Fatalf("risk = %q, want low_read_only", body.DiscoveryPlan.Steps[0].RiskLevel)
+	}
+}
+
+func TestCreateDiscoveryPlanRejectsScopeExpansion(t *testing.T) {
+	assetService := assets.NewService(testAssetRepository())
+	handler := NewHandler(Options{
+		Version: "test-version",
+		Assets:  &assetService,
+	})
+
+	response := httptest.NewRecorder()
+	request := httptest.NewRequest(http.MethodPost, "/api/v1/discovery-plans", strings.NewReader(`{
+		"target": "10.0.0.0/24",
+		"method": "ssh",
+		"profile": "juniper_junos"
+	}`))
+	handler.ServeHTTP(response, request)
+
+	if response.Code != http.StatusBadRequest {
+		t.Fatalf("status = %d, want %d", response.Code, http.StatusBadRequest)
+	}
+}
+
 func TestUnknownAPIPathDoesNotServeFrontend(t *testing.T) {
 	handler := NewHandler(Options{Version: "test-version"})
 

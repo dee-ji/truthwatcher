@@ -17,6 +17,7 @@ import (
 	"truthwatcher/internal/discovery"
 	"truthwatcher/internal/evidence"
 	"truthwatcher/internal/graph"
+	"truthwatcher/internal/planner"
 	"truthwatcher/internal/policy"
 	"truthwatcher/web"
 )
@@ -66,6 +67,7 @@ func NewHandler(opts Options) http.Handler {
 	mux.HandleFunc("GET /api/v1/assets/{id}/graph", handleGetAssetGraph(opts.Graph))
 	mux.HandleFunc("GET /api/v1/graph/neighbors", handleGetGraphNeighbors(opts.Graph))
 	mux.HandleFunc("POST /api/v1/agent/messages", handleAgentMessage(opts.Assets, opts.DiscoveryRuns, opts.Evidence))
+	mux.HandleFunc("POST /api/v1/discovery-plans", handleCreateDiscoveryPlan(opts.Assets))
 	mux.HandleFunc("GET /api/", handleAPINotFound)
 	mux.Handle("GET /", web.Handler())
 
@@ -132,6 +134,39 @@ func handleAgentMessage(assetService *assets.Service, discoveryService *discover
 		}
 
 		writeData(w, http.StatusOK, map[string]agent.Response{"agent_message": response})
+	}
+}
+
+func handleCreateDiscoveryPlan(assetService *assets.Service) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if assetService == nil {
+			writeError(w, http.StatusServiceUnavailable, "asset repository is not configured")
+			return
+		}
+
+		var request planner.Request
+		decoder := json.NewDecoder(r.Body)
+		decoder.DisallowUnknownFields()
+		if err := decoder.Decode(&request); err != nil {
+			if errors.Is(err, io.EOF) {
+				writeError(w, http.StatusBadRequest, "request body is required")
+				return
+			}
+			writeError(w, http.StatusBadRequest, "invalid JSON request body")
+			return
+		}
+
+		service := planner.NewService(planner.Options{
+			Assets: assetService,
+			Policy: policy.NewEngine(),
+		})
+		plan, err := service.CreatePlan(r.Context(), request)
+		if err != nil {
+			writeError(w, http.StatusBadRequest, err.Error())
+			return
+		}
+
+		writeData(w, http.StatusOK, map[string]planner.Plan{"discovery_plan": plan})
 	}
 }
 
