@@ -711,6 +711,10 @@ function renderAskView() {
           <button class="secondary" type="button" data-agent-prompt="list known assets">List known assets</button>
           <button class="secondary" type="button" data-agent-prompt="explain asset evidence">Explain asset evidence</button>
           <button class="secondary" type="button" data-agent-prompt="summarize discovery run">Summarize discovery run</button>
+          <button class="secondary" type="button" data-agent-prompt="what do we know about asset-a">What do we know about X</button>
+          <button class="secondary" type="button" data-agent-prompt="show neighbors for asset-a">Show neighbors for X</button>
+          <button class="secondary" type="button" data-agent-prompt="why do we believe asset-a exists">Why does X exist</button>
+          <button class="secondary" type="button" data-agent-prompt="what is unknown">What is unknown</button>
         </div>
         <div class="chat-history" id="chat-history" aria-live="polite"></div>
         <form class="chat-form" id="agent-form">
@@ -725,6 +729,10 @@ function renderAskView() {
           <li>list known assets</li>
           <li>explain asset evidence</li>
           <li>summarize discovery run</li>
+          <li>what do we know about X</li>
+          <li>show neighbors for X</li>
+          <li>why do we believe X exists</li>
+          <li>what is unknown</li>
         </ul>
         <p class="muted">Conversation history is stored in this browser only.</p>
       </aside>

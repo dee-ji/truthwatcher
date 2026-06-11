@@ -99,7 +99,7 @@ func TestReplyListsKnownAssets(t *testing.T) {
 	if !response.ReadOnly {
 		t.Fatal("response is not read-only")
 	}
-	if !strings.Contains(response.Message, "Known assets: 1") {
+	if !strings.Contains(response.Message, "Known assets: 2") {
 		t.Fatalf("message = %q, want asset count", response.Message)
 	}
 }
@@ -136,6 +136,92 @@ func TestReplySummarizesDiscoveryRun(t *testing.T) {
 	}
 }
 
+func TestReplyWhatWeKnowAboutAsset(t *testing.T) {
+	service := testService()
+
+	response, err := service.Reply(context.Background(), Request{Message: "what do we know about router-a"})
+	if err != nil {
+		t.Fatalf("Reply returned error: %v", err)
+	}
+
+	if response.Intent != "what_we_know_about" {
+		t.Fatalf("intent = %q, want what_we_know_about", response.Intent)
+	}
+	if !strings.Contains(response.Message, "hostname=router-a") {
+		t.Fatalf("message = %q, want hostname fact", response.Message)
+	}
+	if !strings.Contains(response.Message, "evidence-a") {
+		t.Fatalf("message = %q, want evidence reference", response.Message)
+	}
+}
+
+func TestReplyShowsNeighbors(t *testing.T) {
+	service := testService()
+
+	response, err := service.Reply(context.Background(), Request{Message: "show neighbors for asset-a"})
+	if err != nil {
+		t.Fatalf("Reply returned error: %v", err)
+	}
+
+	if response.Intent != "show_neighbors" {
+		t.Fatalf("intent = %q, want show_neighbors", response.Intent)
+	}
+	if !strings.Contains(response.Message, "device:serial:bbb") {
+		t.Fatalf("message = %q, want neighbor asset", response.Message)
+	}
+	if !strings.Contains(response.Message, "evidence-a") {
+		t.Fatalf("message = %q, want evidence reference", response.Message)
+	}
+}
+
+func TestReplyWhyAssetExists(t *testing.T) {
+	service := testService()
+
+	response, err := service.Reply(context.Background(), Request{Message: "why do we believe asset-a exists"})
+	if err != nil {
+		t.Fatalf("Reply returned error: %v", err)
+	}
+
+	if response.Intent != "why_asset_exists" {
+		t.Fatalf("intent = %q, want why_asset_exists", response.Intent)
+	}
+	if !strings.Contains(response.Message, "Evidence references") {
+		t.Fatalf("message = %q, want evidence references", response.Message)
+	}
+}
+
+func TestReplyWhatIsUnknown(t *testing.T) {
+	service := testService()
+
+	response, err := service.Reply(context.Background(), Request{Message: "what is unknown"})
+	if err != nil {
+		t.Fatalf("Reply returned error: %v", err)
+	}
+
+	if response.Intent != "what_is_unknown" {
+		t.Fatalf("intent = %q, want what_is_unknown", response.Intent)
+	}
+	if !strings.Contains(response.Message, "model unknown") {
+		t.Fatalf("message = %q, want unknown model", response.Message)
+	}
+}
+
+func TestReplyUnknownAssetDoesNotGuess(t *testing.T) {
+	service := testService()
+
+	response, err := service.Reply(context.Background(), Request{Message: "what do we know about not-a-real-router"})
+	if err != nil {
+		t.Fatalf("Reply returned error: %v", err)
+	}
+
+	if response.Intent != "what_we_know_about" {
+		t.Fatalf("intent = %q, want what_we_know_about", response.Intent)
+	}
+	if !strings.Contains(response.Message, "I do not know") {
+		t.Fatalf("message = %q, want unknown response", response.Message)
+	}
+}
+
 func TestReplyRejectsEmptyMessage(t *testing.T) {
 	_, err := testService().Reply(context.Background(), Request{})
 	if err == nil {
@@ -158,6 +244,16 @@ func testService() Service {
 				Metadata:         json.RawMessage(`{}`),
 				CreatedAt:        now,
 				UpdatedAt:        now,
+			}, {
+				ID:               "asset-b",
+				Type:             "device",
+				IdentityKey:      "device:serial:bbb",
+				Confidence:       0.8,
+				ConfidenceReason: "directly observed",
+				State:            assets.StateObserved,
+				Metadata:         json.RawMessage(`{}`),
+				CreatedAt:        now,
+				UpdatedAt:        now,
 			}},
 			facts: []assets.Fact{{
 				ID:               "fact-a",
@@ -170,6 +266,19 @@ func testService() Service {
 				State:            assets.StateObserved,
 				EvidenceID:       &evidenceID,
 				CreatedAt:        now,
+			}},
+			relationships: []assets.Relationship{{
+				ID:               "relationship-a",
+				SourceAssetID:    "asset-a",
+				TargetAssetID:    "asset-b",
+				RelationshipType: "lldp_neighbor",
+				Confidence:       0.9,
+				ConfidenceReason: "directly observed",
+				State:            assets.StateObserved,
+				EvidenceID:       &evidenceID,
+				Metadata:         json.RawMessage(`{}`),
+				CreatedAt:        now,
+				UpdatedAt:        now,
 			}},
 		},
 		Discovery: fakeDiscovery{runs: []discovery.DiscoveryRun{{

@@ -254,6 +254,7 @@ Goal: add a controlled agent that plans but does not directly execute unsafe act
 Completed:
 
 - Deterministic Ask Truthwatcher shell added with read-only canned responses and browser-local conversation history.
+- Agent workspace can answer graph-grounded asset, neighbor, existence, and unknown-state questions with evidence references.
 
 Next steps:
 
