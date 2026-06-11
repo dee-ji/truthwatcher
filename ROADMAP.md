@@ -204,6 +204,7 @@ Completed:
 
 - Relational graph query service and graph JSON API endpoints added for asset neighborhood rendering.
 - Embedded static frontend foundation added with dashboard placeholder and API status indicator.
+- Discovery run UI added with run list, detail view, evidence counts, and fake discovery form.
 
 Next steps:
 

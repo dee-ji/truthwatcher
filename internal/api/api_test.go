@@ -87,6 +87,9 @@ func TestServesEmbeddedFrontend(t *testing.T) {
 	if !strings.Contains(response.Body.String(), "Truthwatcher") {
 		t.Fatalf("body does not contain frontend shell: %s", response.Body.String())
 	}
+	if !strings.Contains(response.Body.String(), "#/discovery-runs") {
+		t.Fatalf("body does not contain discovery runs navigation: %s", response.Body.String())
+	}
 }
 
 func TestServesEmbeddedFrontendAsset(t *testing.T) {
@@ -102,8 +105,12 @@ func TestServesEmbeddedFrontendAsset(t *testing.T) {
 	if contentType := response.Header().Get("Content-Type"); !strings.Contains(contentType, "javascript") {
 		t.Fatalf("Content-Type = %q, want javascript", contentType)
 	}
-	if !strings.Contains(response.Body.String(), "checkAPI") {
-		t.Fatalf("body does not contain app script: %s", response.Body.String())
+	body := response.Body.String()
+	if !strings.Contains(body, "/api/v1/discovery-runs/execute") {
+		t.Fatalf("body does not contain fake discovery execution endpoint: %s", body)
+	}
+	if !strings.Contains(body, `collector: "fake"`) {
+		t.Fatalf("body does not constrain discovery form to fake collector: %s", body)
 	}
 }
 
