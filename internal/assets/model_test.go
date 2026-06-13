@@ -10,6 +10,7 @@ type fakeRepository struct {
 	assetParams        CreateAssetParams
 	factParams         CreateFactParams
 	relationshipParams CreateRelationshipParams
+	assets             []Asset
 	facts              []Fact
 }
 
@@ -31,6 +32,9 @@ func (f *fakeRepository) GetAsset(ctx context.Context, id string) (Asset, error)
 }
 
 func (f *fakeRepository) ListAssets(ctx context.Context) ([]Asset, error) {
+	if f.assets != nil {
+		return f.assets, nil
+	}
 	return []Asset{{ID: "asset-1"}}, nil
 }
 
@@ -101,8 +105,11 @@ func TestCreateAssetNormalizesIdentityAndDefaultsMetadata(t *testing.T) {
 	if got, want := repo.assetParams.IdentityKey, "device:serial:abc123"; got != want {
 		t.Fatalf("IdentityKey = %q, want %q", got, want)
 	}
-	if got, want := string(repo.assetParams.Metadata), "{}"; got != want {
-		t.Fatalf("Metadata = %q, want %q", got, want)
+	if !json.Valid(repo.assetParams.Metadata) {
+		t.Fatalf("Metadata = %q, want valid JSON", repo.assetParams.Metadata)
+	}
+	if !hasMetadataValue(repo.assetParams.Metadata, "identity_strength", "strong") {
+		t.Fatalf("Metadata = %q, want strong identity metadata", repo.assetParams.Metadata)
 	}
 	if got, want := repo.assetParams.Confidence, 0.5; got != want {
 		t.Fatalf("Confidence = %v, want %v", got, want)
@@ -112,6 +119,28 @@ func TestCreateAssetNormalizesIdentityAndDefaultsMetadata(t *testing.T) {
 	}
 	if got, want := repo.assetParams.ConfidenceReason, "deterministically inferred without direct evidence"; got != want {
 		t.Fatalf("ConfidenceReason = %q, want %q", got, want)
+	}
+}
+
+func TestIdentityCandidatePrefersStrongIdentifiers(t *testing.T) {
+	candidate := IdentityCandidateForAsset("device", "Juniper", "JN1234", "", "mx-edge-01", "192.0.2.1")
+
+	if candidate.Strength != IdentityStrengthStrong {
+		t.Fatalf("strength = %q, want %q", candidate.Strength, IdentityStrengthStrong)
+	}
+	if got, want := candidate.IdentityKey, "device:vendor_serial:juniper:jn1234"; got != want {
+		t.Fatalf("identity key = %q, want %q", got, want)
+	}
+}
+
+func TestIdentityCandidateMarksHostnameProvisional(t *testing.T) {
+	candidate := IdentityCandidateForAsset("device", "", "", "", "mx-edge-01", "")
+
+	if candidate.Strength != IdentityStrengthProvisional {
+		t.Fatalf("strength = %q, want %q", candidate.Strength, IdentityStrengthProvisional)
+	}
+	if got, want := candidate.IdentityKey, "device:hostname:mx-edge-01"; got != want {
+		t.Fatalf("identity key = %q, want %q", got, want)
 	}
 }
 
@@ -193,6 +222,47 @@ func TestCreateFactMarksConflictingValue(t *testing.T) {
 	}
 }
 
+func TestListConflictingFacts(t *testing.T) {
+	repo := &fakeRepository{
+		assets: []Asset{{ID: "asset-1"}},
+		facts: []Fact{
+			{ID: "fact-ok", AssetID: "asset-1", Name: "hostname", State: StateObserved},
+			{ID: "fact-conflict", AssetID: "asset-1", Name: "hostname", State: StateConflicting},
+		},
+	}
+
+	result, err := NewService(repo).ListConflictingFacts(context.Background())
+	if err != nil {
+		t.Fatalf("ListConflictingFacts returned error: %v", err)
+	}
+	if got, want := len(result), 1; got != want {
+		t.Fatalf("len = %d, want %d", got, want)
+	}
+	if result[0].ID != "fact-conflict" {
+		t.Fatalf("fact id = %q, want fact-conflict", result[0].ID)
+	}
+}
+
+func TestListProvisionalIdentityAssets(t *testing.T) {
+	repo := &fakeRepository{
+		assets: []Asset{
+			{ID: "strong", Type: "device", IdentityKey: "device:vendor_serial:juniper:jn1234"},
+			{ID: "provisional", Type: "device", IdentityKey: "device:hostname:mx-edge-01"},
+		},
+	}
+
+	result, err := NewService(repo).ListProvisionalIdentityAssets(context.Background())
+	if err != nil {
+		t.Fatalf("ListProvisionalIdentityAssets returned error: %v", err)
+	}
+	if got, want := len(result), 1; got != want {
+		t.Fatalf("len = %d, want %d", got, want)
+	}
+	if result[0].ID != "provisional" {
+		t.Fatalf("asset id = %q, want provisional", result[0].ID)
+	}
+}
+
 func TestCreateRelationshipDefaultsMetadata(t *testing.T) {
 	repo := &fakeRepository{}
 
@@ -218,4 +288,13 @@ func TestCreateRelationshipDefaultsMetadata(t *testing.T) {
 	if got, want := repo.relationshipParams.ConfidenceReason, "deterministically inferred without direct evidence"; got != want {
 		t.Fatalf("ConfidenceReason = %q, want %q", got, want)
 	}
+}
+
+func hasMetadataValue(metadata json.RawMessage, key string, value string) bool {
+	var payload map[string]any
+	if err := json.Unmarshal(metadata, &payload); err != nil {
+		return false
+	}
+	got, ok := payload[key].(string)
+	return ok && got == value
 }

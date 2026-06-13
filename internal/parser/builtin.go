@@ -70,11 +70,11 @@ func parseJunosShowVersion(ctx context.Context, item evidence.Evidence, parserNa
 		return result, nil
 	}
 
-	identityKey := assets.MakeIdentityKey("device", "hostname", hostname)
+	identity := assets.IdentityCandidateForAsset("device", "juniper", "", "", hostname, "")
 	result.DeviceIdentities = append(result.DeviceIdentities, DeviceIdentity{
 		AssetRef: AssetRef{
 			AssetType:   "device",
-			IdentityKey: identityKey,
+			IdentityKey: identity.IdentityKey,
 			Confidence:  0.55,
 			EvidenceID:  item.ID,
 		},
@@ -82,19 +82,21 @@ func parseJunosShowVersion(ctx context.Context, item evidence.Evidence, parserNa
 		Vendor:   "juniper",
 		Model:    model,
 		Metadata: mustJSON(map[string]string{
-			"platform": "junos",
-			"command":  item.CommandOrAPI,
+			"platform":          "junos",
+			"command":           item.CommandOrAPI,
+			"identity_strength": string(identity.Strength),
+			"identity_reason":   identity.Reason,
 		}),
 	})
 	result.Facts = append(result.Facts,
-		stringFact(identityKey, "hostname", hostname, parserName, 0.8, item.ID),
-		stringFact(identityKey, "platform", "junos", parserName, 0.8, item.ID),
+		stringFact(identity.IdentityKey, "hostname", hostname, parserName, 0.8, item.ID),
+		stringFact(identity.IdentityKey, "platform", "junos", parserName, 0.8, item.ID),
 	)
 	if model != "" {
-		result.Facts = append(result.Facts, stringFact(identityKey, "model", model, parserName, 0.7, item.ID))
+		result.Facts = append(result.Facts, stringFact(identity.IdentityKey, "model", model, parserName, 0.7, item.ID))
 	}
 	if version != "" {
-		result.Facts = append(result.Facts, stringFact(identityKey, "software_version", version, parserName, 0.7, item.ID))
+		result.Facts = append(result.Facts, stringFact(identity.IdentityKey, "software_version", version, parserName, 0.7, item.ID))
 	}
 	return result, nil
 }
@@ -113,11 +115,11 @@ func parseIOSXRShowVersion(ctx context.Context, item evidence.Evidence, parserNa
 		return result, nil
 	}
 
-	identityKey := assets.MakeIdentityKey("device", "hostname", hostname)
+	identity := assets.IdentityCandidateForAsset("device", "cisco", "", "", hostname, "")
 	result.DeviceIdentities = append(result.DeviceIdentities, DeviceIdentity{
 		AssetRef: AssetRef{
 			AssetType:   "device",
-			IdentityKey: identityKey,
+			IdentityKey: identity.IdentityKey,
 			Confidence:  0.55,
 			EvidenceID:  item.ID,
 		},
@@ -125,19 +127,21 @@ func parseIOSXRShowVersion(ctx context.Context, item evidence.Evidence, parserNa
 		Vendor:   "cisco",
 		Model:    model,
 		Metadata: mustJSON(map[string]string{
-			"platform": "iosxr",
-			"command":  item.CommandOrAPI,
+			"platform":          "iosxr",
+			"command":           item.CommandOrAPI,
+			"identity_strength": string(identity.Strength),
+			"identity_reason":   identity.Reason,
 		}),
 	})
 	result.Facts = append(result.Facts,
-		stringFact(identityKey, "hostname", hostname, parserName, 0.8, item.ID),
-		stringFact(identityKey, "platform", "iosxr", parserName, 0.8, item.ID),
+		stringFact(identity.IdentityKey, "hostname", hostname, parserName, 0.8, item.ID),
+		stringFact(identity.IdentityKey, "platform", "iosxr", parserName, 0.8, item.ID),
 	)
 	if model != "" {
-		result.Facts = append(result.Facts, stringFact(identityKey, "model", model, parserName, 0.65, item.ID))
+		result.Facts = append(result.Facts, stringFact(identity.IdentityKey, "model", model, parserName, 0.65, item.ID))
 	}
 	if version != "" {
-		result.Facts = append(result.Facts, stringFact(identityKey, "software_version", version, parserName, 0.75, item.ID))
+		result.Facts = append(result.Facts, stringFact(identity.IdentityKey, "software_version", version, parserName, 0.75, item.ID))
 	}
 	return result, nil
 }
@@ -222,9 +226,11 @@ func parseJunosShowLLDPNeighbors(ctx context.Context, item evidence.Evidence, pa
 			result.Warnings = append(result.Warnings, "skipped lldp line: "+line)
 			continue
 		}
+		remoteIdentity := assets.IdentityCandidateForAsset("device", "", "", "", parts[4], "")
+		localInterfaceIdentity := assets.IdentityCandidateFromKey("interface", assets.MakeIdentityKey("interface", "name", parts[0]))
 		result.Neighbors = append(result.Neighbors, Neighbor{
 			LocalInterfaceName:  parts[0],
-			RemoteIdentityKey:   assets.MakeIdentityKey("device", "hostname", parts[4]),
+			RemoteIdentityKey:   remoteIdentity.IdentityKey,
 			RemoteSystemName:    parts[4],
 			RemoteInterfaceName: parts[3],
 			Protocol:            "lldp",
@@ -232,8 +238,8 @@ func parseJunosShowLLDPNeighbors(ctx context.Context, item evidence.Evidence, pa
 			Metadata:            mustJSON(map[string]string{"remote_chassis_id": parts[2]}),
 		})
 		result.Relationships = append(result.Relationships, ParsedRelationship{
-			SourceIdentityKey: assets.MakeIdentityKey("interface", "name", parts[0]),
-			TargetIdentityKey: assets.MakeIdentityKey("device", "hostname", parts[4]),
+			SourceIdentityKey: localInterfaceIdentity.IdentityKey,
+			TargetIdentityKey: remoteIdentity.IdentityKey,
 			RelationshipType:  "lldp_neighbor_of",
 			Confidence:        0.75,
 			EvidenceID:        item.ID,
@@ -262,9 +268,11 @@ func parseIOSXRShowLLDPNeighbors(ctx context.Context, item evidence.Evidence, pa
 			result.Warnings = append(result.Warnings, "skipped lldp line: "+line)
 			continue
 		}
+		remoteIdentity := assets.IdentityCandidateForAsset("device", "", "", "", parts[0], "")
+		localInterfaceIdentity := assets.IdentityCandidateFromKey("interface", assets.MakeIdentityKey("interface", "name", parts[1]))
 		result.Neighbors = append(result.Neighbors, Neighbor{
 			LocalInterfaceName:  parts[1],
-			RemoteIdentityKey:   assets.MakeIdentityKey("device", "hostname", parts[0]),
+			RemoteIdentityKey:   remoteIdentity.IdentityKey,
 			RemoteSystemName:    parts[0],
 			RemoteInterfaceName: parts[4],
 			Protocol:            "lldp",
@@ -272,8 +280,8 @@ func parseIOSXRShowLLDPNeighbors(ctx context.Context, item evidence.Evidence, pa
 			Metadata:            mustJSON(map[string]string{"capability": parts[3]}),
 		})
 		result.Relationships = append(result.Relationships, ParsedRelationship{
-			SourceIdentityKey: assets.MakeIdentityKey("interface", "name", parts[1]),
-			TargetIdentityKey: assets.MakeIdentityKey("device", "hostname", parts[0]),
+			SourceIdentityKey: localInterfaceIdentity.IdentityKey,
+			TargetIdentityKey: remoteIdentity.IdentityKey,
 			RelationshipType:  "lldp_neighbor_of",
 			Confidence:        0.75,
 			EvidenceID:        item.ID,
@@ -295,11 +303,11 @@ func component(componentType string, name string, vendor string, model string, s
 	if assetType == "" {
 		assetType = "component"
 	}
-	identityKey := assets.MakeIdentityKey(assetType, "serial", serial)
+	identity := assets.IdentityCandidateForAsset(assetType, vendor, serial, "", "", "")
 	return InventoryComponent{
 		AssetRef: AssetRef{
 			AssetType:   assetType,
-			IdentityKey: identityKey,
+			IdentityKey: identity.IdentityKey,
 			Confidence:  confidence,
 			EvidenceID:  evidenceID,
 		},

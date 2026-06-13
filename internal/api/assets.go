@@ -79,6 +79,30 @@ func handleGetAsset(service *assets.Service) http.HandlerFunc {
 	}
 }
 
+func handleListProvisionalIdentityAssets(service *assets.Service) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if service == nil {
+			writeError(w, http.StatusServiceUnavailable, "asset repository is not configured")
+			return
+		}
+
+		page, err := parsePagination(r)
+		if err != nil {
+			writeError(w, http.StatusBadRequest, err.Error())
+			return
+		}
+
+		items, err := service.ListProvisionalIdentityAssets(r.Context())
+		if err != nil {
+			writeError(w, http.StatusInternalServerError, err.Error())
+			return
+		}
+		paged, metadata := paginate(items, page)
+
+		writeDataWithMetadata(w, http.StatusOK, map[string][]assets.Asset{"assets": paged}, metadata)
+	}
+}
+
 func handleListAssetFacts(service *assets.Service) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if service == nil {
@@ -141,6 +165,30 @@ func handleListAssetRelationships(service *assets.Service) http.HandlerFunc {
 		paged, metadata := paginate(items, page)
 
 		writeDataWithMetadata(w, http.StatusOK, map[string][]assets.Relationship{"relationships": paged}, metadata)
+	}
+}
+
+func handleListConflictingFacts(service *assets.Service) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if service == nil {
+			writeError(w, http.StatusServiceUnavailable, "asset repository is not configured")
+			return
+		}
+
+		page, err := parsePagination(r)
+		if err != nil {
+			writeError(w, http.StatusBadRequest, err.Error())
+			return
+		}
+
+		items, err := service.ListConflictingFacts(r.Context())
+		if err != nil {
+			writeError(w, http.StatusInternalServerError, err.Error())
+			return
+		}
+		paged, metadata := paginate(items, page)
+
+		writeDataWithMetadata(w, http.StatusOK, map[string][]assets.Fact{"facts": paged}, metadata)
 	}
 }
 

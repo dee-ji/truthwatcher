@@ -49,6 +49,9 @@ func TestJunosShowVersionParser(t *testing.T) {
 	if got, want := device.Hostname, "mx-edge-01"; got != want {
 		t.Fatalf("hostname = %q, want %q", got, want)
 	}
+	if got, want := device.IdentityKey, "device:hostname:mx-edge-01"; got != want {
+		t.Fatalf("identity key = %q, want %q", got, want)
+	}
 	if got, want := device.Vendor, "juniper"; got != want {
 		t.Fatalf("vendor = %q, want %q", got, want)
 	}
@@ -71,6 +74,9 @@ func TestJunosShowChassisHardwareParser(t *testing.T) {
 	}
 	if got, want := result.InventoryComponents[0].ComponentType, "chassis"; got != want {
 		t.Fatalf("component type = %q, want %q", got, want)
+	}
+	if got, want := result.InventoryComponents[0].IdentityKey, "chassis:vendor_serial:juniper:jn1234abcdef"; got != want {
+		t.Fatalf("identity key = %q, want %q", got, want)
 	}
 }
 

@@ -1168,6 +1168,79 @@ func TestListAssetsRejectsInvalidPagination(t *testing.T) {
 	}
 }
 
+func TestListProvisionalIdentityAssets(t *testing.T) {
+	service := assets.NewService(&fakeAssetRepository{
+		assets: []assets.Asset{
+			{
+				ID:          "asset-strong",
+				Type:        "device",
+				IdentityKey: "device:vendor_serial:juniper:jn1234",
+				Metadata:    json.RawMessage(`{"identity_strength":"strong"}`),
+			},
+			{
+				ID:          "asset-provisional",
+				Type:        "device",
+				IdentityKey: "device:hostname:mx-edge-01",
+				Metadata:    json.RawMessage(`{"identity_strength":"provisional"}`),
+			},
+		},
+	})
+	handler := NewHandler(Options{
+		Version: "test-version",
+		Assets:  &service,
+	})
+
+	response := httptest.NewRecorder()
+	request := httptest.NewRequest(http.MethodGet, "/api/v1/assets/provisional-identities", nil)
+	handler.ServeHTTP(response, request)
+
+	if response.Code != http.StatusOK {
+		t.Fatalf("status = %d, want %d; body=%s", response.Code, http.StatusOK, response.Body.String())
+	}
+
+	body := decodeResponseData[struct {
+		Assets []assets.Asset `json:"assets"`
+	}](t, response)
+	if got, want := len(body.Assets), 1; got != want {
+		t.Fatalf("asset count = %d, want %d", got, want)
+	}
+	if body.Assets[0].ID != "asset-provisional" {
+		t.Fatalf("asset id = %q, want asset-provisional", body.Assets[0].ID)
+	}
+}
+
+func TestListConflictingFacts(t *testing.T) {
+	service := assets.NewService(&fakeAssetRepository{
+		assets: []assets.Asset{{ID: "asset-a"}},
+		facts: []assets.Fact{
+			{ID: "fact-ok", AssetID: "asset-a", Name: "hostname", State: assets.StateObserved},
+			{ID: "fact-conflict", AssetID: "asset-a", Name: "hostname", State: assets.StateConflicting},
+		},
+	})
+	handler := NewHandler(Options{
+		Version: "test-version",
+		Assets:  &service,
+	})
+
+	response := httptest.NewRecorder()
+	request := httptest.NewRequest(http.MethodGet, "/api/v1/facts/conflicts", nil)
+	handler.ServeHTTP(response, request)
+
+	if response.Code != http.StatusOK {
+		t.Fatalf("status = %d, want %d; body=%s", response.Code, http.StatusOK, response.Body.String())
+	}
+
+	body := decodeResponseData[struct {
+		Facts []assets.Fact `json:"facts"`
+	}](t, response)
+	if got, want := len(body.Facts), 1; got != want {
+		t.Fatalf("fact count = %d, want %d", got, want)
+	}
+	if body.Facts[0].ID != "fact-conflict" {
+		t.Fatalf("fact id = %q, want fact-conflict", body.Facts[0].ID)
+	}
+}
+
 func TestGetAsset(t *testing.T) {
 	service := assets.NewService(testAssetRepository())
 	handler := NewHandler(Options{

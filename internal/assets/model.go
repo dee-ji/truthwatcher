@@ -148,6 +148,7 @@ func (s Service) CreateAsset(ctx context.Context, params CreateAssetParams) (Ass
 	if !json.Valid(params.Metadata) {
 		return Asset{}, fmt.Errorf("metadata must be valid JSON")
 	}
+	params.Metadata = AnnotateIdentityMetadata(params.Metadata, IdentityCandidateFromKey(params.Type, params.IdentityKey))
 
 	return s.repo.CreateAsset(ctx, params)
 }
@@ -277,6 +278,47 @@ func (s Service) ListRelationships(ctx context.Context) ([]Relationship, error) 
 		return nil, fmt.Errorf("asset repository is required")
 	}
 	return s.repo.ListRelationships(ctx)
+}
+
+func (s Service) ListConflictingFacts(ctx context.Context) ([]Fact, error) {
+	if s.repo == nil {
+		return nil, fmt.Errorf("asset repository is required")
+	}
+	items, err := s.repo.ListAssets(ctx)
+	if err != nil {
+		return nil, err
+	}
+	var conflicts []Fact
+	for _, item := range items {
+		facts, err := s.repo.ListFactsByAsset(ctx, item.ID)
+		if err != nil {
+			return nil, err
+		}
+		for _, fact := range facts {
+			if fact.State == StateConflicting {
+				conflicts = append(conflicts, fact)
+			}
+		}
+	}
+	return conflicts, nil
+}
+
+func (s Service) ListProvisionalIdentityAssets(ctx context.Context) ([]Asset, error) {
+	if s.repo == nil {
+		return nil, fmt.Errorf("asset repository is required")
+	}
+	items, err := s.repo.ListAssets(ctx)
+	if err != nil {
+		return nil, err
+	}
+	result := make([]Asset, 0)
+	for _, item := range items {
+		candidate := IdentityCandidateForStoredAsset(item)
+		if candidate.Strength != IdentityStrengthStrong {
+			result = append(result, item)
+		}
+	}
+	return result, nil
 }
 
 func MakeIdentityKey(assetType, source, value string) string {

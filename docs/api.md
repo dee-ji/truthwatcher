@@ -331,6 +331,28 @@ Pagination metadata is returned in `metadata.pagination`:
 }
 ```
 
+### `GET /api/v1/assets/provisional-identities`
+
+Lists assets whose identity is weak or provisional. This is a review endpoint only; it does not merge or rewrite assets.
+
+Response `data`:
+
+```json
+{
+  "assets": [
+    {
+      "id": "33333333-3333-4333-8333-333333333333",
+      "identity_key": "device:hostname:mx-edge-01",
+      "metadata": {
+        "identity_strength": "provisional",
+        "identity_reason": "hostname is not globally unique and may change",
+        "identity_provisional": true
+      }
+    }
+  ]
+}
+```
+
 ### `GET /api/v1/assets`
 
 Lists assets.
@@ -381,6 +403,26 @@ Response `data`:
 ```json
 {
   "facts": []
+}
+```
+
+### `GET /api/v1/facts/conflicts`
+
+Lists facts marked `conflicting` because they disagree with an existing fact for the same asset. Existing facts are not overwritten.
+
+Response `data`:
+
+```json
+{
+  "facts": [
+    {
+      "id": "44444444-4444-4444-8444-444444444444",
+      "asset_id": "33333333-3333-4333-8333-333333333333",
+      "name": "software_version",
+      "state": "conflicting",
+      "confidence_reason": "conflicts with existing fact 55555555-5555-4555-8555-555555555555"
+    }
+  ]
 }
 ```
 

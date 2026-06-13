@@ -29,7 +29,27 @@ Stronger identity anchors include:
 - vendor hardware ID
 - external durable identifier
 
-When only weak identifiers are available, Truthwatcher can use provisional identity and improve it later when stronger evidence exists.
+When only weak identifiers are available, Truthwatcher uses provisional identity and leaves it visible for review. It does not assume hostnames, interface names, or IP addresses are globally unique.
+
+Current deterministic identity behavior:
+
+- `vendor` plus `serial` creates a strong identity such as `device:vendor_serial:juniper:jn1234`.
+- `system_mac` creates a strong identity such as `device:system_mac:00:11:22:33:44:55`.
+- `serial` alone is treated as strong but less preferred than vendor plus serial.
+- `hostname`, `ip`, and `name` identities are provisional.
+- Unknown identity keys are weak.
+
+Assets include identity metadata:
+
+- `identity_strength`: `strong`, `provisional`, or `weak`
+- `identity_reason`: why that strength was assigned
+- `identity_provisional`: `true` unless the identity is strong
+
+Review provisional or weak identities through:
+
+```text
+GET /api/v1/assets/provisional-identities
+```
 
 ## Facts
 
@@ -81,6 +101,14 @@ Truthwatcher makes uncertainty explicit. Current states are:
 
 The model should mark conflicts instead of silently overwriting facts.
 
+When a new fact disagrees with an existing non-conflicting fact of the same name for the same asset, Truthwatcher records the new fact with `state=conflicting` and keeps the existing fact. This is intentionally non-destructive; humans or later explicit merge workflows can review the disagreement.
+
+Review conflicting facts through:
+
+```text
+GET /api/v1/facts/conflicts
+```
+
 ## Graph Views
 
 Graph APIs project assets and relationships into frontend-friendly nodes and edges:
@@ -94,4 +122,4 @@ Graph views are a projection of the relational model, not a separate graph datab
 
 ## Current Boundary
 
-Truthwatcher has parser interfaces and first fixture parsers, but automatic persistence of parser outputs into assets, facts, and relationships is not treated as complete unless the relevant workflow explicitly writes those records.
+Truthwatcher can explicitly parse stored discovery-run evidence into persisted assets, facts, and relationships. It still does not perform automatic destructive merges when stronger identity evidence appears later.
