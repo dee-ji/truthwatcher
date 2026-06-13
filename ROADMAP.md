@@ -58,10 +58,11 @@ Completed:
 - Environment-based configuration and standard-library structured logging added for the server.
 - PostgreSQL database foundation added with `database/sql`, embedded migrations, and `truthwatcher migrate up/status`.
 - HTTP API foundation added with health, readiness, version, request ID, request logging, and panic recovery middleware.
+- Single-binary local packaging added with command help, embedded migrations/UI validation, install documentation, and `make release-local`.
 
 Next steps:
 
-- Execute `prompts/05_DISCOVERY_RUNS.md` only when explicitly requested.
+- Add installer checksums or signed release artifacts only when explicitly requested.
 
 ## Phase 2: Evidence Store
 

@@ -31,6 +31,65 @@ func TestVersionCommand(t *testing.T) {
 	}
 }
 
+func TestCommandHelpDoesNotRequireRuntimeDependencies(t *testing.T) {
+	tests := []struct {
+		name string
+		args []string
+		want []string
+	}{
+		{
+			name: "root",
+			args: []string{"--help"},
+			want: []string{"Usage:", "truthwatcher server", "truthwatcher migrate", "truthwatcher discover fake"},
+		},
+		{
+			name: "version",
+			args: []string{"version", "--help"},
+			want: []string{"Usage:", "truthwatcher version"},
+		},
+		{
+			name: "server",
+			args: []string{"server", "--help"},
+			want: []string{"Usage:", "truthwatcher server", "embedded UI"},
+		},
+		{
+			name: "migrate",
+			args: []string{"migrate", "--help"},
+			want: []string{"Usage:", "truthwatcher migrate up", "embedded PostgreSQL migrations"},
+		},
+		{
+			name: "discover",
+			args: []string{"discover", "--help"},
+			want: []string{"Usage:", "truthwatcher discover fake", "without touching a network"},
+		},
+		{
+			name: "discover fake",
+			args: []string{"discover", "fake", "--help"},
+			want: []string{"Usage:", "truthwatcher discover fake", "read-only policy engine"},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var stdout bytes.Buffer
+			var stderr bytes.Buffer
+
+			err := New().Run(context.Background(), tt.args, &stdout, &stderr)
+			if err != nil {
+				t.Fatalf("help command returned error: %v", err)
+			}
+			for _, want := range tt.want {
+				if !strings.Contains(stdout.String(), want) {
+					t.Fatalf("stdout = %q, want substring %q", stdout.String(), want)
+				}
+			}
+			if stderr.Len() != 0 {
+				t.Fatalf("stderr = %q, want empty", stderr.String())
+			}
+		})
+	}
+}
+
 func TestServerCommandStartsAndStops(t *testing.T) {
 	var stdout bytes.Buffer
 	var stderr bytes.Buffer

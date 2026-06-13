@@ -75,6 +75,10 @@ func (a App) Run(ctx context.Context, args []string, stdout, stderr io.Writer) e
 }
 
 func (a App) runVersion(args []string, stdout io.Writer) error {
+	if wantsHelp(args) {
+		printVersionHelp(stdout)
+		return nil
+	}
 	if len(args) != 0 {
 		return fmt.Errorf("version accepts no arguments")
 	}
@@ -89,6 +93,11 @@ func (a App) runVersion(args []string, stdout io.Writer) error {
 }
 
 func (a App) runServer(ctx context.Context, args []string, stdout, stderr io.Writer) error {
+	if wantsHelp(args) {
+		printServerHelp(stdout)
+		return nil
+	}
+
 	loadConfig := a.loadConfig
 	if loadConfig == nil {
 		loadConfig = config.Load
@@ -128,6 +137,10 @@ func (a App) runServer(ctx context.Context, args []string, stdout, stderr io.Wri
 }
 
 func (a App) runMigrate(ctx context.Context, args []string, stdout io.Writer) error {
+	if wantsHelp(args) {
+		printMigrateHelp(stdout)
+		return nil
+	}
 	if len(args) != 1 {
 		return fmt.Errorf("usage: truthwatcher migrate up|status")
 	}
@@ -194,6 +207,10 @@ func (a App) runDiscover(ctx context.Context, args []string, stdout, stderr io.W
 	if len(args) == 0 {
 		return fmt.Errorf("usage: truthwatcher discover fake --target fixture://junos-mx")
 	}
+	if isHelpArg(args[0]) {
+		printDiscoverHelp(stdout)
+		return nil
+	}
 
 	switch args[0] {
 	case "fake":
@@ -204,6 +221,11 @@ func (a App) runDiscover(ctx context.Context, args []string, stdout, stderr io.W
 }
 
 func (a App) runDiscoverFake(ctx context.Context, args []string, stdout, stderr io.Writer) error {
+	if wantsHelp(args) {
+		printDiscoverFakeHelp(stdout)
+		return nil
+	}
+
 	loadConfig := a.loadConfig
 	if loadConfig == nil {
 		loadConfig = config.Load
@@ -386,6 +408,19 @@ func parseDiscoveryTasks(taskList string) ([]policy.Task, error) {
 	return tasks, nil
 }
 
+func wantsHelp(args []string) bool {
+	for _, arg := range args {
+		if isHelpArg(arg) {
+			return true
+		}
+	}
+	return false
+}
+
+func isHelpArg(arg string) bool {
+	return arg == "-h" || arg == "--help" || arg == "help"
+}
+
 func printUsage(w io.Writer) {
 	fmt.Fprint(w, `Usage:
   truthwatcher version
@@ -399,5 +434,71 @@ Commands:
   server    Start the HTTP server skeleton.
   migrate   Run or inspect database migrations.
   discover  Run a local fixture-backed discovery.
+
+Run "truthwatcher <command> --help" for command details.
+`)
+}
+
+func printVersionHelp(w io.Writer) {
+	fmt.Fprint(w, `Usage:
+  truthwatcher version
+
+Print the Truthwatcher binary version.
+`)
+}
+
+func printServerHelp(w io.Writer) {
+	fmt.Fprint(w, `Usage:
+  truthwatcher server [--addr 127.0.0.1:8080] [--config ./truthwatcher.yaml]
+
+Start the single-binary HTTP server. When TRUTHWATCHER_DATABASE_URL is set,
+the server connects to PostgreSQL for API-backed data; without it, the server
+still serves health, version, and embedded UI routes.
+
+Flags:
+  --addr    HTTP listen address. Overrides TRUTHWATCHER_ADDR.
+  --config  Reserved path for future local config-file support.
+`)
+}
+
+func printMigrateHelp(w io.Writer) {
+	fmt.Fprint(w, `Usage:
+  truthwatcher migrate up
+  truthwatcher migrate status
+
+Run embedded PostgreSQL migrations compiled into the Truthwatcher binary.
+TRUTHWATCHER_DATABASE_URL is required.
+
+Subcommands:
+  up      Apply all pending embedded migrations.
+  status  Print each embedded migration and whether it is applied.
+`)
+}
+
+func printDiscoverHelp(w io.Writer) {
+	fmt.Fprint(w, `Usage:
+  truthwatcher discover fake --target fixture://junos-mx
+
+Run a discovery workflow. The current packaged workflow is fake fixture-backed
+discovery, which stores evidence without touching a network.
+
+Subcommands:
+  fake  Collect fixture-backed evidence and store it in PostgreSQL.
+`)
+}
+
+func printDiscoverFakeHelp(w io.Writer) {
+	fmt.Fprint(w, `Usage:
+  truthwatcher discover fake --target fixture://junos-mx [--profile juniper_junos] [--tasks identify_device,get_inventory]
+
+Collect deterministic fixture-backed command outputs, check them through the
+read-only policy engine, and store raw evidence before any facts are created.
+TRUTHWATCHER_DATABASE_URL is required.
+
+Flags:
+  --target    Fixture target, for example fixture://junos-mx or fixture://iosxr-pe.
+  --profile   Built-in discovery profile. Inferred from target when omitted.
+  --tasks     Comma-separated safe discovery tasks. Defaults to fixture-backed basics.
+  --fixtures  Fixture root directory. Defaults to examples/fixtures.
 `)
 }
