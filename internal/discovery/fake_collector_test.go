@@ -3,6 +3,7 @@ package discovery
 import (
 	"context"
 	"errors"
+	"reflect"
 	"strings"
 	"testing"
 
@@ -88,6 +89,33 @@ func TestFakeCollectorCollectsIOSXRFixtureOutputs(t *testing.T) {
 	}
 	if got, want := len(outputs), 5; got != want {
 		t.Fatalf("output count = %d, want %d", got, want)
+	}
+}
+
+func TestFakeCollectorIsDeterministic(t *testing.T) {
+	profile, ok := BuiltInProfile(ProfileJuniperJunos)
+	if !ok {
+		t.Fatal("expected Junos profile")
+	}
+	collector := NewFakeCollector("../../examples/fixtures", policy.NewEngine())
+	tasks := []policy.Task{policy.TaskIdentifyDevice, policy.TaskGetInventory, policy.TaskGetNeighbors}
+
+	first, err := collector.Collect(context.Background(), "fixture://junos-mx", profile, tasks)
+	if err != nil {
+		t.Fatalf("first Collect returned error: %v", err)
+	}
+	second, err := collector.Collect(context.Background(), "fixture://junos-mx", profile, tasks)
+	if err != nil {
+		t.Fatalf("second Collect returned error: %v", err)
+	}
+
+	if !reflect.DeepEqual(first, second) {
+		t.Fatalf("fake collector output is not deterministic\nfirst=%#v\nsecond=%#v", first, second)
+	}
+	for i, output := range first {
+		if output.Task != tasks[i] {
+			t.Fatalf("output %d task = %q, want %q", i, output.Task, tasks[i])
+		}
 	}
 }
 
