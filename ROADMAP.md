@@ -354,6 +354,14 @@ Define clear interfaces for:
 - export adapters
 - enrichment adapters
 
+Completed:
+
+- Compile-time Go extensibility contracts defined for collectors, parsers, importers, exporters, enrichers, and planners without dynamic plugin loading.
+
+Next steps:
+
+- Add one boring in-repo file import adapter only when explicitly requested.
+
 ### Phase E1: File Import Adapter
 
 Add a simple YAML/JSON/CSV import adapter to seed known facts.

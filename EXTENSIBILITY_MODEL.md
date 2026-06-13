@@ -88,6 +88,129 @@ Every adapter should answer these questions:
 9. What data should never be imported?
 10. How can the adapter be disabled safely?
 
+## Kernel Extension Contracts
+
+Truthwatcher defines extension contracts as Go interfaces first. These are compile-time contracts, not a dynamic plugin runtime.
+
+The contract package must not make the kernel depend on any specific external system. A connector may depend on an external API client in its own package later, but the core kernel must continue to depend only on Truthwatcher primitives.
+
+Initial contract types:
+
+- `Collector`: gathers read-only raw outputs for approved discovery tasks.
+- `Parser`: converts stored evidence into normalized model candidates without writing directly to the database.
+- `Importer`: reads data from an external system and returns evidence-backed model candidates.
+- `Exporter`: sends a kernel snapshot to another system when explicitly invoked.
+- `Enricher`: proposes additional evidence-backed facts or relationships from existing kernel data plus optional external context.
+- `Planner`: proposes safe next discovery steps but does not execute them.
+
+All contracts must preserve these boundaries:
+
+- Connectors return evidence, candidates, snapshots, or plans.
+- The kernel owns persistence decisions.
+- The kernel owns confidence scoring rules.
+- The kernel owns conflict handling.
+- The kernel owns policy enforcement for discovery execution.
+- Planners must not execute.
+- Importers and enrichers must not silently overwrite facts.
+- Collectors must be read-only and policy-gated.
+- Parsers must not require network access.
+- Exporters must be optional and explicitly invoked.
+
+Dynamic loading is intentionally deferred.
+
+Do not add HashiCorp `go-plugin`, Go `plugin`, WASM loading, subprocess plugin execution, or marketplace-style runtime registration until the stable kernel contracts have been exercised by at least one boring in-repo adapter.
+
+## Future Connector Examples
+
+These examples describe expected boundaries only. They are not implementation commitments for the current milestone.
+
+### IPAM Importer
+
+Purpose:
+
+- Import prefixes, IP addresses, VRFs, sites, tenants, reservations, and utilization metadata.
+
+Expected behavior:
+
+- Read from an IPAM system using explicit credentials or credential references.
+- Store imported records as evidence.
+- Produce assets and facts such as site, prefix, VRF, assigned IP, owner, and reservation state.
+- Mark imported facts as sourced from the IPAM adapter, not as observed network truth.
+
+Kernel boundary:
+
+- Truthwatcher must not assume one IPAM product.
+- IPAM data should be compared with observed routing/interface evidence, not treated as automatically correct.
+
+### Monitoring Enricher
+
+Purpose:
+
+- Add operational context such as last seen time, maintenance state, or known alarm references.
+
+Expected behavior:
+
+- Read operational metadata only.
+- Return enrichment candidates linked to external evidence.
+- Avoid becoming alerting, polling, or observability inside Truthwatcher.
+
+Kernel boundary:
+
+- Monitoring data enriches the graph but does not turn Truthwatcher into an NMS.
+- Availability and alarm workflows remain outside the kernel.
+
+### EMS Importer Or Collector
+
+Purpose:
+
+- Import inventory and controller-managed relationships from an element management system.
+
+Expected behavior:
+
+- Use read-only EMS/API access.
+- Store EMS responses as evidence.
+- Produce assets for managed devices/controllers and relationships such as `managed_by`.
+- Keep EMS-specific object details in JSONB metadata unless they become stable kernel nouns.
+
+Kernel boundary:
+
+- EMS access must require explicit configuration and approval.
+- EMS hints do not authorize device access or scope expansion.
+
+### Cloud API Importer
+
+Purpose:
+
+- Import cloud network inventory such as VPCs/VNets, subnets, gateways, route tables, interfaces, and tags.
+
+Expected behavior:
+
+- Use read-only cloud API permissions.
+- Store API responses as evidence.
+- Produce generic assets and relationships without coupling the kernel to one cloud provider.
+
+Kernel boundary:
+
+- Cloud provider SDKs belong in connector packages, not the kernel.
+- Cloud resources should map to stable Truthwatcher primitives.
+
+### Config Archive Importer Or Parser
+
+Purpose:
+
+- Import historical or current network configuration files from a read-only archive.
+
+Expected behavior:
+
+- Store each config file as evidence.
+- Parse only safe facts and relationships.
+- Preserve parser warnings when syntax is unsupported or ambiguous.
+
+Kernel boundary:
+
+- Config archives are evidence, not live device state.
+- Imported config must not trigger network actions.
+
 ## Integration Types
 
 Truthwatcher should support multiple integration patterns.
