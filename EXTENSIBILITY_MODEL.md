@@ -284,6 +284,86 @@ The script receives structured input and returns structured output.
 
 The script must return evidence, facts, and relationships in a documented schema.
 
+BYO script execution is high risk if treated casually. Truthwatcher must keep it local, explicit, and disabled by default.
+
+Script runner rules:
+
+- Server mode must not allow arbitrary script execution by default.
+- A local caller must explicitly enable the script runner.
+- A local caller must allowlist the exact script path.
+- The runner must execute the script directly, not through a shell.
+- The runner must pass input JSON on stdin.
+- The script must return output JSON on stdout.
+- The runner must enforce a timeout.
+- The runner must validate requested tasks through the policy engine before execution.
+- The runner must validate returned evidence `command_or_api` values through the policy engine.
+- Scripts must not mutate network state.
+- Scripts must not guess credentials.
+- Scripts must not perform brute force, scans, config changes, clears, reloads, commits, copies, deletes, or writes.
+- Scripts must return evidence or normalized candidates; arbitrary logs are not valid output.
+
+Input JSON:
+
+```json
+{
+  "target": "fixture://junos-mx",
+  "method": "script",
+  "profile": "juniper_junos",
+  "tasks": ["identify_device"],
+  "credential_ref": "optional-local-reference",
+  "dry_run": true,
+  "context": {
+    "note": "adapter-specific context"
+  }
+}
+```
+
+Output JSON:
+
+```json
+{
+  "evidence": [
+    {
+      "target": "fixture://junos-mx",
+      "method": "script",
+      "command_or_api": "show version",
+      "raw_output": "Hostname: fixture-junos-mx",
+      "metadata": {
+        "script": "emit_static_version.sh"
+      }
+    }
+  ],
+  "candidates": {
+    "facts": [
+      {
+        "asset_id": "asset-placeholder",
+        "name": "hostname",
+        "value": "fixture-junos-mx",
+        "source": "byo_script",
+        "confidence": 0.4,
+        "confidence_reason": "returned by local BYO script",
+        "state": "user_seeded"
+      }
+    ]
+  },
+  "warnings": [
+    "script output is untrusted until persisted by the kernel"
+  ]
+}
+```
+
+Exit codes:
+
+- `0`: script completed and stdout contains valid output JSON.
+- Non-zero: script failed; stderr may contain a short diagnostic.
+- Timeout: runner kills the process and treats the run as failed.
+
+Evidence-first rule:
+
+- If the script learned something from an external source, it should return raw evidence.
+- Normalized facts or relationships should be linked to evidence when possible.
+- Seeded or imported facts must not pretend to be observed device evidence.
+
 ### Plugin Adapter
 
 A compiled or loaded Go plugin may add support for a new vendor, protocol, parser, or data source.

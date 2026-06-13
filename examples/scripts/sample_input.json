@@ -1,0 +1,10 @@
+{
+  "target": "fixture://junos-mx",
+  "method": "script",
+  "profile": "juniper_junos",
+  "tasks": ["identify_device"],
+  "dry_run": true,
+  "context": {
+    "note": "local script examples must not touch the network"
+  }
+}

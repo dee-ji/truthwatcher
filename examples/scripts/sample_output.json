@@ -1,0 +1,30 @@
+{
+  "evidence": [
+    {
+      "target": "fixture://junos-mx",
+      "method": "script",
+      "command_or_api": "show version",
+      "raw_output": "Hostname: fixture-junos-mx\nModel: mx480\nJunos: 22.4R1",
+      "metadata": {
+        "script": "emit_static_version.sh",
+        "network_access": false
+      }
+    }
+  ],
+  "candidates": {
+    "facts": [
+      {
+        "asset_id": "asset-placeholder",
+        "name": "hostname",
+        "value": "fixture-junos-mx",
+        "source": "byo_script",
+        "confidence": 0.4,
+        "confidence_reason": "returned by local BYO script; not yet observed by built-in collector",
+        "state": "user_seeded"
+      }
+    ]
+  },
+  "warnings": [
+    "example output is static fixture data, not live network evidence"
+  ]
+}
