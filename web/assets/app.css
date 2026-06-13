@@ -380,7 +380,8 @@ button:disabled {
 }
 
 .field input,
-.field select {
+.field select,
+.field textarea {
   width: 100%;
   padding: .8rem .9rem;
   border: 1px solid var(--line);
@@ -388,6 +389,10 @@ button:disabled {
   color: var(--ink);
   font: inherit;
   background: rgb(255 250 241 / 82%);
+}
+
+.field textarea {
+  resize: vertical;
 }
 
 .task-list {
@@ -698,6 +703,89 @@ button:disabled {
   white-space: pre-wrap;
 }
 
+.plan-layout {
+  display: grid;
+  grid-template-columns: minmax(0, .95fr) minmax(0, 1.05fr);
+  gap: 1rem;
+  align-items: start;
+}
+
+.plan-result {
+  min-height: 360px;
+}
+
+.approval-banner {
+  display: grid;
+  gap: .25rem;
+  margin-bottom: 1rem;
+  padding: 1rem;
+  border: 1px solid rgb(47 125 85 / 24%);
+  border-radius: 20px;
+  color: var(--ok);
+  background: rgb(47 125 85 / 8%);
+}
+
+.approval-banner strong {
+  font-size: 1.05rem;
+  letter-spacing: -.02em;
+}
+
+.plan-step-list {
+  display: grid;
+  gap: .8rem;
+  padding: 0;
+  margin: 0 0 1rem;
+  list-style: none;
+}
+
+.plan-step {
+  display: grid;
+  gap: .7rem;
+  padding: 1rem;
+  border: 1px solid rgb(16 32 39 / 10%);
+  border-radius: 18px;
+  background: rgb(255 250 241 / 72%);
+}
+
+.plan-step > div {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: .75rem;
+}
+
+.plan-step dl {
+  display: grid;
+  grid-template-columns: 150px minmax(0, 1fr);
+  gap: .45rem .75rem;
+  margin: 0;
+}
+
+.plan-step dt {
+  color: var(--muted);
+  font-size: .74rem;
+  font-weight: 800;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+}
+
+.plan-step dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.risk-badge {
+  padding: .24rem .52rem;
+  border: 1px solid rgb(47 125 85 / 24%);
+  border-radius: 999px;
+  color: var(--ok);
+  font-size: .72rem;
+  font-weight: 900;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  background: rgb(47 125 85 / 8%);
+}
+
 .ask-layout {
   display: grid;
   grid-template-columns: minmax(0, 1fr) 320px;
@@ -854,7 +942,12 @@ button:disabled {
 
   .ask-layout,
   .chat-form,
-  .asset-meta-grid {
+  .asset-meta-grid,
+  .plan-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .plan-step dl {
     grid-template-columns: 1fr;
   }
 

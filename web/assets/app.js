@@ -67,6 +67,11 @@ async function renderRoute() {
     return;
   }
 
+  if (route === "/discovery-plans") {
+    renderDiscoveryPlansView();
+    return;
+  }
+
   if (route === "/graph") {
     await renderGraphView();
     return;
@@ -91,6 +96,9 @@ function setActiveNav(route) {
   }
   if (route.startsWith("/assets")) {
     active = document.querySelector('[data-nav="assets"]');
+  }
+  if (route === "/discovery-plans") {
+    active = document.querySelector('[data-nav="discovery-plans"]');
   }
   if (route === "/graph") {
     active = document.querySelector('[data-nav="graph"]');
@@ -149,6 +157,11 @@ async function renderDashboard() {
         <span class="card-label">Graph</span>
         <h2>Inspect relationships</h2>
         <p>Render a small asset neighborhood with confidence visible on every edge.</p>
+      </article>
+      <article class="card">
+        <span class="card-label">Planner</span>
+        <h2>Review safe next steps</h2>
+        <p>Create read-only discovery plans that require human approval before execution.</p>
       </article>
       <article class="card">
         <span class="card-label">Ask Truthwatcher</span>
@@ -589,6 +602,173 @@ function assetRelationshipsMarkup(relationships, assetID) {
         `;
       }).join("")}
     </ul>
+  `;
+}
+
+function renderDiscoveryPlansView() {
+  app.innerHTML = `
+    <section class="section-header">
+      <div>
+        <p class="eyebrow">Discovery planner</p>
+        <h1>Review safe discovery plans</h1>
+        <p>Suggest read-only next steps from a single explicit target. Plans require human approval and are not executed automatically.</p>
+      </div>
+      <a class="button secondary" href="#/">Back to dashboard</a>
+    </section>
+    <section class="plan-layout">
+      <form class="form-panel" id="discovery-plan-form">
+        <div class="readonly-note">
+          Planning only. This page cannot execute discovery, guess credentials, or expand target scope.
+        </div>
+        <div class="form-grid">
+          <div class="field">
+            <label for="plan-target">Target</label>
+            <input id="plan-target" name="target" value="fixture://junos-mx" required>
+          </div>
+          <div class="field">
+            <label for="plan-method">Method</label>
+            <select id="plan-method" name="method">
+              <option value="fake">fake</option>
+              <option value="ssh">ssh</option>
+            </select>
+          </div>
+          <div class="field">
+            <label for="plan-profile">Profile</label>
+            <select id="plan-profile" name="profile">
+              <option value="juniper_junos">juniper_junos</option>
+              <option value="cisco_iosxr">cisco_iosxr</option>
+            </select>
+          </div>
+          <div class="field">
+            <label for="plan-seed-input">Seed input JSON</label>
+            <textarea id="plan-seed-input" name="seed_input" rows="5" placeholder='{"target":"fixture://junos-mx","method":"fake","profile":"juniper_junos"}'></textarea>
+          </div>
+          <fieldset class="task-list">
+            <legend>Optional tasks</legend>
+            <div class="task-options">
+              ${discoveryTasks.map((task) => `
+                <label>
+                  <input type="checkbox" name="tasks" value="${escapeHTML(task)}">
+                  ${escapeHTML(task)}
+                </label>
+              `).join("")}
+            </div>
+          </fieldset>
+        </div>
+        <div class="form-actions">
+          <button type="submit">Create plan</button>
+          <span class="muted" id="plan-message">Planner returns suggestions only.</span>
+        </div>
+      </form>
+      <section class="detail-panel plan-result" id="plan-result">
+        <div class="empty-state">Submit a seed target to review suggested read-only steps.</div>
+      </section>
+    </section>
+  `;
+
+  document.getElementById("discovery-plan-form").addEventListener("submit", submitDiscoveryPlan);
+}
+
+async function submitDiscoveryPlan(event) {
+  event.preventDefault();
+  const form = event.currentTarget;
+  const button = form.querySelector("button");
+  const message = document.getElementById("plan-message");
+  const resultPanel = document.getElementById("plan-result");
+  const formData = new FormData(form);
+
+  const request = {
+    target: String(formData.get("target") || "").trim(),
+    method: String(formData.get("method") || "").trim(),
+    profile: String(formData.get("profile") || "").trim(),
+    tasks: formData.getAll("tasks"),
+  };
+  const seedInputRaw = String(formData.get("seed_input") || "").trim();
+  if (seedInputRaw) {
+    try {
+      request.seed_input = JSON.parse(seedInputRaw);
+    } catch (error) {
+      message.textContent = "Seed input must be valid JSON.";
+      resultPanel.innerHTML = `<div class="error-state">Seed input must be a JSON object.</div>`;
+      return;
+    }
+  }
+
+  button.disabled = true;
+  message.textContent = "Creating safe discovery plan...";
+  resultPanel.innerHTML = `<div class="empty-state">Creating plan...</div>`;
+
+  try {
+    const payload = await apiPost("/api/v1/discovery-plans", request);
+    const plan = payload?.data?.discovery_plan;
+    message.textContent = "Plan created. Human approval is required before execution.";
+    renderDiscoveryPlan(plan);
+  } catch (error) {
+    message.textContent = error.message;
+    resultPanel.innerHTML = `<div class="error-state">${escapeHTML(error.message)}</div>`;
+  } finally {
+    button.disabled = false;
+  }
+}
+
+function renderDiscoveryPlan(plan) {
+  const resultPanel = document.getElementById("plan-result");
+  if (!resultPanel || !plan) {
+    return;
+  }
+  const steps = plan.steps || [];
+  resultPanel.innerHTML = `
+    <div class="approval-banner">
+      <strong>Human approval required</strong>
+      <span>Execution allowed: ${plan.execution_allowed === true ? "yes" : "no"}. This UI does not execute plans.</span>
+    </div>
+    <div class="detail-grid compact">
+      <div class="metric">
+        <small>Approval required</small>
+        <strong>${plan.approval_required === true ? "yes" : "no"}</strong>
+      </div>
+      <div class="metric">
+        <small>Execution allowed</small>
+        <strong>${plan.execution_allowed === true ? "yes" : "no"}</strong>
+      </div>
+      <div class="metric">
+        <small>Suggested steps</small>
+        <strong>${steps.length}</strong>
+      </div>
+    </div>
+    ${plan.warnings?.length ? `
+      <span class="code-block-label">Planner warnings</span>
+      <ul class="edge-list">
+        ${plan.warnings.map((warning) => `<li><span>${escapeHTML(warning)}</span></li>`).join("")}
+      </ul>
+    ` : ""}
+    <span class="code-block-label">Suggested steps</span>
+    ${steps.length === 0 ? `<p class="muted">No steps suggested.</p>` : `
+      <ul class="plan-step-list">
+        ${steps.map((step) => `
+          <li class="plan-step">
+            <div>
+              <strong>${escapeHTML(step.task || "task")}</strong>
+              <span class="risk-badge">${escapeHTML(step.risk_level || "risk unknown")}</span>
+            </div>
+            <dl>
+              <dt>Target</dt>
+              <dd>${escapeHTML(step.target || "unknown")}</dd>
+              <dt>Method</dt>
+              <dd>${escapeHTML(step.method || "unknown")}</dd>
+              <dt>Profile</dt>
+              <dd>${escapeHTML(step.profile || "unknown")}</dd>
+              <dt>Reason</dt>
+              <dd>${escapeHTML(step.reason || "not provided")}</dd>
+              <dt>Expected evidence</dt>
+              <dd>${escapeHTML(step.expected_evidence || "not provided")}</dd>
+            </dl>
+          </li>
+        `).join("")}
+      </ul>
+    `}
+    <span class="code-block-label">Seed input</span>
+    <pre class="code-block">${escapeHTML(JSON.stringify(plan.seed_input || {}, null, 2))}</pre>
   `;
 }
 

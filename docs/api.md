@@ -99,6 +99,14 @@ Plans are not executable approvals:
 - Scope-expanding targets such as CIDRs, wildcards, and comma-separated lists are rejected.
 - Seeded architecture hints may inform suggested tasks or profile defaults, but they remain unobserved context.
 
+The embedded UI exposes the same planning workflow at:
+
+```text
+/#/discovery-plans
+```
+
+That page submits seed input to this endpoint and renders suggested steps for review. It does not execute plans or add an approval execution path.
+
 ### `POST /api/v1/discovery-plans`
 
 Request:

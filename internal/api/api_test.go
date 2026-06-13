@@ -95,6 +95,9 @@ func TestServesEmbeddedFrontend(t *testing.T) {
 	if !strings.Contains(response.Body.String(), "#/assets") {
 		t.Fatalf("body does not contain assets navigation: %s", response.Body.String())
 	}
+	if !strings.Contains(response.Body.String(), "#/discovery-plans") {
+		t.Fatalf("body does not contain discovery plans navigation: %s", response.Body.String())
+	}
 	if !strings.Contains(response.Body.String(), "#/graph") {
 		t.Fatalf("body does not contain graph navigation: %s", response.Body.String())
 	}
@@ -128,6 +131,15 @@ func TestServesEmbeddedFrontendAsset(t *testing.T) {
 	}
 	if !strings.Contains(body, "renderAssetsView") {
 		t.Fatalf("body does not contain asset browser renderer: %s", body)
+	}
+	if !strings.Contains(body, "renderDiscoveryPlansView") {
+		t.Fatalf("body does not contain discovery plan renderer: %s", body)
+	}
+	if !strings.Contains(body, "/api/v1/discovery-plans") {
+		t.Fatalf("body does not contain discovery plans endpoint: %s", body)
+	}
+	if !strings.Contains(body, "This UI does not execute plans") {
+		t.Fatalf("body does not clearly prevent automatic execution: %s", body)
 	}
 	if !strings.Contains(body, "/api/v1/assets/${encodeURIComponent(id)}/facts?limit=100") {
 		t.Fatalf("body does not contain asset fact API fetch path: %s", body)

@@ -140,6 +140,12 @@ You can also browse assets, facts, relationships, and linked read-only evidence 
 http://127.0.0.1:8080/#/assets
 ```
 
+Review safe discovery plan suggestions without executing them:
+
+```text
+http://127.0.0.1:8080/#/discovery-plans
+```
+
 Current limitation: fake discovery stores raw evidence first. Parser persistence is an explicit second step so raw evidence is preserved even when parsing produces warnings or skips unsupported commands.
 
 ## Target Milestone
