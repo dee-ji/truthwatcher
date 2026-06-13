@@ -207,6 +207,14 @@ These are not all current capabilities. The v0.1 priority remains the evidence k
 ./bin/truthwatcher discover fake --help
 ```
 
+## License
+
+Truthwatcher is licensed under the GNU General Public License v3.0 or later.
+
+Copyright (C) 2026 dee-ji
+
+See [LICENSE](LICENSE) for the full license text.
+
 ## Additional Docs
 
 - [Install](docs/install.md)
