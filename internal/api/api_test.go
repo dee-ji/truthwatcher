@@ -581,6 +581,32 @@ func TestExecuteDiscoveryRunWithFakeCollector(t *testing.T) {
 	if audit["target"] != "fixture://junos-mx" {
 		t.Fatalf("target = %q, want fixture://junos-mx", audit["target"])
 	}
+	actions, ok := audit["actions"].([]any)
+	if !ok {
+		t.Fatalf("actions = %#v, want array", audit["actions"])
+	}
+	if len(actions) != 1 {
+		t.Fatalf("action count = %d, want 1", len(actions))
+	}
+	action, ok := actions[0].(map[string]any)
+	if !ok {
+		t.Fatalf("action = %#v, want object", actions[0])
+	}
+	if action["initiator"] != "api" {
+		t.Fatalf("action initiator = %q, want api", action["initiator"])
+	}
+	if action["target"] != "fixture://junos-mx" {
+		t.Fatalf("action target = %q, want fixture://junos-mx", action["target"])
+	}
+	if action["profile"] != "juniper_junos" {
+		t.Fatalf("action profile = %q, want juniper_junos", action["profile"])
+	}
+	if action["command_or_api"] != "show version" {
+		t.Fatalf("action command = %q, want show version", action["command_or_api"])
+	}
+	if action["evidence_id"] == "" {
+		t.Fatalf("action evidence_id is empty: %#v", action)
+	}
 }
 
 func TestExecuteDiscoveryRunRequiresExplicitProfileAndTasks(t *testing.T) {

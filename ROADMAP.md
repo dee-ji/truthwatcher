@@ -359,11 +359,13 @@ Completed:
 - Compile-time Go extensibility contracts defined for collectors, parsers, importers, exporters, enrichers, and planners without dynamic plugin loading.
 - Local JSON file import/export connector foundation added for assets, facts, relationships, and evidence metadata.
 - BYO script contract documented and disabled-by-default local script runner foundation added with policy checks and static examples.
+- Security and audit hardening pass added typed discovery audit records, expanded denied command tests, credential handling notes, and audit/log redaction hooks.
 
 Next steps:
 
 - Add CLI or API wiring for file import/export only when explicitly requested.
 - Add CLI-only BYO script execution wiring only when explicitly requested.
+- Add persistent audit storage only when explicitly requested.
 
 ### Phase E1: File Import Adapter
 

@@ -45,6 +45,7 @@ func TestCheckCommandAllowsReadOnlyShowCommands(t *testing.T) {
 		"show lldp neighbors",
 		"show bgp summary",
 		"show route summary",
+		"show configuration",
 	} {
 		t.Run(command, func(t *testing.T) {
 			if err := engine.CheckCommand(command); err != nil {
@@ -59,12 +60,26 @@ func TestCheckCommandDeniesDangerousPatterns(t *testing.T) {
 
 	tests := map[string]string{
 		"configure terminal":                 "configure",
+		"conf t":                             "conf t",
+		"edit interfaces ge-0/0/0":           "edit",
 		"commit confirmed":                   "commit",
+		"write terminal":                     "write",
 		"delete flash:old.bin":               "delete",
+		"remove file old.log":                "remove",
 		"reload in 5":                        "reload",
+		"reboot":                             "reboot",
 		"clear counters":                     "clear",
 		"write   memory":                     "write memory",
 		"copy running-config startup-config": "copy",
+		"scp config user@host:/tmp":          "scp",
+		"ftp get image.bin":                  "ftp",
+		"tftp get image.bin":                 "tftp",
+		"erase startup-config":               "erase",
+		"format flash:":                      "format",
+		"install add file image.bin":         "install",
+		"upgrade system image.bin":           "upgrade",
+		"set system host-name router-a":      "set",
+		"no shutdown":                        "no",
 		"request system reboot":              "request system reboot",
 		"REQUEST SYSTEM REBOOT":              "request system reboot",
 	}

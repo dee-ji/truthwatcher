@@ -29,6 +29,9 @@ func TestStartDiscoveryRunStoresEvidenceAndCompletes(t *testing.T) {
 		Collector: NewFakeCollector("../../examples/fixtures", policy.NewEngine()),
 		Evidence:  evidenceStore,
 		Policy:    policy.NewEngine(),
+		Initiator: "unit-test",
+		RequestID: "req-test",
+		Context:   json.RawMessage(`{"path":"/test"}`),
 	})
 	if err != nil {
 		t.Fatalf("StartDiscoveryRun returned error: %v", err)
@@ -44,6 +47,61 @@ func TestStartDiscoveryRunStoresEvidenceAndCompletes(t *testing.T) {
 	}
 	if evidenceStore.items[0].DiscoveryRunID != result.DiscoveryRun.ID {
 		t.Fatalf("evidence discovery_run_id = %q, want %q", evidenceStore.items[0].DiscoveryRunID, result.DiscoveryRun.ID)
+	}
+	if got, want := len(result.Audit), 1; got != want {
+		t.Fatalf("audit record count = %d, want %d", got, want)
+	}
+	auditRecord := result.Audit[0]
+	if auditRecord.Initiator != "unit-test" {
+		t.Fatalf("audit initiator = %q, want unit-test", auditRecord.Initiator)
+	}
+	if auditRecord.RequestID != "req-test" {
+		t.Fatalf("audit request_id = %q, want req-test", auditRecord.RequestID)
+	}
+	if auditRecord.Target != "fixture://junos-mx" {
+		t.Fatalf("audit target = %q, want fixture://junos-mx", auditRecord.Target)
+	}
+	if auditRecord.Profile != ProfileJuniperJunos {
+		t.Fatalf("audit profile = %q, want %q", auditRecord.Profile, ProfileJuniperJunos)
+	}
+	if auditRecord.Task != string(policy.TaskIdentifyDevice) {
+		t.Fatalf("audit task = %q, want identify_device", auditRecord.Task)
+	}
+	if auditRecord.CommandOrAPI != "show version" {
+		t.Fatalf("audit command = %q, want show version", auditRecord.CommandOrAPI)
+	}
+	if auditRecord.EvidenceID != result.Evidence[0].ID {
+		t.Fatalf("audit evidence_id = %q, want %q", auditRecord.EvidenceID, result.Evidence[0].ID)
+	}
+	if auditRecord.StartedAt.IsZero() || auditRecord.CompletedAt.IsZero() {
+		t.Fatalf("audit timestamps are not populated: %#v", auditRecord)
+	}
+
+	var seedInput struct {
+		Audit struct {
+			Initiator string `json:"initiator"`
+			RequestID string `json:"request_id"`
+		} `json:"audit"`
+	}
+	if err := json.Unmarshal(result.DiscoveryRun.SeedInput, &seedInput); err != nil {
+		t.Fatalf("decode seed input: %v", err)
+	}
+	if seedInput.Audit.Initiator != "unit-test" || seedInput.Audit.RequestID != "req-test" {
+		t.Fatalf("seed audit = %#v, want initiator/request", seedInput.Audit)
+	}
+
+	var metadata struct {
+		Audit struct {
+			Initiator string `json:"initiator"`
+			Target    string `json:"target"`
+			Profile   string `json:"profile"`
+		} `json:"audit"`
+	}
+	if err := json.Unmarshal(evidenceStore.items[0].Metadata, &metadata); err != nil {
+		t.Fatalf("decode evidence metadata: %v", err)
+	}
+	if metadata.Audit.Initiator != "unit-test" || metadata.Audit.Target != "fixture://junos-mx" || metadata.Audit.Profile != ProfileJuniperJunos {
+		t.Fatalf("evidence audit metadata = %#v, want initiator/target/profile", metadata.Audit)
 	}
 }
 

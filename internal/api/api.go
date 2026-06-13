@@ -284,6 +284,9 @@ func handleExecuteDiscoveryRun(discoveryRuns *discovery.Service, evidenceStore *
 			Collector: discovery.NewFakeCollector(request.FixtureRoot, policy.NewEngine()),
 			Evidence:  evidenceStore,
 			Policy:    policy.NewEngine(),
+			Initiator: "api",
+			RequestID: r.Header.Get("X-Request-ID"),
+			Context:   discoveryRequestContext(r),
 		})
 		if err != nil {
 			status := http.StatusInternalServerError
@@ -490,8 +493,22 @@ func discoveryExecutionMetadata(collector, target, profile string, tasks []polic
 			"discovery_run":  result.DiscoveryRun.ID,
 			"run_status":     result.DiscoveryRun.Status,
 			"evidence_count": len(result.Evidence),
+			"actions":        result.Audit,
 		},
 	}
+}
+
+func discoveryRequestContext(r *http.Request) json.RawMessage {
+	payload := map[string]string{
+		"request_id": r.Header.Get("X-Request-ID"),
+		"path":       r.URL.Path,
+		"method":     r.Method,
+	}
+	data, err := json.Marshal(payload)
+	if err != nil {
+		return nil
+	}
+	return data
 }
 
 func writeData(w http.ResponseWriter, status int, data any) {
@@ -531,6 +548,7 @@ func requestID(next http.Handler) http.Handler {
 			id = "req-" + strconv.FormatUint(atomic.AddUint64(&requestCounter, 1), 10)
 		}
 
+		r.Header.Set("X-Request-ID", id)
 		w.Header().Set("X-Request-ID", id)
 		next.ServeHTTP(w, r)
 	})

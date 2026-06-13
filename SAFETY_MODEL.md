@@ -107,6 +107,13 @@ Use credential references:
 
 Never expose credentials to agents or logs.
 
+Security notes:
+
+- Discovery APIs and collectors should accept credential references, not raw credentials.
+- Raw credentials must not be written to discovery run seed input, evidence metadata, audit records, or logs.
+- Development-only credential mechanisms must be clearly labeled and must not become default server behavior.
+- BYO scripts and future adapters must receive credential references only when explicitly configured by a local caller.
+
 ## Agent Safety
 
 Agents may:
@@ -130,14 +137,25 @@ Agents may not:
 Every discovery action must log:
 
 - Who/what initiated it.
+- Request or execution context when available.
 - Target.
 - Discovery run ID.
 - Method.
+- Discovery profile.
 - Task.
 - Command/request.
-- Timestamp.
+- Start and completion timestamps.
 - Result status.
 - Evidence ID.
+
+Audit hardening rules:
+
+- Discovery execution must produce an audit record for every command/API output that becomes evidence.
+- Discovery run seed input must include initiator/request context where available.
+- Evidence metadata should include audit context for target, method, profile, task, command/API, and initiator.
+- Audit records must not contain raw credentials.
+- Audit/log output should use redaction hooks for obvious sensitive assignments such as password, token, secret, and credential values.
+- Redaction hooks must not mutate raw evidence before persistence; raw evidence integrity remains the source of truth.
 
 ## Human Approval Points
 

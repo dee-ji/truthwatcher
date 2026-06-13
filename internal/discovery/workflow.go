@@ -7,6 +7,7 @@ import (
 	"strings"
 	"time"
 
+	"truthwatcher/internal/audit"
 	"truthwatcher/internal/evidence"
 	"truthwatcher/internal/policy"
 )
@@ -28,11 +29,15 @@ type StartDiscoveryRunParams struct {
 	Collector Collector
 	Evidence  EvidenceStore
 	Policy    policy.Engine
+	Initiator string
+	RequestID string
+	Context   json.RawMessage
 }
 
 type StartDiscoveryRunResult struct {
-	DiscoveryRun DiscoveryRun        `json:"discovery_run"`
-	Evidence     []evidence.Evidence `json:"evidence"`
+	DiscoveryRun DiscoveryRun            `json:"discovery_run"`
+	Evidence     []evidence.Evidence     `json:"evidence"`
+	Audit        []audit.DiscoveryAction `json:"audit"`
 }
 
 // StartDiscoveryRun executes one evidence-first discovery workflow.
@@ -69,7 +74,8 @@ func (s Service) StartDiscoveryRun(ctx context.Context, params StartDiscoveryRun
 		}
 	}
 
-	seedInput, err := workflowSeedInput(params.Seed, params.Profile, params.Tasks)
+	initiator := audit.NormalizeInitiator(strings.TrimSpace(params.Initiator))
+	seedInput, err := workflowSeedInput(params.Seed, params.Profile, params.Tasks, initiator, params.RequestID, params.Context)
 	if err != nil {
 		return StartDiscoveryRunResult{}, err
 	}
@@ -95,7 +101,8 @@ func (s Service) StartDiscoveryRun(ctx context.Context, params StartDiscoveryRun
 	}
 
 	for _, output := range outputs {
-		metadata, err := collectedOutputMetadata(output)
+		actionStartedAt := time.Now().UTC()
+		metadata, err := collectedOutputMetadata(output, initiator, params.RequestID, params.Context, run.ID, "", "started", actionStartedAt, time.Time{})
 		if err != nil {
 			result.DiscoveryRun = s.markRunFailed(ctx, run.ID, err)
 			return result, err
@@ -113,6 +120,9 @@ func (s Service) StartDiscoveryRun(ctx context.Context, params StartDiscoveryRun
 			return result, err
 		}
 		result.Evidence = append(result.Evidence, item)
+		actionCompletedAt := time.Now().UTC()
+		record := auditRecord(output, initiator, params.RequestID, params.Context, run.ID, item.ID, "stored", actionStartedAt, actionCompletedAt)
+		result.Audit = append(result.Audit, record)
 	}
 
 	completedAt := time.Now().UTC()
@@ -143,29 +153,43 @@ func (s Service) markRunFailed(ctx context.Context, id string, cause error) Disc
 	return run
 }
 
-func workflowSeedInput(seed DiscoverySeed, profile Profile, tasks []policy.Task) (json.RawMessage, error) {
+func workflowSeedInput(seed DiscoverySeed, profile Profile, tasks []policy.Task, initiator string, requestID string, context json.RawMessage) (json.RawMessage, error) {
 	payload := struct {
-		Target  string        `json:"target"`
-		Method  string        `json:"method"`
-		Profile string        `json:"profile"`
-		Tasks   []policy.Task `json:"tasks"`
+		Target  string          `json:"target"`
+		Method  string          `json:"method"`
+		Profile string          `json:"profile"`
+		Tasks   []policy.Task   `json:"tasks"`
+		Audit   seedAudit       `json:"audit"`
+		Context json.RawMessage `json:"context,omitempty"`
 	}{
 		Target:  seed.Target,
 		Method:  seed.Method,
 		Profile: profile.Name,
 		Tasks:   tasks,
+		Audit: seedAudit{
+			Initiator: initiator,
+			RequestID: strings.TrimSpace(requestID),
+		},
+		Context: defaultRawMessage(context),
 	}
 	return json.Marshal(payload)
 }
 
-func collectedOutputMetadata(output CollectedOutput) (json.RawMessage, error) {
+type seedAudit struct {
+	Initiator string `json:"initiator"`
+	RequestID string `json:"request_id,omitempty"`
+}
+
+func collectedOutputMetadata(output CollectedOutput, initiator string, requestID string, context json.RawMessage, discoveryRunID string, evidenceID string, status string, startedAt time.Time, completedAt time.Time) (json.RawMessage, error) {
+	record := auditRecord(output, initiator, requestID, context, discoveryRunID, evidenceID, status, startedAt, completedAt)
 	metadata := struct {
-		Collector   string      `json:"collector"`
-		Task        policy.Task `json:"task"`
-		Profile     string      `json:"profile"`
-		Platform    string      `json:"platform"`
-		Vendor      string      `json:"vendor"`
-		ParserHints []string    `json:"parser_hints"`
+		Collector   string                `json:"collector"`
+		Task        policy.Task           `json:"task"`
+		Profile     string                `json:"profile"`
+		Platform    string                `json:"platform"`
+		Vendor      string                `json:"vendor"`
+		ParserHints []string              `json:"parser_hints"`
+		Audit       audit.DiscoveryAction `json:"audit"`
 	}{
 		Collector:   output.Method,
 		Task:        output.Task,
@@ -173,6 +197,32 @@ func collectedOutputMetadata(output CollectedOutput) (json.RawMessage, error) {
 		Platform:    output.Platform,
 		Vendor:      output.Vendor,
 		ParserHints: output.ParserHints,
+		Audit:       record,
 	}
 	return json.Marshal(metadata)
+}
+
+func auditRecord(output CollectedOutput, initiator string, requestID string, context json.RawMessage, discoveryRunID string, evidenceID string, status string, startedAt time.Time, completedAt time.Time) audit.DiscoveryAction {
+	return audit.DiscoveryAction{
+		Initiator:      audit.NormalizeInitiator(strings.TrimSpace(initiator)),
+		RequestID:      strings.TrimSpace(requestID),
+		DiscoveryRunID: discoveryRunID,
+		Target:         output.Target,
+		Method:         output.Method,
+		Profile:        output.ProfileName,
+		Task:           string(output.Task),
+		CommandOrAPI:   output.Command,
+		Status:         status,
+		EvidenceID:     evidenceID,
+		StartedAt:      startedAt,
+		CompletedAt:    completedAt,
+		Context:        defaultRawMessage(context),
+	}
+}
+
+func defaultRawMessage(value json.RawMessage) json.RawMessage {
+	if strings.TrimSpace(string(value)) == "" {
+		return nil
+	}
+	return value
 }
