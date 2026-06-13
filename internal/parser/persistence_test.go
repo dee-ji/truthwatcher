@@ -1,0 +1,300 @@
+package parser
+
+import (
+	"context"
+	"encoding/json"
+	"os"
+	"path/filepath"
+	"strings"
+	"testing"
+	"time"
+
+	"truthwatcher/internal/assets"
+	"truthwatcher/internal/evidence"
+)
+
+func TestParseDiscoveryRunPersistsParsedModel(t *testing.T) {
+	runID := "11111111-1111-4111-8111-111111111111"
+	evidenceItems := []evidence.Evidence{
+		persistenceFixtureEvidence(t, "evidence-version", runID, PlatformJunos, CommandShowVersion, "junos-mx", "show_version.txt"),
+		persistenceFixtureEvidence(t, "evidence-lldp", runID, PlatformJunos, CommandShowLLDPNeighbors, "junos-mx", "show_lldp_neighbors.txt"),
+	}
+	assetRepo := &persistenceAssetRepository{}
+	assetService := assets.NewService(assetRepo)
+	parseRepo := &persistenceParseRepository{}
+	service := NewPersistenceService(PersistenceOptions{
+		Evidence:     persistenceEvidenceRepository{items: evidenceItems},
+		Assets:       assetService,
+		ParseResults: parseRepo,
+		Registry:     BuiltInRegistry(),
+	})
+
+	result, err := service.ParseDiscoveryRun(context.Background(), ParseDiscoveryRunParams{
+		DiscoveryRunID: runID,
+		Platform:       PlatformJunos,
+	})
+	if err != nil {
+		t.Fatalf("ParseDiscoveryRun returned error: %v", err)
+	}
+
+	if got, want := result.EvidenceCount, 2; got != want {
+		t.Fatalf("evidence count = %d, want %d", got, want)
+	}
+	if len(result.Assets) == 0 {
+		t.Fatal("no assets were persisted")
+	}
+	if !hasAssetIdentity(assetRepo.assets, "device:hostname:mx-edge-01") {
+		t.Fatalf("device asset missing: %#v", assetRepo.assets)
+	}
+	if !hasAssetIdentity(assetRepo.assets, "device:hostname:spine-01") {
+		t.Fatalf("neighbor asset missing: %#v", assetRepo.assets)
+	}
+	if got, want := len(result.Facts), 4; got != want {
+		t.Fatalf("facts persisted = %d, want %d", got, want)
+	}
+	if result.Facts[0].EvidenceID == nil || *result.Facts[0].EvidenceID != "evidence-version" {
+		t.Fatalf("fact evidence link = %#v, want evidence-version", result.Facts[0].EvidenceID)
+	}
+	if got, want := len(result.Relationships), 2; got != want {
+		t.Fatalf("relationships persisted = %d, want %d", got, want)
+	}
+	if result.Relationships[0].EvidenceID == nil || *result.Relationships[0].EvidenceID != "evidence-lldp" {
+		t.Fatalf("relationship evidence link = %#v, want evidence-lldp", result.Relationships[0].EvidenceID)
+	}
+	if got, want := len(parseRepo.records), 2; got != want {
+		t.Fatalf("parse records = %d, want %d", got, want)
+	}
+	for _, record := range parseRepo.records {
+		if record.Status != ParseStatusParsed {
+			t.Fatalf("parse record status = %q, want %q", record.Status, ParseStatusParsed)
+		}
+	}
+}
+
+func TestParseDiscoveryRunRecordsSkippedWarnings(t *testing.T) {
+	runID := "11111111-1111-4111-8111-111111111111"
+	item := evidence.Evidence{
+		ID:             "evidence-unsupported",
+		DiscoveryRunID: runID,
+		Target:         "fixture://junos-mx",
+		Method:         "fake",
+		CommandOrAPI:   "show interfaces terse",
+		RawOutput:      "unsupported",
+		RawOutputHash:  evidence.HashRawOutput("unsupported"),
+		CollectedAt:    time.Date(2026, 6, 10, 12, 0, 0, 0, time.UTC),
+		Metadata:       json.RawMessage(`{}`),
+	}
+	assetService := assets.NewService(&persistenceAssetRepository{})
+	parseRepo := &persistenceParseRepository{}
+	service := NewPersistenceService(PersistenceOptions{
+		Evidence:     persistenceEvidenceRepository{items: []evidence.Evidence{item}},
+		Assets:       assetService,
+		ParseResults: parseRepo,
+		Registry:     BuiltInRegistry(),
+	})
+
+	result, err := service.ParseDiscoveryRun(context.Background(), ParseDiscoveryRunParams{
+		DiscoveryRunID: runID,
+		Platform:       PlatformJunos,
+	})
+	if err != nil {
+		t.Fatalf("ParseDiscoveryRun returned error: %v", err)
+	}
+
+	if len(result.Assets) != 0 || len(result.Facts) != 0 || len(result.Relationships) != 0 {
+		t.Fatalf("persisted model data for unsupported evidence: %#v", result)
+	}
+	if got, want := len(parseRepo.records), 1; got != want {
+		t.Fatalf("parse records = %d, want %d", got, want)
+	}
+	record := parseRepo.records[0]
+	if record.Status != ParseStatusSkipped {
+		t.Fatalf("parse status = %q, want %q", record.Status, ParseStatusSkipped)
+	}
+	if !strings.Contains(string(record.Warnings), "no parser registered") {
+		t.Fatalf("warnings = %s, want no parser registered", record.Warnings)
+	}
+}
+
+type persistenceEvidenceRepository struct {
+	items []evidence.Evidence
+}
+
+func (r persistenceEvidenceRepository) ListEvidenceByDiscoveryRun(ctx context.Context, discoveryRunID string) ([]evidence.Evidence, error) {
+	var result []evidence.Evidence
+	for _, item := range r.items {
+		if item.DiscoveryRunID == discoveryRunID {
+			result = append(result, item)
+		}
+	}
+	return result, nil
+}
+
+type persistenceParseRepository struct {
+	records []ParseRecord
+}
+
+func (r *persistenceParseRepository) CreateParseResult(ctx context.Context, params CreateParseResultParams) (ParseRecord, error) {
+	warnings, err := json.Marshal(params.Warnings)
+	if err != nil {
+		return ParseRecord{}, err
+	}
+	record := ParseRecord{
+		ID:             "parse-record-" + params.EvidenceID,
+		DiscoveryRunID: params.DiscoveryRunID,
+		EvidenceID:     params.EvidenceID,
+		ParserName:     params.ParserName,
+		Status:         params.Status,
+		Warnings:       warnings,
+		ErrorMessage:   params.ErrorMessage,
+		CreatedAt:      time.Date(2026, 6, 10, 12, 0, 0, 0, time.UTC),
+	}
+	r.records = append(r.records, record)
+	return record, nil
+}
+
+func (r *persistenceParseRepository) ListParseResultsByDiscoveryRun(ctx context.Context, discoveryRunID string) ([]ParseRecord, error) {
+	var result []ParseRecord
+	for _, item := range r.records {
+		if item.DiscoveryRunID == discoveryRunID {
+			result = append(result, item)
+		}
+	}
+	return result, nil
+}
+
+type persistenceAssetRepository struct {
+	assets        []assets.Asset
+	facts         []assets.Fact
+	relationships []assets.Relationship
+}
+
+func (r *persistenceAssetRepository) CreateAsset(ctx context.Context, params assets.CreateAssetParams) (assets.Asset, error) {
+	now := time.Date(2026, 6, 10, 12, 0, 0, 0, time.UTC)
+	item := assets.Asset{
+		ID:               "asset-" + string(rune('a'+len(r.assets))),
+		Type:             params.Type,
+		IdentityKey:      params.IdentityKey,
+		Vendor:           params.Vendor,
+		Model:            params.Model,
+		Serial:           params.Serial,
+		SystemMAC:        params.SystemMAC,
+		Confidence:       params.Confidence,
+		ConfidenceReason: params.ConfidenceReason,
+		State:            params.State,
+		Metadata:         params.Metadata,
+		CreatedAt:        now,
+		UpdatedAt:        now,
+	}
+	r.assets = append(r.assets, item)
+	return item, nil
+}
+
+func (r *persistenceAssetRepository) GetAsset(ctx context.Context, id string) (assets.Asset, error) {
+	for _, item := range r.assets {
+		if item.ID == id {
+			return item, nil
+		}
+	}
+	return assets.Asset{}, assets.ErrNotFound
+}
+
+func (r *persistenceAssetRepository) ListAssets(ctx context.Context) ([]assets.Asset, error) {
+	return r.assets, nil
+}
+
+func (r *persistenceAssetRepository) CreateFact(ctx context.Context, params assets.CreateFactParams) (assets.Fact, error) {
+	item := assets.Fact{
+		ID:               "fact-" + string(rune('a'+len(r.facts))),
+		AssetID:          params.AssetID,
+		Name:             params.Name,
+		Value:            params.Value,
+		Source:           params.Source,
+		Confidence:       params.Confidence,
+		ConfidenceReason: params.ConfidenceReason,
+		State:            params.State,
+		EvidenceID:       params.EvidenceID,
+		CreatedAt:        time.Date(2026, 6, 10, 12, 0, 0, 0, time.UTC),
+	}
+	r.facts = append(r.facts, item)
+	return item, nil
+}
+
+func (r *persistenceAssetRepository) GetFact(ctx context.Context, id string) (assets.Fact, error) {
+	for _, item := range r.facts {
+		if item.ID == id {
+			return item, nil
+		}
+	}
+	return assets.Fact{}, assets.ErrNotFound
+}
+
+func (r *persistenceAssetRepository) ListFactsByAsset(ctx context.Context, assetID string) ([]assets.Fact, error) {
+	var result []assets.Fact
+	for _, item := range r.facts {
+		if item.AssetID == assetID {
+			result = append(result, item)
+		}
+	}
+	return result, nil
+}
+
+func (r *persistenceAssetRepository) CreateRelationship(ctx context.Context, params assets.CreateRelationshipParams) (assets.Relationship, error) {
+	item := assets.Relationship{
+		ID:               "relationship-" + string(rune('a'+len(r.relationships))),
+		SourceAssetID:    params.SourceAssetID,
+		TargetAssetID:    params.TargetAssetID,
+		RelationshipType: params.RelationshipType,
+		Confidence:       params.Confidence,
+		ConfidenceReason: params.ConfidenceReason,
+		State:            params.State,
+		EvidenceID:       params.EvidenceID,
+		Metadata:         params.Metadata,
+		CreatedAt:        time.Date(2026, 6, 10, 12, 0, 0, 0, time.UTC),
+		UpdatedAt:        time.Date(2026, 6, 10, 12, 0, 0, 0, time.UTC),
+	}
+	r.relationships = append(r.relationships, item)
+	return item, nil
+}
+
+func (r *persistenceAssetRepository) GetRelationship(ctx context.Context, id string) (assets.Relationship, error) {
+	for _, item := range r.relationships {
+		if item.ID == id {
+			return item, nil
+		}
+	}
+	return assets.Relationship{}, assets.ErrNotFound
+}
+
+func (r *persistenceAssetRepository) ListRelationships(ctx context.Context) ([]assets.Relationship, error) {
+	return r.relationships, nil
+}
+
+func persistenceFixtureEvidence(t *testing.T, id string, runID string, platform string, command string, fixtureDir string, filename string) evidence.Evidence {
+	t.Helper()
+
+	raw, err := os.ReadFile(filepath.Join("..", "..", "examples", "fixtures", fixtureDir, filename))
+	if err != nil {
+		t.Fatalf("read fixture: %v", err)
+	}
+	return evidence.Evidence{
+		ID:             id,
+		DiscoveryRunID: runID,
+		Target:         "fixture://" + platform,
+		Method:         "fake",
+		CommandOrAPI:   command,
+		RawOutput:      string(raw),
+		RawOutputHash:  evidence.HashRawOutput(string(raw)),
+		CollectedAt:    time.Date(2026, 6, 10, 12, 0, 0, 0, time.UTC),
+		Metadata:       json.RawMessage(`{}`),
+	}
+}
+
+func hasAssetIdentity(items []assets.Asset, identityKey string) bool {
+	for _, item := range items {
+		if item.IdentityKey == identityKey {
+			return true
+		}
+	}
+	return false
+}

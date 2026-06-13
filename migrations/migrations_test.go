@@ -45,8 +45,8 @@ func TestEmbeddedMigrationsLoad(t *testing.T) {
 		t.Fatalf("Embedded returned error: %v", err)
 	}
 
-	if len(got) != 5 {
-		t.Fatalf("len = %d, want 5", len(got))
+	if len(got) != 6 {
+		t.Fatalf("len = %d, want 6", len(got))
 	}
 	if got[0].ID != "000001_init" {
 		t.Fatalf("migration ID = %q, want 000001_init", got[0].ID)
@@ -62,5 +62,8 @@ func TestEmbeddedMigrationsLoad(t *testing.T) {
 	}
 	if got[4].ID != "000005_uncertainty" {
 		t.Fatalf("migration ID = %q, want 000005_uncertainty", got[4].ID)
+	}
+	if got[5].ID != "000006_parser_results" {
+		t.Fatalf("migration ID = %q, want 000006_parser_results", got[5].ID)
 	}
 }

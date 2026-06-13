@@ -15,6 +15,7 @@ import (
 	"truthwatcher/internal/discovery"
 	"truthwatcher/internal/evidence"
 	"truthwatcher/internal/graph"
+	"truthwatcher/internal/parser"
 	"truthwatcher/internal/seeding"
 )
 
@@ -837,6 +838,103 @@ func TestListEvidenceByDiscoveryRun(t *testing.T) {
 	if body.Evidence[0].RawOutputHash == "" {
 		t.Fatal("raw_output_hash is empty")
 	}
+}
+
+func TestParseDiscoveryRunEndpoint(t *testing.T) {
+	runID := "11111111-1111-4111-8111-111111111111"
+	evidenceService := evidence.NewService(&fakeEvidenceRepository{
+		items: []evidence.Evidence{{
+			ID:             "evidence-a",
+			DiscoveryRunID: runID,
+			Target:         "fixture://junos-mx",
+			Method:         "fake",
+			CommandOrAPI:   "show version",
+			RawOutput:      "Hostname: mx-edge-01\nModel: mx480\nJunos: 22.4R3-S2.4\n",
+			RawOutputHash:  evidence.HashRawOutput("Hostname: mx-edge-01\nModel: mx480\nJunos: 22.4R3-S2.4\n"),
+			CollectedAt:    time.Date(2026, 6, 10, 12, 0, 0, 0, time.UTC),
+			Metadata:       json.RawMessage(`{}`),
+		}},
+	})
+	assetService := assets.NewService(&fakeAssetRepository{})
+	parseService := parser.NewPersistenceService(parser.PersistenceOptions{
+		Evidence:     evidenceService,
+		Assets:       assetService,
+		ParseResults: &fakeParseResultRepository{},
+		Registry:     parser.BuiltInRegistry(),
+	})
+	handler := NewHandler(Options{
+		Version: "test-version",
+		Parser:  &parseService,
+	})
+
+	response := httptest.NewRecorder()
+	request := httptest.NewRequest(http.MethodPost, "/api/v1/discovery-runs/"+runID+"/parse", strings.NewReader(`{"platform":"junos"}`))
+	handler.ServeHTTP(response, request)
+
+	if response.Code != http.StatusOK {
+		t.Fatalf("status = %d, want %d; body=%s", response.Code, http.StatusOK, response.Body.String())
+	}
+
+	body := decodeResponseData[struct {
+		ParseResult parser.ParseDiscoveryRunResult `json:"parse_result"`
+	}](t, response)
+	if body.ParseResult.DiscoveryRunID != runID {
+		t.Fatalf("discovery run id = %q, want %q", body.ParseResult.DiscoveryRunID, runID)
+	}
+	if len(body.ParseResult.Assets) != 1 {
+		t.Fatalf("asset count = %d, want 1", len(body.ParseResult.Assets))
+	}
+	if len(body.ParseResult.Facts) == 0 {
+		t.Fatal("expected facts from parser")
+	}
+	if len(body.ParseResult.ParseResults) != 1 {
+		t.Fatalf("parse result count = %d, want 1", len(body.ParseResult.ParseResults))
+	}
+}
+
+func TestParseDiscoveryRunEndpointRequiresParserStore(t *testing.T) {
+	handler := NewHandler(Options{Version: "test-version"})
+
+	response := httptest.NewRecorder()
+	request := httptest.NewRequest(http.MethodPost, "/api/v1/discovery-runs/11111111-1111-4111-8111-111111111111/parse", strings.NewReader(`{"platform":"junos"}`))
+	handler.ServeHTTP(response, request)
+
+	if response.Code != http.StatusServiceUnavailable {
+		t.Fatalf("status = %d, want %d", response.Code, http.StatusServiceUnavailable)
+	}
+}
+
+type fakeParseResultRepository struct {
+	records []parser.ParseRecord
+}
+
+func (f *fakeParseResultRepository) CreateParseResult(ctx context.Context, params parser.CreateParseResultParams) (parser.ParseRecord, error) {
+	warnings, err := json.Marshal(params.Warnings)
+	if err != nil {
+		return parser.ParseRecord{}, err
+	}
+	record := parser.ParseRecord{
+		ID:             "parse-result-" + params.EvidenceID,
+		DiscoveryRunID: params.DiscoveryRunID,
+		EvidenceID:     params.EvidenceID,
+		ParserName:     params.ParserName,
+		Status:         params.Status,
+		Warnings:       warnings,
+		ErrorMessage:   params.ErrorMessage,
+		CreatedAt:      time.Date(2026, 6, 10, 12, 0, 0, 0, time.UTC),
+	}
+	f.records = append(f.records, record)
+	return record, nil
+}
+
+func (f *fakeParseResultRepository) ListParseResultsByDiscoveryRun(ctx context.Context, discoveryRunID string) ([]parser.ParseRecord, error) {
+	var result []parser.ParseRecord
+	for _, item := range f.records {
+		if item.DiscoveryRunID == discoveryRunID {
+			result = append(result, item)
+		}
+	}
+	return result, nil
 }
 
 func TestGetEvidence(t *testing.T) {

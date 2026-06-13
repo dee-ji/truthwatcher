@@ -242,6 +242,40 @@ Response `metadata.audit`:
 }
 ```
 
+### `POST /api/v1/discovery-runs/{id}/parse`
+
+Parses already-stored evidence for one discovery run and persists derived assets, facts, and relationships. This endpoint does not run discovery, does not touch a network, and records parser warnings without deleting raw evidence.
+
+Request:
+
+```json
+{
+  "platform": "junos"
+}
+```
+
+Response `data`:
+
+```json
+{
+  "parse_result": {
+    "discovery_run_id": "11111111-1111-4111-8111-111111111111",
+    "evidence_count": 4,
+    "parse_results": [
+      {
+        "evidence_id": "22222222-2222-4222-8222-222222222222",
+        "parser_name": "junos_show_version",
+        "status": "parsed",
+        "warnings": []
+      }
+    ],
+    "assets": [],
+    "facts": [],
+    "relationships": []
+  }
+}
+```
+
 ## Evidence
 
 ### `GET /api/v1/discovery-runs/{id}/evidence`

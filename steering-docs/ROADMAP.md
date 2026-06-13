@@ -185,10 +185,12 @@ Completed:
 
 - Parser interface, normalized parse output model, registry, and no-op fallback parser added.
 - First fixture-driven Junos and IOS-XR parsers added for version, inventory, and LLDP neighbor evidence.
+- Explicit parser persistence workflow added for stored discovery-run evidence, including parse result records, CLI/API execution paths, and evidence-linked asset/fact/relationship creation.
 
 Next steps:
 
-- Wire parser outputs into asset, fact, and relationship persistence only when explicitly requested.
+- Improve identity merge behavior for cases where version, inventory, and neighbor evidence describe the same physical device through different keys.
+- Add more fixture parser coverage only where it supports the evidence kernel workflow.
 
 Deliverables:
 

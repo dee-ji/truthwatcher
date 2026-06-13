@@ -20,6 +20,7 @@ import (
 	"truthwatcher/internal/evidence"
 	"truthwatcher/internal/graph"
 	"truthwatcher/internal/logging"
+	"truthwatcher/internal/parser"
 	"truthwatcher/internal/policy"
 	"truthwatcher/migrations"
 )
@@ -68,6 +69,8 @@ func (a App) Run(ctx context.Context, args []string, stdout, stderr io.Writer) e
 		return a.runMigrate(ctx, args[1:], stdout)
 	case "discover":
 		return a.runDiscover(ctx, args[1:], stdout, stderr)
+	case "parse":
+		return a.runParse(ctx, args[1:], stdout, stderr)
 	default:
 		printUsage(stderr)
 		return fmt.Errorf("unknown command %q", args[0])
@@ -308,6 +311,94 @@ func (a App) runDiscoverFake(ctx context.Context, args []string, stdout, stderr 
 	return nil
 }
 
+func (a App) runParse(ctx context.Context, args []string, stdout, stderr io.Writer) error {
+	if len(args) == 0 {
+		return fmt.Errorf("usage: truthwatcher parse discovery-run --id <id> --platform junos")
+	}
+	if isHelpArg(args[0]) {
+		printParseHelp(stdout)
+		return nil
+	}
+
+	switch args[0] {
+	case "discovery-run":
+		return a.runParseDiscoveryRun(ctx, args[1:], stdout, stderr)
+	default:
+		return fmt.Errorf("usage: truthwatcher parse discovery-run --id <id> --platform junos")
+	}
+}
+
+func (a App) runParseDiscoveryRun(ctx context.Context, args []string, stdout, stderr io.Writer) error {
+	if wantsHelp(args) {
+		printParseDiscoveryRunHelp(stdout)
+		return nil
+	}
+
+	loadConfig := a.loadConfig
+	if loadConfig == nil {
+		loadConfig = config.Load
+	}
+
+	cfg, err := loadConfig()
+	if err != nil {
+		return err
+	}
+
+	var discoveryRunID string
+	var platform string
+	flags := flag.NewFlagSet("parse discovery-run", flag.ContinueOnError)
+	flags.SetOutput(stderr)
+	flags.StringVar(&discoveryRunID, "id", "", "discovery run id whose stored evidence should be parsed")
+	flags.StringVar(&platform, "platform", "", "parser platform, for example junos or iosxr")
+	if err := flags.Parse(args); err != nil {
+		return err
+	}
+	if flags.NArg() != 0 {
+		return fmt.Errorf("parse discovery-run accepts flags only")
+	}
+	if strings.TrimSpace(discoveryRunID) == "" {
+		return fmt.Errorf("--id is required")
+	}
+	if strings.TrimSpace(platform) == "" {
+		return fmt.Errorf("--platform is required")
+	}
+	if strings.TrimSpace(cfg.DatabaseURL) == "" {
+		return fmt.Errorf("%s is required for parse discovery-run", config.EnvDatabaseURL)
+	}
+
+	conn, err := db.Open(ctx, cfg.DatabaseURL)
+	if err != nil {
+		return err
+	}
+	defer conn.Close()
+
+	evidenceService := evidence.NewService(db.NewEvidenceRepository(conn))
+	assetService := assets.NewService(db.NewAssetRepository(conn))
+	parseService := parser.NewPersistenceService(parser.PersistenceOptions{
+		Evidence:     evidenceService,
+		Assets:       assetService,
+		ParseResults: db.NewParseResultRepository(conn),
+		Registry:     parser.BuiltInRegistry(),
+	})
+	result, err := parseService.ParseDiscoveryRun(ctx, parser.ParseDiscoveryRunParams{
+		DiscoveryRunID: discoveryRunID,
+		Platform:       platform,
+	})
+	if err != nil {
+		return err
+	}
+
+	fmt.Fprintf(stdout, "parsed discovery run %s: %d evidence, %d assets, %d facts, %d relationships, %d warnings\n",
+		result.DiscoveryRunID,
+		result.EvidenceCount,
+		len(result.Assets),
+		len(result.Facts),
+		len(result.Relationships),
+		len(result.Warnings),
+	)
+	return nil
+}
+
 func serveHTTP(ctx context.Context, cfg config.Config, logger *slog.Logger, stdout io.Writer) error {
 	if logger == nil {
 		logger = slog.New(slog.NewTextHandler(io.Discard, nil))
@@ -317,6 +408,7 @@ func serveHTTP(ctx context.Context, cfg config.Config, logger *slog.Logger, stdo
 	var evidenceStore *evidence.Service
 	var assetStore *assets.Service
 	var graphStore *graph.Service
+	var parserStore *parser.PersistenceService
 	if strings.TrimSpace(cfg.DatabaseURL) != "" {
 		conn, err := db.Open(ctx, cfg.DatabaseURL)
 		if err != nil {
@@ -332,6 +424,13 @@ func serveHTTP(ctx context.Context, cfg config.Config, logger *slog.Logger, stdo
 		assetStore = &assetService
 		graphService := graph.NewService(assetService)
 		graphStore = &graphService
+		parserService := parser.NewPersistenceService(parser.PersistenceOptions{
+			Evidence:     evidenceService,
+			Assets:       assetService,
+			ParseResults: db.NewParseResultRepository(conn),
+			Registry:     parser.BuiltInRegistry(),
+		})
+		parserStore = &parserService
 	}
 
 	listener, err := net.Listen("tcp", cfg.HTTPAddr)
@@ -348,6 +447,7 @@ func serveHTTP(ctx context.Context, cfg config.Config, logger *slog.Logger, stdo
 			Evidence:      evidenceStore,
 			Assets:        assetStore,
 			Graph:         graphStore,
+			Parser:        parserStore,
 		}),
 		ReadHeaderTimeout: 5 * time.Second,
 	}
@@ -428,12 +528,14 @@ func printUsage(w io.Writer) {
   truthwatcher migrate up
   truthwatcher migrate status
   truthwatcher discover fake --target fixture://junos-mx
+  truthwatcher parse discovery-run --id <id> --platform junos
 
 Commands:
   version   Print the Truthwatcher version.
   server    Start the HTTP server skeleton.
   migrate   Run or inspect database migrations.
   discover  Run a local fixture-backed discovery.
+  parse     Persist parser output from stored evidence.
 
 Run "truthwatcher <command> --help" for command details.
 `)
@@ -500,5 +602,32 @@ Flags:
   --profile   Built-in discovery profile. Inferred from target when omitted.
   --tasks     Comma-separated safe discovery tasks. Defaults to fixture-backed basics.
   --fixtures  Fixture root directory. Defaults to examples/fixtures.
+`)
+}
+
+func printParseHelp(w io.Writer) {
+	fmt.Fprint(w, `Usage:
+  truthwatcher parse discovery-run --id <id> --platform junos
+
+Parse already-stored evidence into assets, facts, and relationships. This does
+not run discovery or touch a network.
+
+Subcommands:
+  discovery-run  Parse all evidence for a discovery run.
+`)
+}
+
+func printParseDiscoveryRunHelp(w io.Writer) {
+	fmt.Fprint(w, `Usage:
+  truthwatcher parse discovery-run --id <id> --platform junos
+
+Convert stored raw evidence for one discovery run into persisted assets, facts,
+and relationships. Raw evidence must already exist; parser warnings are recorded
+without deleting or mutating evidence.
+TRUTHWATCHER_DATABASE_URL is required.
+
+Flags:
+  --id        Discovery run id.
+  --platform  Parser platform, for example junos or iosxr.
 `)
 }

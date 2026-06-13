@@ -112,7 +112,21 @@ curl http://127.0.0.1:8080/api/v1/discovery-runs/<discovery-run-id>/evidence
 curl http://127.0.0.1:8080/api/v1/evidence/<evidence-id>
 ```
 
-5. Inspect graph data when assets and relationships exist:
+5. Parse stored evidence into assets, facts, and relationships:
+
+```sh
+./bin/truthwatcher parse discovery-run --id <discovery-run-id> --platform junos
+```
+
+Or through the API:
+
+```sh
+curl -X POST http://127.0.0.1:8080/api/v1/discovery-runs/<discovery-run-id>/parse \
+  -H 'Content-Type: application/json' \
+  -d '{"platform":"junos"}'
+```
+
+6. Inspect graph data when assets and relationships exist:
 
 ```sh
 curl http://127.0.0.1:8080/api/v1/assets
@@ -120,7 +134,7 @@ curl http://127.0.0.1:8080/api/v1/assets/<asset-id>/graph
 curl 'http://127.0.0.1:8080/api/v1/graph/neighbors?asset_id=<asset-id>'
 ```
 
-Current limitation: fake discovery stores raw evidence first. Parser-to-persistence wiring for automatic asset/fact/relationship creation is intentionally separate work, so graph results depend on persisted model data already existing.
+Current limitation: fake discovery stores raw evidence first. Parser persistence is an explicit second step so raw evidence is preserved even when parsing produces warnings or skips unsupported commands.
 
 ## Target Milestone
 

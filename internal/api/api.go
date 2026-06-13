@@ -17,6 +17,7 @@ import (
 	"truthwatcher/internal/discovery"
 	"truthwatcher/internal/evidence"
 	"truthwatcher/internal/graph"
+	"truthwatcher/internal/parser"
 	"truthwatcher/internal/planner"
 	"truthwatcher/internal/policy"
 	"truthwatcher/internal/seeding"
@@ -30,6 +31,7 @@ type Options struct {
 	Evidence      *evidence.Service
 	Assets        *assets.Service
 	Graph         *graph.Service
+	Parser        *parser.PersistenceService
 }
 
 type responseEnvelope struct {
@@ -58,6 +60,7 @@ func NewHandler(opts Options) http.Handler {
 	mux.HandleFunc("GET /api/v1/discovery-runs", handleListDiscoveryRuns(opts.DiscoveryRuns))
 	mux.HandleFunc("GET /api/v1/discovery-runs/{id}", handleGetDiscoveryRun(opts.DiscoveryRuns))
 	mux.HandleFunc("GET /api/v1/discovery-runs/{id}/evidence", handleListEvidenceByDiscoveryRun(opts.Evidence))
+	mux.HandleFunc("POST /api/v1/discovery-runs/{id}/parse", handleParseDiscoveryRun(opts.Parser))
 	mux.HandleFunc("GET /api/v1/evidence/{id}", handleGetEvidence(opts.Evidence))
 	mux.HandleFunc("GET /api/v1/assets", handleListAssets(opts.Assets))
 	mux.HandleFunc("GET /api/v1/assets/{id}", handleGetAsset(opts.Assets))
@@ -365,6 +368,40 @@ func handleListEvidenceByDiscoveryRun(service *evidence.Service) http.HandlerFun
 		}
 
 		writeData(w, http.StatusOK, map[string][]evidence.Evidence{"evidence": items})
+	}
+}
+
+func handleParseDiscoveryRun(service *parser.PersistenceService) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if service == nil {
+			writeError(w, http.StatusServiceUnavailable, "parser persistence is not configured")
+			return
+		}
+
+		var request struct {
+			Platform string `json:"platform"`
+		}
+		decoder := json.NewDecoder(r.Body)
+		decoder.DisallowUnknownFields()
+		if err := decoder.Decode(&request); err != nil {
+			if errors.Is(err, io.EOF) {
+				writeError(w, http.StatusBadRequest, "request body is required")
+				return
+			}
+			writeError(w, http.StatusBadRequest, "invalid JSON request body")
+			return
+		}
+
+		result, err := service.ParseDiscoveryRun(r.Context(), parser.ParseDiscoveryRunParams{
+			DiscoveryRunID: r.PathValue("id"),
+			Platform:       request.Platform,
+		})
+		if err != nil {
+			writeError(w, http.StatusBadRequest, err.Error())
+			return
+		}
+
+		writeData(w, http.StatusOK, map[string]parser.ParseDiscoveryRunResult{"parse_result": result})
 	}
 }
 
