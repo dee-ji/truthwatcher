@@ -14,6 +14,7 @@ import (
 
 	"truthwatcher/internal/agent"
 	"truthwatcher/internal/assets"
+	"truthwatcher/internal/audit"
 	"truthwatcher/internal/discovery"
 	"truthwatcher/internal/evidence"
 	"truthwatcher/internal/graph"
@@ -32,6 +33,7 @@ type Options struct {
 	Assets        *assets.Service
 	Graph         *graph.Service
 	Parser        *parser.PersistenceService
+	Audit         *audit.Service
 }
 
 type responseEnvelope struct {
@@ -56,7 +58,7 @@ func NewHandler(opts Options) http.Handler {
 	mux.HandleFunc("GET /readyz", handleReadyz)
 	mux.HandleFunc("GET /api/v1/version", handleVersion(opts.Version))
 	mux.HandleFunc("POST /api/v1/discovery-runs", handleCreateDiscoveryRun(opts.DiscoveryRuns))
-	mux.HandleFunc("POST /api/v1/discovery-runs/execute", handleExecuteDiscoveryRun(opts.DiscoveryRuns, opts.Evidence))
+	mux.HandleFunc("POST /api/v1/discovery-runs/execute", handleExecuteDiscoveryRun(opts.DiscoveryRuns, opts.Evidence, opts.Audit))
 	mux.HandleFunc("GET /api/v1/discovery-runs", handleListDiscoveryRuns(opts.DiscoveryRuns))
 	mux.HandleFunc("GET /api/v1/discovery-runs/{id}", handleGetDiscoveryRun(opts.DiscoveryRuns))
 	mux.HandleFunc("GET /api/v1/discovery-runs/{id}/evidence", handleListEvidenceByDiscoveryRun(opts.Evidence))
@@ -244,7 +246,7 @@ func handleCreateDiscoveryRun(service *discovery.Service) http.HandlerFunc {
 	}
 }
 
-func handleExecuteDiscoveryRun(discoveryRuns *discovery.Service, evidenceStore *evidence.Service) http.HandlerFunc {
+func handleExecuteDiscoveryRun(discoveryRuns *discovery.Service, evidenceStore *evidence.Service, auditStore *audit.Service) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if discoveryRuns == nil {
 			writeError(w, http.StatusServiceUnavailable, "discovery run repository is not configured")
@@ -288,6 +290,7 @@ func handleExecuteDiscoveryRun(discoveryRuns *discovery.Service, evidenceStore *
 			Tasks:     tasks,
 			Collector: discovery.NewFakeCollector(request.FixtureRoot, policy.NewEngine()),
 			Evidence:  evidenceStore,
+			Audit:     auditStore,
 			Policy:    policy.NewEngine(),
 			Initiator: "api",
 			RequestID: r.Header.Get("X-Request-ID"),
@@ -522,6 +525,12 @@ func validateDiscoveryExecutionRequest(collector, target, profileName string, ta
 }
 
 func discoveryExecutionMetadata(collector, target, profile string, tasks []policy.Task, result discovery.StartDiscoveryRunResult) map[string]any {
+	auditIDs := make([]string, 0, len(result.Audit))
+	for _, item := range result.Audit {
+		if strings.TrimSpace(item.ID) != "" {
+			auditIDs = append(auditIDs, item.ID)
+		}
+	}
 	return map[string]any{
 		"audit": map[string]any{
 			"initiator":      "api",
@@ -533,6 +542,7 @@ func discoveryExecutionMetadata(collector, target, profile string, tasks []polic
 			"run_status":     result.DiscoveryRun.Status,
 			"evidence_count": len(result.Evidence),
 			"actions":        result.Audit,
+			"audit_ids":      auditIDs,
 		},
 	}
 }

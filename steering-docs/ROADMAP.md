@@ -376,11 +376,11 @@ Completed:
 - Security and audit hardening pass added typed discovery audit records, expanded denied command tests, credential handling notes, and audit/log redaction hooks.
 - Testing strategy documented with deterministic fake collector expectations, fixture parser/API test boundaries, and no-Docker/no-device normal test rules.
 - Local JSON import/export CLI commands added for writing graph snapshots and validating import candidates without exporting raw evidence output or treating imported data as observed proof.
+- Persistent audit storage added for discovery execution and command evidence actions, including migration, repository/service validation, API metadata audit IDs, and safety documentation.
 
 Next steps:
 
 - Add CLI-only BYO script execution wiring only when explicitly requested.
-- Add persistent audit storage only when explicitly requested.
 - Add opt-in PostgreSQL repository integration tests only when a non-Docker DB harness is explicitly requested.
 
 ### Phase E1: File Import Adapter

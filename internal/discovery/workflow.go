@@ -17,6 +17,10 @@ type EvidenceStore interface {
 	CreateEvidence(context.Context, evidence.CreateEvidenceParams) (evidence.Evidence, error)
 }
 
+type AuditStore interface {
+	CreateRecord(context.Context, audit.CreateRecordParams) (audit.Record, error)
+}
+
 type DiscoverySeed struct {
 	Target string `json:"target"`
 	Method string `json:"method"`
@@ -28,6 +32,7 @@ type StartDiscoveryRunParams struct {
 	Tasks     []policy.Task
 	Collector Collector
 	Evidence  EvidenceStore
+	Audit     AuditStore
 	Policy    policy.Engine
 	Initiator string
 	RequestID string
@@ -97,6 +102,9 @@ func (s Service) StartDiscoveryRun(ctx context.Context, params StartDiscoveryRun
 	outputs, err := params.Collector.Collect(ctx, params.Seed.Target, params.Profile, params.Tasks)
 	if err != nil {
 		result.DiscoveryRun = s.markRunFailed(ctx, run.ID, err)
+		if auditErr := createRunAuditRecord(ctx, params.Audit, params.Seed, params.Profile, initiator, params.RequestID, params.Context, run.ID, audit.StatusFailed, err, run.StartedAt, time.Now().UTC()); auditErr != nil {
+			return result, auditErr
+		}
 		return result, err
 	}
 
@@ -121,7 +129,13 @@ func (s Service) StartDiscoveryRun(ctx context.Context, params StartDiscoveryRun
 		}
 		result.Evidence = append(result.Evidence, item)
 		actionCompletedAt := time.Now().UTC()
-		record := auditRecord(output, initiator, params.RequestID, params.Context, run.ID, item.ID, "stored", actionStartedAt, actionCompletedAt)
+		record := auditRecord(output, initiator, params.RequestID, params.Context, run.ID, item.ID, audit.StatusStored, actionStartedAt, actionCompletedAt)
+		persisted, err := persistAuditRecord(ctx, params.Audit, record)
+		if err != nil {
+			result.DiscoveryRun = s.markRunFailed(ctx, run.ID, err)
+			return result, err
+		}
+		record = persisted
 		result.Audit = append(result.Audit, record)
 	}
 
@@ -132,6 +146,9 @@ func (s Service) StartDiscoveryRun(ctx context.Context, params StartDiscoveryRun
 		CompletedAt: &completedAt,
 	})
 	if err != nil {
+		return result, err
+	}
+	if err := createRunAuditRecord(ctx, params.Audit, params.Seed, params.Profile, initiator, params.RequestID, params.Context, run.ID, audit.StatusCompleted, nil, run.StartedAt, completedAt); err != nil {
 		return result, err
 	}
 	result.DiscoveryRun = run
@@ -204,6 +221,7 @@ func collectedOutputMetadata(output CollectedOutput, initiator string, requestID
 
 func auditRecord(output CollectedOutput, initiator string, requestID string, context json.RawMessage, discoveryRunID string, evidenceID string, status string, startedAt time.Time, completedAt time.Time) audit.DiscoveryAction {
 	return audit.DiscoveryAction{
+		Action:         "discovery_command",
 		Initiator:      audit.NormalizeInitiator(strings.TrimSpace(initiator)),
 		RequestID:      strings.TrimSpace(requestID),
 		DiscoveryRunID: discoveryRunID,
@@ -218,6 +236,58 @@ func auditRecord(output CollectedOutput, initiator string, requestID string, con
 		CompletedAt:    completedAt,
 		Context:        defaultRawMessage(context),
 	}
+}
+
+func persistAuditRecord(ctx context.Context, store AuditStore, record audit.DiscoveryAction) (audit.DiscoveryAction, error) {
+	if store == nil {
+		return record, nil
+	}
+	persisted, err := store.CreateRecord(ctx, audit.CreateRecordParams{
+		Action:         record.Action,
+		Initiator:      record.Initiator,
+		RequestID:      record.RequestID,
+		DiscoveryRunID: record.DiscoveryRunID,
+		Target:         record.Target,
+		Method:         record.Method,
+		Profile:        record.Profile,
+		Task:           record.Task,
+		CommandOrAPI:   record.CommandOrAPI,
+		Status:         record.Status,
+		EvidenceID:     record.EvidenceID,
+		ErrorMessage:   record.ErrorMessage,
+		StartedAt:      record.StartedAt,
+		CompletedAt:    record.CompletedAt,
+		Context:        record.Context,
+	})
+	if err != nil {
+		return audit.DiscoveryAction{}, err
+	}
+	return persisted, nil
+}
+
+func createRunAuditRecord(ctx context.Context, store AuditStore, seed DiscoverySeed, profile Profile, initiator string, requestID string, context json.RawMessage, discoveryRunID string, status string, cause error, startedAt time.Time, completedAt time.Time) error {
+	if store == nil {
+		return nil
+	}
+	message := ""
+	if cause != nil {
+		message = cause.Error()
+	}
+	_, err := store.CreateRecord(ctx, audit.CreateRecordParams{
+		Action:         "discovery_run_execute",
+		Initiator:      initiator,
+		RequestID:      requestID,
+		DiscoveryRunID: discoveryRunID,
+		Target:         seed.Target,
+		Method:         seed.Method,
+		Profile:        profile.Name,
+		Status:         status,
+		ErrorMessage:   message,
+		StartedAt:      startedAt,
+		CompletedAt:    completedAt,
+		Context:        context,
+	})
+	return err
 }
 
 func defaultRawMessage(value json.RawMessage) json.RawMessage {

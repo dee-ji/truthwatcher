@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"truthwatcher/internal/assets"
+	"truthwatcher/internal/audit"
 	"truthwatcher/internal/discovery"
 	"truthwatcher/internal/evidence"
 	"truthwatcher/internal/graph"
@@ -575,10 +576,13 @@ func TestExecuteDiscoveryRunWithFakeCollector(t *testing.T) {
 	runService := discovery.NewService(runRepo)
 	evidenceRepo := &fakeEvidenceRepository{}
 	evidenceService := evidence.NewService(evidenceRepo)
+	auditRepo := &fakeAuditRepository{}
+	auditService := audit.NewService(auditRepo)
 	handler := NewHandler(Options{
 		Version:       "test-version",
 		DiscoveryRuns: &runService,
 		Evidence:      &evidenceService,
+		Audit:         &auditService,
 	})
 
 	requestBody := `{
@@ -646,6 +650,19 @@ func TestExecuteDiscoveryRunWithFakeCollector(t *testing.T) {
 	}
 	if action["evidence_id"] == "" {
 		t.Fatalf("action evidence_id is empty: %#v", action)
+	}
+	if action["id"] == "" {
+		t.Fatalf("action audit id is empty: %#v", action)
+	}
+	auditIDs, ok := audit["audit_ids"].([]any)
+	if !ok {
+		t.Fatalf("audit_ids = %#v, want array", audit["audit_ids"])
+	}
+	if len(auditIDs) != 1 || auditIDs[0] == "" {
+		t.Fatalf("audit_ids = %#v, want persisted command audit id", auditIDs)
+	}
+	if got, want := len(auditRepo.records), 2; got != want {
+		t.Fatalf("persisted audit records = %d, want command plus run record", got)
 	}
 }
 
@@ -802,6 +819,33 @@ func TestDiscoveryRunEndpointsReturnUnavailableWithoutRepository(t *testing.T) {
 
 type fakeEvidenceRepository struct {
 	items []evidence.Evidence
+}
+
+type fakeAuditRepository struct {
+	records []audit.Record
+}
+
+func (f *fakeAuditRepository) CreateAuditRecord(ctx context.Context, params audit.CreateRecordParams) (audit.Record, error) {
+	record := audit.Record{
+		ID:             "audit-" + string(rune('a'+len(f.records))),
+		Action:         params.Action,
+		Initiator:      params.Initiator,
+		RequestID:      params.RequestID,
+		DiscoveryRunID: params.DiscoveryRunID,
+		Target:         params.Target,
+		Method:         params.Method,
+		Profile:        params.Profile,
+		Task:           params.Task,
+		CommandOrAPI:   params.CommandOrAPI,
+		Status:         params.Status,
+		EvidenceID:     params.EvidenceID,
+		ErrorMessage:   params.ErrorMessage,
+		StartedAt:      params.StartedAt,
+		CompletedAt:    params.CompletedAt,
+		Context:        params.Context,
+	}
+	f.records = append(f.records, record)
+	return record, nil
 }
 
 func (f *fakeEvidenceRepository) CreateEvidence(ctx context.Context, params evidence.CreateEvidenceParams) (evidence.Evidence, error) {

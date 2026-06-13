@@ -150,6 +150,8 @@ Every discovery action must log:
 
 Audit hardening rules:
 
+- Persistent audit storage records discovery run execution and each command/API output that becomes evidence.
+- Persistent audit rows include action, initiator, request context, discovery run ID, target, method, profile, task, command/API, status, error, evidence reference, and timestamps where available.
 - Discovery execution must produce an audit record for every command/API output that becomes evidence.
 - Discovery run seed input must include initiator/request context where available.
 - Evidence metadata should include audit context for target, method, profile, task, command/API, and initiator.

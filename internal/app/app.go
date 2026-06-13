@@ -14,6 +14,7 @@ import (
 
 	"truthwatcher/internal/api"
 	"truthwatcher/internal/assets"
+	"truthwatcher/internal/audit"
 	"truthwatcher/internal/config"
 	"truthwatcher/internal/db"
 	"truthwatcher/internal/discovery"
@@ -291,6 +292,7 @@ func (a App) runDiscoverFake(ctx context.Context, args []string, stdout, stderr 
 
 	runService := discovery.NewService(db.NewDiscoveryRunRepository(conn))
 	evidenceService := evidence.NewService(db.NewEvidenceRepository(conn))
+	auditService := audit.NewService(db.NewAuditRepository(conn))
 
 	collector := discovery.NewFakeCollector(fixtureRoot, policy.NewEngine())
 	result, err := runService.StartDiscoveryRun(ctx, discovery.StartDiscoveryRunParams{
@@ -302,6 +304,7 @@ func (a App) runDiscoverFake(ctx context.Context, args []string, stdout, stderr 
 		Tasks:     tasks,
 		Collector: collector,
 		Evidence:  evidenceService,
+		Audit:     auditService,
 		Policy:    policy.NewEngine(),
 	})
 	if err != nil {
@@ -568,6 +571,7 @@ func serveHTTP(ctx context.Context, cfg config.Config, logger *slog.Logger, stdo
 	var assetStore *assets.Service
 	var graphStore *graph.Service
 	var parserStore *parser.PersistenceService
+	var auditStore *audit.Service
 	if strings.TrimSpace(cfg.DatabaseURL) != "" {
 		conn, err := db.Open(ctx, cfg.DatabaseURL)
 		if err != nil {
@@ -579,6 +583,8 @@ func serveHTTP(ctx context.Context, cfg config.Config, logger *slog.Logger, stdo
 		discoveryRuns = &service
 		evidenceService := evidence.NewService(db.NewEvidenceRepository(conn))
 		evidenceStore = &evidenceService
+		auditService := audit.NewService(db.NewAuditRepository(conn))
+		auditStore = &auditService
 		assetService := assets.NewService(db.NewAssetRepository(conn))
 		assetStore = &assetService
 		graphService := graph.NewService(assetService)
@@ -607,6 +613,7 @@ func serveHTTP(ctx context.Context, cfg config.Config, logger *slog.Logger, stdo
 			Assets:        assetStore,
 			Graph:         graphStore,
 			Parser:        parserStore,
+			Audit:         auditStore,
 		}),
 		ReadHeaderTimeout: 5 * time.Second,
 	}

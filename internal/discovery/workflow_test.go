@@ -4,9 +4,11 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"testing"
 	"time"
 
+	"truthwatcher/internal/audit"
 	"truthwatcher/internal/evidence"
 	"truthwatcher/internal/policy"
 )
@@ -14,6 +16,7 @@ import (
 func TestStartDiscoveryRunStoresEvidenceAndCompletes(t *testing.T) {
 	repo := newWorkflowRunRepository()
 	evidenceStore := &workflowEvidenceStore{}
+	auditStore := &workflowAuditStore{}
 	profile, ok := BuiltInProfile(ProfileJuniperJunos)
 	if !ok {
 		t.Fatal("expected Junos profile")
@@ -28,6 +31,7 @@ func TestStartDiscoveryRunStoresEvidenceAndCompletes(t *testing.T) {
 		Tasks:     []policy.Task{policy.TaskIdentifyDevice},
 		Collector: NewFakeCollector("../../examples/fixtures", policy.NewEngine()),
 		Evidence:  evidenceStore,
+		Audit:     auditStore,
 		Policy:    policy.NewEngine(),
 		Initiator: "unit-test",
 		RequestID: "req-test",
@@ -52,6 +56,12 @@ func TestStartDiscoveryRunStoresEvidenceAndCompletes(t *testing.T) {
 		t.Fatalf("audit record count = %d, want %d", got, want)
 	}
 	auditRecord := result.Audit[0]
+	if auditRecord.ID == "" {
+		t.Fatalf("audit id is empty: %#v", auditRecord)
+	}
+	if auditRecord.Action != "discovery_command" {
+		t.Fatalf("audit action = %q, want discovery_command", auditRecord.Action)
+	}
 	if auditRecord.Initiator != "unit-test" {
 		t.Fatalf("audit initiator = %q, want unit-test", auditRecord.Initiator)
 	}
@@ -75,6 +85,12 @@ func TestStartDiscoveryRunStoresEvidenceAndCompletes(t *testing.T) {
 	}
 	if auditRecord.StartedAt.IsZero() || auditRecord.CompletedAt.IsZero() {
 		t.Fatalf("audit timestamps are not populated: %#v", auditRecord)
+	}
+	if got, want := len(auditStore.records), 2; got != want {
+		t.Fatalf("persisted audit record count = %d, want command plus run record", got)
+	}
+	if auditStore.records[1].Action != "discovery_run_execute" || auditStore.records[1].Status != "completed" {
+		t.Fatalf("run audit = %#v, want completed discovery_run_execute", auditStore.records[1])
 	}
 
 	var seedInput struct {
@@ -108,6 +124,7 @@ func TestStartDiscoveryRunStoresEvidenceAndCompletes(t *testing.T) {
 func TestStartDiscoveryRunMarksFailedWhenCollectorFails(t *testing.T) {
 	repo := newWorkflowRunRepository()
 	evidenceStore := &workflowEvidenceStore{}
+	auditStore := &workflowAuditStore{}
 	profile, ok := BuiltInProfile(ProfileJuniperJunos)
 	if !ok {
 		t.Fatal("expected Junos profile")
@@ -122,6 +139,7 @@ func TestStartDiscoveryRunMarksFailedWhenCollectorFails(t *testing.T) {
 		Tasks:     []policy.Task{policy.TaskIdentifyDevice},
 		Collector: NewFakeCollector("../../examples/fixtures", policy.NewEngine()),
 		Evidence:  evidenceStore,
+		Audit:     auditStore,
 		Policy:    policy.NewEngine(),
 	})
 	if err == nil {
@@ -135,6 +153,15 @@ func TestStartDiscoveryRunMarksFailedWhenCollectorFails(t *testing.T) {
 	}
 	if len(result.Evidence) != 0 {
 		t.Fatalf("evidence count = %d, want 0", len(result.Evidence))
+	}
+	if got, want := len(auditStore.records), 1; got != want {
+		t.Fatalf("persisted audit record count = %d, want failed run audit", got)
+	}
+	if auditStore.records[0].Action != "discovery_run_execute" || auditStore.records[0].Status != "failed" {
+		t.Fatalf("failed run audit = %#v, want failed discovery_run_execute", auditStore.records[0])
+	}
+	if auditStore.records[0].ErrorMessage == "" {
+		t.Fatalf("failed run audit error is empty: %#v", auditStore.records[0])
 	}
 }
 
@@ -189,6 +216,33 @@ func (f *workflowRunRepository) UpdateDiscoveryRunStatus(ctx context.Context, pa
 
 type workflowEvidenceStore struct {
 	items []evidence.Evidence
+}
+
+type workflowAuditStore struct {
+	records []audit.Record
+}
+
+func (f *workflowAuditStore) CreateRecord(ctx context.Context, params audit.CreateRecordParams) (audit.Record, error) {
+	record := audit.Record{
+		ID:             fmt.Sprintf("audit-%d", len(f.records)+1),
+		Action:         params.Action,
+		Initiator:      params.Initiator,
+		RequestID:      params.RequestID,
+		DiscoveryRunID: params.DiscoveryRunID,
+		Target:         params.Target,
+		Method:         params.Method,
+		Profile:        params.Profile,
+		Task:           params.Task,
+		CommandOrAPI:   params.CommandOrAPI,
+		Status:         params.Status,
+		EvidenceID:     params.EvidenceID,
+		ErrorMessage:   params.ErrorMessage,
+		StartedAt:      params.StartedAt,
+		CompletedAt:    params.CompletedAt,
+		Context:        params.Context,
+	}
+	f.records = append(f.records, record)
+	return record, nil
 }
 
 func (f *workflowEvidenceStore) CreateEvidence(ctx context.Context, params evidence.CreateEvidenceParams) (evidence.Evidence, error) {
