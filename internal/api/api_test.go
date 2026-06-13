@@ -98,6 +98,9 @@ func TestServesEmbeddedFrontend(t *testing.T) {
 	if !strings.Contains(response.Body.String(), "#/discovery-plans") {
 		t.Fatalf("body does not contain discovery plans navigation: %s", response.Body.String())
 	}
+	if !strings.Contains(response.Body.String(), "#/architecture-seeds") {
+		t.Fatalf("body does not contain architecture seeds navigation: %s", response.Body.String())
+	}
 	if !strings.Contains(response.Body.String(), "#/graph") {
 		t.Fatalf("body does not contain graph navigation: %s", response.Body.String())
 	}
@@ -140,6 +143,18 @@ func TestServesEmbeddedFrontendAsset(t *testing.T) {
 	}
 	if !strings.Contains(body, "This UI does not execute plans") {
 		t.Fatalf("body does not clearly prevent automatic execution: %s", body)
+	}
+	if !strings.Contains(body, "renderArchitectureSeedsView") {
+		t.Fatalf("body does not contain architecture seed renderer: %s", body)
+	}
+	if !strings.Contains(body, "/api/v1/architecture-seeds") {
+		t.Fatalf("body does not contain architecture seeds endpoint: %s", body)
+	}
+	if !strings.Contains(body, "Seeded hints are context, not observed proof") {
+		t.Fatalf("body does not label seeded hints as context: %s", body)
+	}
+	if !strings.Contains(body, "user_seeded facts with low confidence") {
+		t.Fatalf("body does not show seeded facts as low confidence user_seeded data: %s", body)
 	}
 	if !strings.Contains(body, "/api/v1/assets/${encodeURIComponent(id)}/facts?limit=100") {
 		t.Fatalf("body does not contain asset fact API fetch path: %s", body)

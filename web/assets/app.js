@@ -72,6 +72,11 @@ async function renderRoute() {
     return;
   }
 
+  if (route === "/architecture-seeds") {
+    renderArchitectureSeedsView();
+    return;
+  }
+
   if (route === "/graph") {
     await renderGraphView();
     return;
@@ -99,6 +104,9 @@ function setActiveNav(route) {
   }
   if (route === "/discovery-plans") {
     active = document.querySelector('[data-nav="discovery-plans"]');
+  }
+  if (route === "/architecture-seeds") {
+    active = document.querySelector('[data-nav="architecture-seeds"]');
   }
   if (route === "/graph") {
     active = document.querySelector('[data-nav="graph"]');
@@ -162,6 +170,11 @@ async function renderDashboard() {
         <span class="card-label">Planner</span>
         <h2>Review safe next steps</h2>
         <p>Create read-only discovery plans that require human approval before execution.</p>
+      </article>
+      <article class="card">
+        <span class="card-label">Architecture Seeds</span>
+        <h2>Add planning context</h2>
+        <p>Record ASNs, vendors, route reflectors, EMS systems, services, and regions as user-seeded context.</p>
       </article>
       <article class="card">
         <span class="card-label">Ask Truthwatcher</span>
@@ -770,6 +783,157 @@ function renderDiscoveryPlan(plan) {
     <span class="code-block-label">Seed input</span>
     <pre class="code-block">${escapeHTML(JSON.stringify(plan.seed_input || {}, null, 2))}</pre>
   `;
+}
+
+function renderArchitectureSeedsView() {
+  app.innerHTML = `
+    <section class="section-header">
+      <div>
+        <p class="eyebrow">Architecture seeding</p>
+        <h1>Seed planning context</h1>
+        <p>Submit known network context for planning. Seeded hints are context, not observed proof, and this page does not trigger discovery.</p>
+      </div>
+      <a class="button secondary" href="#/">Back to dashboard</a>
+    </section>
+    <section class="plan-layout">
+      <form class="form-panel" id="architecture-seed-form">
+        <div class="readonly-note">
+          Seeded hints are context, not observed proof. They are stored as user_seeded facts with low confidence and cannot execute discovery.
+        </div>
+        <div class="form-grid">
+          <div class="field">
+            <label for="seed-network-type">Organization/network type</label>
+            <input id="seed-network-type" name="organization_network_type" placeholder="service_provider">
+          </div>
+          <div class="field">
+            <label for="seed-asns">Known ASNs</label>
+            <textarea id="seed-asns" name="known_asns" rows="4" placeholder="65000, 65001"></textarea>
+          </div>
+          <div class="field">
+            <label for="seed-route-reflectors">Known route reflectors</label>
+            <textarea id="seed-route-reflectors" name="known_route_reflectors" rows="4" placeholder="rr1.example.net"></textarea>
+          </div>
+          <div class="field">
+            <label for="seed-vendors">Known vendors</label>
+            <textarea id="seed-vendors" name="known_vendors" rows="4" placeholder="juniper, cisco"></textarea>
+          </div>
+          <div class="field">
+            <label for="seed-ems">Known EMS systems</label>
+            <textarea id="seed-ems" name="known_ems_systems" rows="4" placeholder="ems-a"></textarea>
+          </div>
+          <div class="field">
+            <label for="seed-services">Known services</label>
+            <textarea id="seed-services" name="known_services" rows="4" placeholder="l3vpn, internet"></textarea>
+          </div>
+          <div class="field">
+            <label for="seed-regions">Known regions/markets</label>
+            <textarea id="seed-regions" name="known_regions_markets" rows="4" placeholder="nyc, dfw"></textarea>
+          </div>
+        </div>
+        <div class="form-actions">
+          <button type="submit">Save seed hints</button>
+          <span class="muted" id="architecture-seed-message">At least one hint is required.</span>
+        </div>
+      </form>
+      <section class="detail-panel plan-result" id="architecture-seed-result">
+        <div class="empty-state">Submit architecture hints to see the stored user_seeded facts.</div>
+      </section>
+    </section>
+  `;
+
+  document.getElementById("architecture-seed-form").addEventListener("submit", submitArchitectureSeed);
+}
+
+async function submitArchitectureSeed(event) {
+  event.preventDefault();
+  const form = event.currentTarget;
+  const button = form.querySelector("button");
+  const message = document.getElementById("architecture-seed-message");
+  const resultPanel = document.getElementById("architecture-seed-result");
+  const formData = new FormData(form);
+  const request = {
+    organization_network_type: String(formData.get("organization_network_type") || "").trim(),
+    known_asns: splitSeedList(formData.get("known_asns")),
+    known_route_reflectors: splitSeedList(formData.get("known_route_reflectors")),
+    known_vendors: splitSeedList(formData.get("known_vendors")),
+    known_ems_systems: splitSeedList(formData.get("known_ems_systems")),
+    known_services: splitSeedList(formData.get("known_services")),
+    known_regions_markets: splitSeedList(formData.get("known_regions_markets")),
+  };
+
+  button.disabled = true;
+  message.textContent = "Saving architecture seed hints...";
+  resultPanel.innerHTML = `<div class="empty-state">Saving seed hints...</div>`;
+
+  try {
+    const payload = await apiPost("/api/v1/architecture-seeds", request);
+    const seed = payload?.data?.architecture_seed;
+    message.textContent = "Seed hints stored as user_seeded context.";
+    renderArchitectureSeed(seed);
+  } catch (error) {
+    message.textContent = error.message;
+    resultPanel.innerHTML = `<div class="error-state">${escapeHTML(error.message)}</div>`;
+  } finally {
+    button.disabled = false;
+  }
+}
+
+function renderArchitectureSeed(seed) {
+  const resultPanel = document.getElementById("architecture-seed-result");
+  if (!resultPanel || !seed) {
+    return;
+  }
+  const asset = seed.asset || {};
+  const facts = seed.facts || [];
+  resultPanel.innerHTML = `
+    <div class="approval-banner">
+      <strong>Context only</strong>
+      <span>${escapeHTML(seed.warning || "Seeded hints are context, not observed proof.")}</span>
+    </div>
+    <div class="detail-grid compact">
+      <div class="metric">
+        <small>Asset type</small>
+        <strong>${escapeHTML(asset.type || "architecture_context")}</strong>
+      </div>
+      <div class="metric">
+        <small>State</small>
+        <strong>${stateBadge(asset.state || "user_seeded")}</strong>
+      </div>
+      <div class="metric">
+        <small>Confidence</small>
+        <strong>${escapeHTML(confidenceLabel(asset))}</strong>
+      </div>
+    </div>
+    <span class="code-block-label">Identity key</span>
+    <pre class="code-block">${escapeHTML(asset.identity_key || "architecture:seed:default")}</pre>
+    <span class="code-block-label">Seeded facts</span>
+    ${seededFactsMarkup(facts)}
+  `;
+}
+
+function seededFactsMarkup(facts) {
+  if (facts.length === 0) {
+    return `<p class="muted">No facts were returned for this seed request.</p>`;
+  }
+  return `
+    <ul class="edge-list">
+      ${facts.map((fact) => `
+        <li>
+          <strong>${escapeHTML(fact.name || "seeded_fact")}</strong>
+          <span>${escapeHTML(factValueLabel(fact.value))}</span>
+          <small>${escapeHTML(confidenceLabel(fact))}</small>
+          <small>source ${escapeHTML(fact.source || "user_seeded")} / state ${escapeHTML(fact.state || "user_seeded")}</small>
+        </li>
+      `).join("")}
+    </ul>
+  `;
+}
+
+function splitSeedList(value) {
+  return String(value || "")
+    .split(/[\n,]+/)
+    .map((item) => item.trim())
+    .filter(Boolean);
 }
 
 async function renderGraphView() {

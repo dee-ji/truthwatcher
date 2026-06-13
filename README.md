@@ -146,6 +146,12 @@ Review safe discovery plan suggestions without executing them:
 http://127.0.0.1:8080/#/discovery-plans
 ```
 
+Seed architecture context without treating it as observed proof:
+
+```text
+http://127.0.0.1:8080/#/architecture-seeds
+```
+
 Current limitation: fake discovery stores raw evidence first. Parser persistence is an explicit second step so raw evidence is preserved even when parsing produces warnings or skips unsupported commands.
 
 ## Target Milestone

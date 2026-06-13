@@ -54,6 +54,14 @@ Seeded hints are stored as facts with:
 
 Seeded hints are not proof. They may guide discovery planning, but they do not authorize discovery execution and they do not replace observed evidence.
 
+The embedded UI exposes the same seed workflow at:
+
+```text
+/#/architecture-seeds
+```
+
+That page stores context only. It does not trigger discovery, approve execution, or convert seeded hints into observed facts.
+
 ### `POST /api/v1/architecture-seeds`
 
 Stores user-provided architecture hints.
