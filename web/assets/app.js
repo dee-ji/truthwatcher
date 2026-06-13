@@ -57,6 +57,16 @@ async function renderRoute() {
     return;
   }
 
+  if (route === "/assets") {
+    await renderAssetsView();
+    return;
+  }
+
+  if (route.startsWith("/assets/")) {
+    await renderAssetDetail(route.split("/").pop());
+    return;
+  }
+
   if (route === "/graph") {
     await renderGraphView();
     return;
@@ -78,6 +88,9 @@ function setActiveNav(route) {
   let active = document.querySelector('[data-nav="dashboard"]');
   if (route.startsWith("/discovery-runs")) {
     active = document.querySelector('[data-nav="discovery-runs"]');
+  }
+  if (route.startsWith("/assets")) {
+    active = document.querySelector('[data-nav="assets"]');
   }
   if (route === "/graph") {
     active = document.querySelector('[data-nav="graph"]');
@@ -126,6 +139,11 @@ async function renderDashboard() {
         <span class="card-label">Evidence First</span>
         <h2>Raw output remains primary</h2>
         <p>Every run stores evidence before model facts are created.</p>
+      </article>
+      <article class="card">
+        <span class="card-label">Assets</span>
+        <h2>Browse modeled knowledge</h2>
+        <p>Filter assets, inspect facts and relationships, and open linked raw evidence.</p>
       </article>
       <article class="card">
         <span class="card-label">Graph</span>
@@ -354,6 +372,226 @@ async function renderDiscoveryRunDetail(id) {
   }
 }
 
+async function renderAssetsView() {
+  app.innerHTML = `
+    <section class="section-header">
+      <div>
+        <p class="eyebrow">Assets</p>
+        <h1>Asset browser</h1>
+        <p>Filter persisted assets using the same fields supported by the API. Identity strength, confidence, and state remain visible.</p>
+      </div>
+      <a class="button secondary" href="#/">Back to dashboard</a>
+    </section>
+    <form class="form-panel" id="asset-filter-form">
+      <div class="form-grid asset-filter-grid">
+        <div class="field">
+          <label for="asset-type-filter">Type</label>
+          <input id="asset-type-filter" name="type" placeholder="device">
+        </div>
+        <div class="field">
+          <label for="asset-vendor-filter">Vendor</label>
+          <input id="asset-vendor-filter" name="vendor" placeholder="juniper">
+        </div>
+        <div class="field">
+          <label for="asset-serial-filter">Serial</label>
+          <input id="asset-serial-filter" name="serial" placeholder="JN1234">
+        </div>
+        <div class="field">
+          <label for="asset-identity-filter">Identity key</label>
+          <input id="asset-identity-filter" name="identity_key" placeholder="device:hostname:mx-edge-01">
+        </div>
+      </div>
+      <div class="form-actions">
+        <button type="submit">Apply filters</button>
+        <button class="secondary" type="button" id="clear-asset-filters">Clear</button>
+        <span class="muted" id="asset-filter-message">Shows up to 100 matching assets.</span>
+      </div>
+    </form>
+    <section class="table-panel" id="assets-panel">
+      <div class="empty-state">Loading assets...</div>
+    </section>
+  `;
+
+  document.getElementById("asset-filter-form").addEventListener("submit", (event) => {
+    event.preventDefault();
+    loadAssetsFromFilters();
+  });
+  document.getElementById("clear-asset-filters").addEventListener("click", () => {
+    document.getElementById("asset-filter-form").reset();
+    loadAssetsFromFilters();
+  });
+  await loadAssetsFromFilters();
+}
+
+async function loadAssetsFromFilters() {
+  const panel = document.getElementById("assets-panel");
+  const message = document.getElementById("asset-filter-message");
+  const form = document.getElementById("asset-filter-form");
+  const params = new URLSearchParams({ limit: "100" });
+  for (const [key, value] of new FormData(form).entries()) {
+    const trimmed = String(value || "").trim();
+    if (trimmed) {
+      params.set(key, trimmed);
+    }
+  }
+
+  panel.innerHTML = `<div class="empty-state">Loading assets...</div>`;
+  try {
+    const payload = await apiGet(`/api/v1/assets?${params.toString()}`);
+    const assets = payload?.data?.assets || [];
+    const pagination = payload?.metadata?.pagination;
+    message.textContent = `${assets.length} assets shown${pagination ? ` of ${pagination.total}` : ""}.`;
+    if (assets.length === 0) {
+      panel.innerHTML = `<div class="empty-state">No assets match these filters.</div>`;
+      return;
+    }
+    panel.innerHTML = `
+      <table class="table">
+        <thead>
+          <tr>
+            <th>Asset</th>
+            <th>Type</th>
+            <th>Vendor</th>
+            <th>Serial</th>
+            <th>Identity</th>
+            <th>Confidence</th>
+            <th>State</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${assets.map((asset) => `
+            <tr>
+              <td><a href="#/assets/${escapeHTML(asset.id)}">${escapeHTML(assetLabel(asset))}</a></td>
+              <td>${escapeHTML(asset.type || "unknown")}</td>
+              <td>${escapeHTML(asset.vendor || "unknown")}</td>
+              <td>${escapeHTML(asset.serial || "unknown")}</td>
+              <td>
+                <code>${escapeHTML(asset.identity_key || "")}</code>
+                ${identityBadge(asset)}
+              </td>
+              <td>${escapeHTML(confidenceLabel(asset))}</td>
+              <td>${stateBadge(asset.state)}</td>
+            </tr>
+          `).join("")}
+        </tbody>
+      </table>
+    `;
+  } catch (error) {
+    message.textContent = error.message;
+    panel.innerHTML = `<div class="error-state">${escapeHTML(error.message)}</div>`;
+  }
+}
+
+async function renderAssetDetail(id) {
+  app.innerHTML = `
+    <section class="section-header">
+      <div>
+        <p class="eyebrow">Asset details</p>
+        <h1>Asset ${escapeHTML(shortID(id))}</h1>
+        <p>Review facts, relationships, confidence, state, and evidence references without hiding uncertainty.</p>
+      </div>
+      <a class="button secondary" href="#/assets">Back to assets</a>
+    </section>
+    <section class="detail-panel" id="asset-detail">
+      <div class="empty-state">Loading asset...</div>
+    </section>
+    ${evidenceDrawerMarkup()}
+  `;
+  setupEvidenceDrawer();
+
+  const panel = document.getElementById("asset-detail");
+  try {
+    const [assetPayload, factsPayload, relationshipsPayload] = await Promise.all([
+      apiGet(`/api/v1/assets/${encodeURIComponent(id)}`),
+      apiGet(`/api/v1/assets/${encodeURIComponent(id)}/facts?limit=100`),
+      apiGet(`/api/v1/assets/${encodeURIComponent(id)}/relationships?limit=100`),
+    ]);
+    const asset = assetPayload?.data?.asset;
+    const facts = factsPayload?.data?.facts || [];
+    const relationships = relationshipsPayload?.data?.relationships || [];
+
+    panel.innerHTML = `
+      <div class="detail-grid">
+        <div class="metric">
+          <small>Type</small>
+          <strong>${escapeHTML(asset.type || "unknown")}</strong>
+        </div>
+        <div class="metric">
+          <small>Confidence</small>
+          <strong>${escapeHTML(confidenceLabel(asset))}</strong>
+        </div>
+        <div class="metric">
+          <small>State</small>
+          <strong>${stateBadge(asset.state)}</strong>
+        </div>
+        <div class="metric">
+          <small>Identity</small>
+          <strong>${identityBadge(asset)}</strong>
+        </div>
+      </div>
+      <span class="code-block-label">Identity key</span>
+      <pre class="code-block">${escapeHTML(asset.identity_key || asset.id)}</pre>
+      <div class="asset-meta-grid">
+        <div>
+          <span class="code-block-label">Facts</span>
+          ${assetFactsMarkup(facts)}
+        </div>
+        <div>
+          <span class="code-block-label">Relationships</span>
+          ${assetRelationshipsMarkup(relationships, asset.id)}
+        </div>
+      </div>
+      <span class="code-block-label">Metadata</span>
+      <pre class="code-block">${escapeHTML(JSON.stringify(asset.metadata || {}, null, 2))}</pre>
+    `;
+    attachEvidenceButtons(panel);
+  } catch (error) {
+    panel.innerHTML = `<div class="error-state">${escapeHTML(error.message)}</div>`;
+  }
+}
+
+function assetFactsMarkup(facts) {
+  if (facts.length === 0) {
+    return `<p class="muted">No facts recorded for this asset.</p>`;
+  }
+  return `
+    <ul class="edge-list">
+      ${facts.map((fact) => `
+        <li class="${fact.state === "conflicting" ? "conflict-row" : ""}">
+          <strong>${escapeHTML(fact.name || "fact")}</strong>
+          <span>${escapeHTML(factValueLabel(fact.value))}</span>
+          <small>${escapeHTML(confidenceLabel(fact))}</small>
+          <small>${escapeHTML(fact.confidence_reason || "")}</small>
+          ${evidenceButton(fact.evidence_id)}
+        </li>
+      `).join("")}
+    </ul>
+  `;
+}
+
+function assetRelationshipsMarkup(relationships, assetID) {
+  if (relationships.length === 0) {
+    return `<p class="muted">No relationships recorded for this asset.</p>`;
+  }
+  return `
+    <ul class="edge-list">
+      ${relationships.map((relationship) => {
+        const direction = relationship.source_asset_id === assetID ? "outgoing" : "incoming";
+        const peer = relationship.source_asset_id === assetID ? relationship.target_asset_id : relationship.source_asset_id;
+        return `
+          <li>
+            <strong>${escapeHTML(relationship.relationship_type || "related")}</strong>
+            <span>${escapeHTML(direction)} peer ${escapeHTML(peer || "unknown")}</span>
+            <small>${escapeHTML(confidenceLabel(relationship))}</small>
+            <small>${escapeHTML(relationship.confidence_reason || "")}</small>
+            ${evidenceButton(relationship.evidence_id)}
+          </li>
+        `;
+      }).join("")}
+    </ul>
+  `;
+}
+
 async function renderGraphView() {
   app.innerHTML = `
     <section class="section-header">
@@ -390,6 +628,22 @@ async function renderGraphView() {
         <div class="empty-state">Click a node to show asset details.</div>
       </aside>
     </section>
+    ${evidenceDrawerMarkup()}
+  `;
+
+  document.getElementById("graph-form").addEventListener("submit", submitGraphForm);
+  document.getElementById("asset-select").addEventListener("change", (event) => {
+    const selectedID = event.currentTarget.value;
+    if (selectedID) {
+      document.getElementById("asset-id").value = selectedID;
+    }
+  });
+  setupEvidenceDrawer();
+  await loadAssetOptions();
+}
+
+function evidenceDrawerMarkup() {
+  return `
     <div class="drawer-backdrop hidden" id="evidence-drawer-backdrop"></div>
     <aside class="evidence-drawer hidden" id="evidence-drawer" aria-label="Evidence drawer" aria-live="polite">
       <div class="drawer-header">
@@ -404,16 +658,6 @@ async function renderGraphView() {
       </div>
     </aside>
   `;
-
-  document.getElementById("graph-form").addEventListener("submit", submitGraphForm);
-  document.getElementById("asset-select").addEventListener("change", (event) => {
-    const selectedID = event.currentTarget.value;
-    if (selectedID) {
-      document.getElementById("asset-id").value = selectedID;
-    }
-  });
-  setupEvidenceDrawer();
-  await loadAssetOptions();
 }
 
 async function loadAssetOptions() {
@@ -890,6 +1134,11 @@ function statusPill(status) {
   return `<span class="status-pill ${safeStatus}">${safeStatus}</span>`;
 }
 
+function stateBadge(state) {
+  const safeState = escapeHTML(state || "unknown");
+  return `<span class="status-pill ${safeState}">${safeState}</span>`;
+}
+
 function formatDate(value) {
   if (!value) {
     return "Not set";
@@ -922,6 +1171,12 @@ function confidenceLabel(item) {
   const percent = Math.round(Number(item.confidence) * 100);
   const state = item.state ? ` ${item.state}` : "";
   return `${percent}%${state}`;
+}
+
+function identityBadge(asset) {
+  const strength = asset?.metadata?.identity_strength || "unknown";
+  const reason = asset?.metadata?.identity_reason || "";
+  return `<span class="identity-badge ${escapeHTML(strength)}" title="${escapeHTML(reason)}">${escapeHTML(strength)}</span>`;
 }
 
 function truncate(value, length) {

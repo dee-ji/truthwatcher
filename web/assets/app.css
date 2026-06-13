@@ -329,6 +329,12 @@ button:disabled {
   color: var(--bad);
 }
 
+.status-pill.conflicting {
+  color: var(--bad);
+  border-color: rgb(162 59 59 / 24%);
+  background: rgb(162 59 59 / 8%);
+}
+
 .status-pill.running,
 .status-pill.pending {
   color: var(--accent-dark);
@@ -553,6 +559,42 @@ button:disabled {
   grid-template-columns: 1fr;
 }
 
+.asset-meta-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+
+.identity-badge {
+  display: inline-flex;
+  align-items: center;
+  width: fit-content;
+  margin-top: .35rem;
+  padding: .24rem .52rem;
+  border: 1px solid rgb(16 32 39 / 10%);
+  border-radius: 999px;
+  color: var(--muted);
+  font-size: .72rem;
+  font-weight: 900;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  background: rgb(255 250 241 / 72%);
+}
+
+.identity-badge.strong {
+  color: var(--ok);
+  border-color: rgb(47 125 85 / 24%);
+  background: rgb(47 125 85 / 8%);
+}
+
+.identity-badge.provisional,
+.identity-badge.weak {
+  color: var(--accent-dark);
+  border-color: rgb(196 85 45 / 24%);
+  background: rgb(196 85 45 / 8%);
+}
+
 .edge-list {
   display: grid;
   gap: .6rem;
@@ -568,6 +610,11 @@ button:disabled {
   border: 1px solid rgb(16 32 39 / 9%);
   border-radius: 16px;
   background: rgb(255 250 241 / 68%);
+}
+
+.edge-list li.conflict-row {
+  border-color: rgb(162 59 59 / 24%);
+  background: rgb(162 59 59 / 8%);
 }
 
 .edge-list span,
@@ -806,7 +853,8 @@ button:disabled {
   }
 
   .ask-layout,
-  .chat-form {
+  .chat-form,
+  .asset-meta-grid {
     grid-template-columns: 1fr;
   }
 

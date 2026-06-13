@@ -134,6 +134,12 @@ curl http://127.0.0.1:8080/api/v1/assets/<asset-id>/graph
 curl 'http://127.0.0.1:8080/api/v1/graph/neighbors?asset_id=<asset-id>'
 ```
 
+You can also browse assets, facts, relationships, and linked read-only evidence in the embedded UI:
+
+```text
+http://127.0.0.1:8080/#/assets
+```
+
 Current limitation: fake discovery stores raw evidence first. Parser persistence is an explicit second step so raw evidence is preserved even when parsing produces warnings or skips unsupported commands.
 
 ## Target Milestone

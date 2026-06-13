@@ -219,10 +219,11 @@ Completed:
 - Discovery run UI added with run list, detail view, evidence counts, and fake discovery form.
 - Basic graph view added with API-backed node/edge rendering, asset click details, and edge confidence labels.
 - Evidence drawer added for graph facts and relationships with read-only raw output display and copy support.
+- Asset browsing UI added with API-backed filters, asset detail facts and relationships, confidence/state visibility, and linked read-only evidence access.
 
 Next steps:
 
-- Add asset/evidence views only when explicitly requested.
+- Add focused evidence search or filtering views only when explicitly requested.
 
 Deliverables:
 

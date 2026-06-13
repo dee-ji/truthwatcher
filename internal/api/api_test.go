@@ -92,6 +92,9 @@ func TestServesEmbeddedFrontend(t *testing.T) {
 	if !strings.Contains(response.Body.String(), "#/discovery-runs") {
 		t.Fatalf("body does not contain discovery runs navigation: %s", response.Body.String())
 	}
+	if !strings.Contains(response.Body.String(), "#/assets") {
+		t.Fatalf("body does not contain assets navigation: %s", response.Body.String())
+	}
 	if !strings.Contains(response.Body.String(), "#/graph") {
 		t.Fatalf("body does not contain graph navigation: %s", response.Body.String())
 	}
@@ -122,6 +125,15 @@ func TestServesEmbeddedFrontendAsset(t *testing.T) {
 	}
 	if !strings.Contains(body, "/api/v1/assets/${encodeURIComponent(assetID)}/graph") {
 		t.Fatalf("body does not contain graph API fetch path: %s", body)
+	}
+	if !strings.Contains(body, "renderAssetsView") {
+		t.Fatalf("body does not contain asset browser renderer: %s", body)
+	}
+	if !strings.Contains(body, "/api/v1/assets/${encodeURIComponent(id)}/facts?limit=100") {
+		t.Fatalf("body does not contain asset fact API fetch path: %s", body)
+	}
+	if !strings.Contains(body, "/api/v1/assets/${encodeURIComponent(id)}/relationships?limit=100") {
+		t.Fatalf("body does not contain asset relationship API fetch path: %s", body)
 	}
 	if !strings.Contains(body, "renderGraph") {
 		t.Fatalf("body does not contain graph renderer: %s", body)
