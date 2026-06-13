@@ -111,9 +111,10 @@ type ImportRequest struct {
 }
 
 type ImportResult struct {
-	Evidence   []EvidenceCandidate `json:"evidence,omitempty"`
-	Candidates ModelCandidates     `json:"candidates"`
-	Warnings   []string            `json:"warnings,omitempty"`
+	Evidence         []EvidenceCandidate        `json:"evidence,omitempty"`
+	EvidenceMetadata []ImportedEvidenceMetadata `json:"evidence_metadata,omitempty"`
+	Candidates       ModelCandidates            `json:"candidates"`
+	Warnings         []string                   `json:"warnings,omitempty"`
 }
 
 type ExportRequest struct {

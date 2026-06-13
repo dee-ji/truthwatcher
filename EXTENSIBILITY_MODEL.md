@@ -246,6 +246,36 @@ Examples:
 - export graph data to a data lake
 - export service inventory to a reporting platform
 
+### File JSON Adapter
+
+The first boring adapter is a local JSON file importer/exporter.
+
+Purpose:
+
+- Prove import/export contracts without depending on NetBox, Nautobot, IPAM, cloud APIs, or another external platform.
+- Allow engineers to move a bounded Truthwatcher graph snapshot between environments for testing and review.
+
+Export behavior:
+
+- Exports assets.
+- Exports facts.
+- Exports relationships.
+- Exports evidence metadata only.
+- Does not export raw evidence output.
+
+Import behavior:
+
+- Imports the same JSON snapshot format.
+- Preserves fact source, confidence, state, evidence references, and metadata where present.
+- Preserves evidence metadata such as target, method, command/API, hash, parser name, collection time, and metadata.
+- Creates evidence candidates only when raw output is explicitly present in the imported file.
+
+Kernel boundary:
+
+- The adapter returns candidates; the kernel still owns validation, conflict handling, and persistence.
+- Imported file data is evidence-backed context, not automatically observed truth.
+- The adapter does not implement NetBox, Nautobot, IPAM, monitoring, EMS, or cloud integration.
+
 ### Script Adapter
 
 A user brings their own script or executable.

@@ -357,10 +357,11 @@ Define clear interfaces for:
 Completed:
 
 - Compile-time Go extensibility contracts defined for collectors, parsers, importers, exporters, enrichers, and planners without dynamic plugin loading.
+- Local JSON file import/export connector foundation added for assets, facts, relationships, and evidence metadata.
 
 Next steps:
 
-- Add one boring in-repo file import adapter only when explicitly requested.
+- Add CLI or API wiring for file import/export only when explicitly requested.
 
 ### Phase E1: File Import Adapter
 
