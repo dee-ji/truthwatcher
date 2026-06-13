@@ -7,6 +7,8 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -66,6 +68,26 @@ func TestCommandHelpDoesNotRequireRuntimeDependencies(t *testing.T) {
 			name: "discover fake",
 			args: []string{"discover", "fake", "--help"},
 			want: []string{"Usage:", "truthwatcher discover fake", "read-only policy engine"},
+		},
+		{
+			name: "export",
+			args: []string{"export", "--help"},
+			want: []string{"Usage:", "truthwatcher export json", "assets, facts, relationships"},
+		},
+		{
+			name: "export json",
+			args: []string{"export", "json", "--help"},
+			want: []string{"Usage:", "truthwatcher export json", "Raw evidence output is not exported"},
+		},
+		{
+			name: "import",
+			args: []string{"import", "--help"},
+			want: []string{"Usage:", "truthwatcher import json", "import candidates"},
+		},
+		{
+			name: "import json",
+			args: []string{"import", "json", "--help"},
+			want: []string{"Usage:", "truthwatcher import json", "does not persist records"},
 		},
 	}
 
@@ -206,5 +228,99 @@ func TestDiscoverFakeRequiresDatabaseURL(t *testing.T) {
 	}
 	if !strings.Contains(err.Error(), config.EnvDatabaseURL) {
 		t.Fatalf("error = %q, want database url env name", err.Error())
+	}
+}
+
+func TestExportJSONRequiresDatabaseURL(t *testing.T) {
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+
+	app := App{
+		Version: "test-version",
+		loadConfig: func() (config.Config, error) {
+			return config.Default(), nil
+		},
+	}
+
+	err := app.Run(context.Background(), []string{"export", "json", "--output", filepath.Join(t.TempDir(), "snapshot.json")}, &stdout, &stderr)
+	if err == nil {
+		t.Fatal("export json without database url returned nil error")
+	}
+	if !strings.Contains(err.Error(), config.EnvDatabaseURL) {
+		t.Fatalf("error = %q, want database url env name", err.Error())
+	}
+}
+
+func TestImportJSONValidatesCandidatesWithoutDatabase(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "snapshot.json")
+	data := `{
+  "schema_version": "truthwatcher.file_snapshot.v1",
+  "generated_at": "2026-06-13T12:00:00Z",
+  "assets": [{
+    "id": "asset-a",
+    "type": "device",
+    "identity_key": "device:serial:aaa",
+    "confidence": 0.95,
+    "confidence_reason": "directly observed from evidence",
+    "state": "observed",
+    "metadata": {}
+  }],
+  "facts": [{
+    "id": "fact-a",
+    "asset_id": "asset-a",
+    "name": "hostname",
+    "value": "router-a",
+    "source": "parser",
+    "confidence": 0.95,
+    "confidence_reason": "directly observed from evidence",
+    "state": "observed",
+    "evidence_id": "evidence-a"
+  }],
+  "relationships": [{
+    "id": "relationship-a",
+    "source_asset_id": "asset-a",
+    "target_asset_id": "asset-b",
+    "relationship_type": "lldp_neighbor_of",
+    "confidence": 0.8,
+    "confidence_reason": "directly observed from evidence",
+    "state": "observed",
+    "evidence_id": "evidence-a",
+    "metadata": {}
+  }],
+  "evidence_metadata": [{
+    "id": "evidence-a",
+    "discovery_run_id": "run-a",
+    "target": "router-a",
+    "method": "ssh",
+    "command_or_api": "show version",
+    "raw_output_hash": "hash-a"
+  }]
+}`
+	if err := os.WriteFile(path, []byte(data), 0o600); err != nil {
+		t.Fatalf("write snapshot: %v", err)
+	}
+
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	err := New().Run(context.Background(), []string{"import", "json", "--input", path}, &stdout, &stderr)
+	if err != nil {
+		t.Fatalf("import json returned error: %v", err)
+	}
+	output := stdout.String()
+	for _, want := range []string{
+		"validated import candidates",
+		"assets: 1",
+		"facts: 1",
+		"relationships: 1",
+		"evidence metadata: 1",
+		"does not persist records or treat imported data as observed proof",
+		"warning: imported observed facts are candidates only",
+	} {
+		if !strings.Contains(output, want) {
+			t.Fatalf("stdout = %q, want substring %q", output, want)
+		}
+	}
+	if stderr.Len() != 0 {
+		t.Fatalf("stderr = %q, want empty", stderr.String())
 	}
 }

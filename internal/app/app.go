@@ -18,6 +18,7 @@ import (
 	"truthwatcher/internal/db"
 	"truthwatcher/internal/discovery"
 	"truthwatcher/internal/evidence"
+	"truthwatcher/internal/extensibility"
 	"truthwatcher/internal/graph"
 	"truthwatcher/internal/logging"
 	"truthwatcher/internal/parser"
@@ -71,6 +72,10 @@ func (a App) Run(ctx context.Context, args []string, stdout, stderr io.Writer) e
 		return a.runDiscover(ctx, args[1:], stdout, stderr)
 	case "parse":
 		return a.runParse(ctx, args[1:], stdout, stderr)
+	case "export":
+		return a.runExport(ctx, args[1:], stdout, stderr)
+	case "import":
+		return a.runImport(ctx, args[1:], stdout, stderr)
 	default:
 		printUsage(stderr)
 		return fmt.Errorf("unknown command %q", args[0])
@@ -399,6 +404,160 @@ func (a App) runParseDiscoveryRun(ctx context.Context, args []string, stdout, st
 	return nil
 }
 
+func (a App) runExport(ctx context.Context, args []string, stdout, stderr io.Writer) error {
+	if len(args) == 0 {
+		return fmt.Errorf("usage: truthwatcher export json --output <path>")
+	}
+	if isHelpArg(args[0]) {
+		printExportHelp(stdout)
+		return nil
+	}
+
+	switch args[0] {
+	case "json":
+		return a.runExportJSON(ctx, args[1:], stdout, stderr)
+	default:
+		return fmt.Errorf("usage: truthwatcher export json --output <path>")
+	}
+}
+
+func (a App) runExportJSON(ctx context.Context, args []string, stdout, stderr io.Writer) error {
+	if wantsHelp(args) {
+		printExportJSONHelp(stdout)
+		return nil
+	}
+
+	loadConfig := a.loadConfig
+	if loadConfig == nil {
+		loadConfig = config.Load
+	}
+
+	cfg, err := loadConfig()
+	if err != nil {
+		return err
+	}
+
+	var outputPath string
+	flags := flag.NewFlagSet("export json", flag.ContinueOnError)
+	flags.SetOutput(stderr)
+	flags.StringVar(&outputPath, "output", "", "local JSON snapshot output path")
+	if err := flags.Parse(args); err != nil {
+		return err
+	}
+	if flags.NArg() != 0 {
+		return fmt.Errorf("export json accepts flags only")
+	}
+	if strings.TrimSpace(outputPath) == "" {
+		return fmt.Errorf("--output is required")
+	}
+	if strings.TrimSpace(cfg.DatabaseURL) == "" {
+		return fmt.Errorf("%s is required for export json", config.EnvDatabaseURL)
+	}
+
+	conn, err := db.Open(ctx, cfg.DatabaseURL)
+	if err != nil {
+		return err
+	}
+	defer conn.Close()
+
+	assetRepo := db.NewAssetRepository(conn)
+	evidenceRepo := db.NewEvidenceRepository(conn)
+	assetItems, err := assetRepo.ListAssets(ctx)
+	if err != nil {
+		return err
+	}
+	factItems, err := assetRepo.ListFacts(ctx)
+	if err != nil {
+		return err
+	}
+	relationshipItems, err := assetRepo.ListRelationships(ctx)
+	if err != nil {
+		return err
+	}
+	evidenceItems, err := evidenceRepo.ListEvidence(ctx)
+	if err != nil {
+		return err
+	}
+
+	result, err := extensibility.FileJSONExporter{}.Export(ctx, extensibility.ExportRequest{
+		Destination: outputPath,
+		Snapshot: extensibility.GraphSnapshot{
+			Assets:        assetItems,
+			Facts:         factItems,
+			Relationships: relationshipItems,
+			Evidence:      evidenceItems,
+		},
+	})
+	if err != nil {
+		return err
+	}
+
+	fmt.Fprintf(stdout, "exported %d records to %s\n", result.Exported, result.Destination)
+	fmt.Fprintln(stdout, "raw evidence output was not exported; evidence metadata and hashes were included")
+	return nil
+}
+
+func (a App) runImport(ctx context.Context, args []string, stdout, stderr io.Writer) error {
+	if len(args) == 0 {
+		return fmt.Errorf("usage: truthwatcher import json --input <path>")
+	}
+	if isHelpArg(args[0]) {
+		printImportHelp(stdout)
+		return nil
+	}
+
+	switch args[0] {
+	case "json":
+		return a.runImportJSON(ctx, args[1:], stdout, stderr)
+	default:
+		return fmt.Errorf("usage: truthwatcher import json --input <path>")
+	}
+}
+
+func (a App) runImportJSON(ctx context.Context, args []string, stdout, stderr io.Writer) error {
+	if wantsHelp(args) {
+		printImportJSONHelp(stdout)
+		return nil
+	}
+
+	var inputPath string
+	flags := flag.NewFlagSet("import json", flag.ContinueOnError)
+	flags.SetOutput(stderr)
+	flags.StringVar(&inputPath, "input", "", "local JSON snapshot input path")
+	if err := flags.Parse(args); err != nil {
+		return err
+	}
+	if flags.NArg() != 0 {
+		return fmt.Errorf("import json accepts flags only")
+	}
+	if strings.TrimSpace(inputPath) == "" {
+		return fmt.Errorf("--input is required")
+	}
+
+	result, err := extensibility.FileJSONImporter{}.Import(ctx, extensibility.ImportRequest{
+		Source: inputPath,
+	})
+	if err != nil {
+		return err
+	}
+	warnings, err := extensibility.ValidateImportResult(result)
+	if err != nil {
+		return err
+	}
+
+	fmt.Fprintf(stdout, "validated import candidates from %s\n", inputPath)
+	fmt.Fprintf(stdout, "assets: %d\n", len(result.Candidates.Assets))
+	fmt.Fprintf(stdout, "facts: %d\n", len(result.Candidates.Facts))
+	fmt.Fprintf(stdout, "relationships: %d\n", len(result.Candidates.Relationships))
+	fmt.Fprintf(stdout, "evidence metadata: %d\n", len(result.EvidenceMetadata))
+	fmt.Fprintf(stdout, "evidence candidates with raw output: %d\n", len(result.Evidence))
+	fmt.Fprintln(stdout, "import json validates candidates only; it does not persist records or treat imported data as observed proof")
+	for _, warning := range warnings {
+		fmt.Fprintf(stdout, "warning: %s\n", warning)
+	}
+	return nil
+}
+
 func serveHTTP(ctx context.Context, cfg config.Config, logger *slog.Logger, stdout io.Writer) error {
 	if logger == nil {
 		logger = slog.New(slog.NewTextHandler(io.Discard, nil))
@@ -529,6 +688,8 @@ func printUsage(w io.Writer) {
   truthwatcher migrate status
   truthwatcher discover fake --target fixture://junos-mx
   truthwatcher parse discovery-run --id <id> --platform junos
+  truthwatcher export json --output <path>
+  truthwatcher import json --input <path>
 
 Commands:
   version   Print the Truthwatcher version.
@@ -536,6 +697,8 @@ Commands:
   migrate   Run or inspect database migrations.
   discover  Run a local fixture-backed discovery.
   parse     Persist parser output from stored evidence.
+  export    Export a local JSON graph snapshot.
+  import    Validate local JSON snapshot import candidates.
 
 Run "truthwatcher <command> --help" for command details.
 `)
@@ -629,5 +792,52 @@ TRUTHWATCHER_DATABASE_URL is required.
 Flags:
   --id        Discovery run id.
   --platform  Parser platform, for example junos or iosxr.
+`)
+}
+
+func printExportHelp(w io.Writer) {
+	fmt.Fprint(w, `Usage:
+  truthwatcher export json --output <path>
+
+Export local Truthwatcher data through explicit connector commands.
+
+Subcommands:
+  json  Export assets, facts, relationships, and evidence metadata to JSON.
+`)
+}
+
+func printExportJSONHelp(w io.Writer) {
+	fmt.Fprint(w, `Usage:
+  truthwatcher export json --output <path>
+
+Write a local graph snapshot containing assets, facts, relationships, and
+evidence metadata. Raw evidence output is not exported by default.
+TRUTHWATCHER_DATABASE_URL is required.
+
+Flags:
+  --output  Destination path for the JSON snapshot.
+`)
+}
+
+func printImportHelp(w io.Writer) {
+	fmt.Fprint(w, `Usage:
+  truthwatcher import json --input <path>
+
+Validate local Truthwatcher import candidates.
+
+Subcommands:
+  json  Read a local JSON snapshot and summarize import candidates.
+`)
+}
+
+func printImportJSONHelp(w io.Writer) {
+	fmt.Fprint(w, `Usage:
+  truthwatcher import json --input <path>
+
+Read a local graph snapshot, validate candidate records, and print a summary.
+This command does not persist records or treat imported data as observed proof.
+
+Flags:
+  --input  Source path for the JSON snapshot.
 `)
 }

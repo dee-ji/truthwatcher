@@ -96,6 +96,21 @@ Response `data`:
 }
 ```
 
+## Local JSON Import and Export
+
+The CLI exposes local file connector commands for graph snapshots:
+
+```text
+truthwatcher export json --output <path>
+truthwatcher import json --input <path>
+```
+
+Export writes assets, facts, relationships, and evidence metadata. It does not export raw evidence output by default.
+
+Import validates candidates and prints a summary. It does not persist records or treat imported data as observed proof.
+
+See [Local JSON Import and Export](import-export.md).
+
 ## Discovery Plans
 
 Discovery plans suggest safe read-only next steps from current graph data and user seed input.

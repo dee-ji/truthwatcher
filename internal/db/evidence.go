@@ -117,6 +117,36 @@ ORDER BY collected_at ASC, id ASC
 	return results, nil
 }
 
+func (r EvidenceRepository) ListEvidence(ctx context.Context) ([]evidence.Evidence, error) {
+	if r.db == nil {
+		return nil, fmt.Errorf("database is required")
+	}
+
+	rows, err := r.db.QueryContext(ctx, `
+SELECT id, discovery_run_id, target, method, command_or_api, raw_output, raw_output_hash, parser_name, collected_at, metadata
+FROM evidence
+ORDER BY collected_at ASC, id ASC
+`)
+	if err != nil {
+		return nil, fmt.Errorf("list evidence: %w", err)
+	}
+	defer rows.Close()
+
+	var results []evidence.Evidence
+	for rows.Next() {
+		item, err := scanEvidence(rows)
+		if err != nil {
+			return nil, fmt.Errorf("scan evidence: %w", err)
+		}
+		results = append(results, item)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("read evidence: %w", err)
+	}
+
+	return results, nil
+}
+
 func scanEvidence(s scanner) (evidence.Evidence, error) {
 	var item evidence.Evidence
 	var parserName sql.NullString

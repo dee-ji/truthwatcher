@@ -175,6 +175,36 @@ ORDER BY created_at DESC, id DESC
 	return results, nil
 }
 
+func (r AssetRepository) ListFacts(ctx context.Context) ([]assets.Fact, error) {
+	if r.db == nil {
+		return nil, fmt.Errorf("database is required")
+	}
+
+	rows, err := r.db.QueryContext(ctx, `
+SELECT id, asset_id, name, value, source, confidence, confidence_reason, state, evidence_id, created_at
+FROM facts
+ORDER BY created_at DESC, id DESC
+`)
+	if err != nil {
+		return nil, fmt.Errorf("list facts: %w", err)
+	}
+	defer rows.Close()
+
+	var results []assets.Fact
+	for rows.Next() {
+		item, err := scanFact(rows)
+		if err != nil {
+			return nil, fmt.Errorf("scan fact: %w", err)
+		}
+		results = append(results, item)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("read facts: %w", err)
+	}
+
+	return results, nil
+}
+
 func (r AssetRepository) CreateRelationship(ctx context.Context, params assets.CreateRelationshipParams) (assets.Relationship, error) {
 	if r.db == nil {
 		return assets.Relationship{}, fmt.Errorf("database is required")
