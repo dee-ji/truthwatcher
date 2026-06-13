@@ -212,5 +212,6 @@ These are not all current capabilities. The v0.1 priority remains the evidence k
 - [Install](docs/install.md)
 - [API](docs/api.md)
 - [Testing](docs/testing.md)
+- [Future Phases](docs/future.md)
 - [Roadmap](ROADMAP.md)
 - [Agent Collaboration Contract](AGENT_COLLABORATION_CONTRACT.md)

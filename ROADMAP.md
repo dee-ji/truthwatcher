@@ -60,11 +60,13 @@ Completed:
 - HTTP API foundation added with health, readiness, version, request ID, request logging, and panic recovery middleware.
 - Single-binary local packaging added with command help, embedded migrations/UI validation, install documentation, and `make release-local`.
 - First user-facing README and concept documentation added for evidence-first modeling, discovery planning, assets/facts/relationships, and extensibility.
+- Future phase candidates documented with prerequisites and v0.1 deferral rationale.
 
 Next steps:
 
 - Add installer checksums or signed release artifacts only when explicitly requested.
 - Keep user-facing docs aligned with parser persistence and graph workflow changes as those features are completed.
+- Promote future phases to implementation only through small, explicit prompts after prerequisite kernel work exists.
 
 ## Phase 2: Evidence Store
 
