@@ -7,15 +7,15 @@ This pack contains a sequenced set of prompts for building Truthwatcher without 
 For every Codex session:
 
 1. Open the project in GoLand.
-2. Make sure these project files exist in the repo root:
-   - `PROJECT_TRUTHWATCHER.md`
-   - `AGENT_COLLABORATION_CONTRACT.md`
-   - `ARCHITECTURE_DECISIONS.md`
-   - `DATA_MODEL.md`
-   - `SAFETY_MODEL.md`
-   - `MVP_SPEC.md`
-   - `EXTENSIBILITY_MODEL.md`
-   - `ROADMAP.md`
+2. Make sure these project steering files exist:
+   - `steering-docs/PROJECT_TRUTHWATCHER.md`
+   - `steering-docs/AGENT_COLLABORATION_CONTRACT.md`
+   - `steering-docs/ARCHITECTURE_DECISIONS.md`
+   - `steering-docs/DATA_MODEL.md`
+   - `steering-docs/SAFETY_MODEL.md`
+   - `steering-docs/MVP_SPEC.md`
+   - `steering-docs/EXTENSIBILITY_MODEL.md`
+   - `steering-docs/ROADMAP.md`
 3. Copy one prompt at a time into Codex.
 4. Review the diff.
 5. Run tests.

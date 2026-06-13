@@ -1,12 +1,12 @@
 Before coding, read these files:
-- PROJECT_TRUTHWATCHER.md
-- AGENT_COLLABORATION_CONTRACT.md
-- ARCHITECTURE_DECISIONS.md
-- DATA_MODEL.md
-- SAFETY_MODEL.md
-- MVP_SPEC.md
-- EXTENSIBILITY_MODEL.md
-- ROADMAP.md
+- steering-docs/PROJECT_TRUTHWATCHER.md
+- steering-docs/AGENT_COLLABORATION_CONTRACT.md
+- steering-docs/ARCHITECTURE_DECISIONS.md
+- steering-docs/DATA_MODEL.md
+- steering-docs/SAFETY_MODEL.md
+- steering-docs/MVP_SPEC.md
+- steering-docs/EXTENSIBILITY_MODEL.md
+- steering-docs/ROADMAP.md
 
 Act as an informed engineering sidekick. Challenge scope creep. Do not simply agree. If a requested implementation conflicts with the project constitution, stop and explain the conflict.
 
@@ -18,7 +18,7 @@ Rules:
 - Do not build a full chat platform before the evidence kernel exists.
 - Prefer boring, explicit Go code.
 - Add tests where practical.
-- Update ROADMAP.md only with completed work and next steps.
+- Update steering-docs/ROADMAP.md only with completed work and next steps.
 - Do not rewrite vision documents unless directly asked.
 
 
@@ -26,7 +26,7 @@ You are helping build Truthwatcher.
 
 Truthwatcher is a Go-based, single-binary, evidence-first network cartography platform for service-provider environments.
 
-First, read all project markdown files in the repo root. Then read `PROMPT_INDEX.md`.
+First, read the steering documents listed above. Then read `steering-docs/PROMPT_INDEX.md`.
 
 Your job is not to build the whole product. Your job is to execute one prompt at a time from the prompt pack.
 

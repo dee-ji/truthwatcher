@@ -4,12 +4,12 @@
 
 Before modifying code, read these files:
 
-1. PROJECT_TRUTHWATCHER.md
-2. ROADMAP.md
-3. ARCHITECTURE_DECISIONS.md
-4. DATA_MODEL.md
-5. SAFETY_MODEL.md
-6. MVP_SPEC.md
+1. steering-docs/PROJECT_TRUTHWATCHER.md
+2. steering-docs/ROADMAP.md
+3. steering-docs/ARCHITECTURE_DECISIONS.md
+4. steering-docs/DATA_MODEL.md
+5. steering-docs/SAFETY_MODEL.md
+6. steering-docs/MVP_SPEC.md
 
 ## Prime Directive
 
@@ -69,7 +69,7 @@ examples/
 
 Good task prompt:
 
-> Implement the DiscoveryRun database model, migration, and repository. Do not modify unrelated packages. Follow DATA_MODEL.md and MVP_SPEC.md.
+> Implement the DiscoveryRun database model, migration, and repository. Do not modify unrelated packages. Follow steering-docs/DATA_MODEL.md and steering-docs/MVP_SPEC.md.
 
 Bad task prompt:
 

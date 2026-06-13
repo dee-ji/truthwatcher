@@ -4,14 +4,14 @@ Use this at the beginning of every Codex session.
 
 ```text
 Read:
-- PROJECT_TRUTHWATCHER.md
-- AGENT_COLLABORATION_CONTRACT.md
-- ARCHITECTURE_DECISIONS.md
-- DATA_MODEL.md
-- SAFETY_MODEL.md
-- MVP_SPEC.md
-- EXTENSIBILITY_MODEL.md
-- ROADMAP.md
+- steering-docs/PROJECT_TRUTHWATCHER.md
+- steering-docs/AGENT_COLLABORATION_CONTRACT.md
+- steering-docs/ARCHITECTURE_DECISIONS.md
+- steering-docs/DATA_MODEL.md
+- steering-docs/SAFETY_MODEL.md
+- steering-docs/MVP_SPEC.md
+- steering-docs/EXTENSIBILITY_MODEL.md
+- steering-docs/ROADMAP.md
 
 Then implement only the task in:
 
@@ -22,6 +22,6 @@ Constraints:
 - Do not introduce new architecture unless required.
 - Do not build future phases.
 - Add tests when practical.
-- Update ROADMAP.md with completed work.
+- Update steering-docs/ROADMAP.md with completed work.
 - Stop after this task.
 ```

@@ -133,7 +133,7 @@ The evidence kernel is moving toward this first complete workflow:
 5. Create assets and relationships with confidence and evidence references.
 6. Display evidence, assets, and graph relationships in the UI.
 
-Some pieces of this target exist today; others are intentionally tracked as separate roadmap work. See [ROADMAP.md](ROADMAP.md) for current completion status.
+Some pieces of this target exist today; others are intentionally tracked as separate roadmap work. See [steering-docs/ROADMAP.md](steering-docs/ROADMAP.md) for current completion status.
 
 ## Safety Model
 
@@ -146,7 +146,7 @@ Truthwatcher is read-only by design.
 - Chat or agent-style features do not execute discovery or network actions.
 - Seeded architecture hints are context, not observed proof.
 
-See [docs/concepts/evidence-first.md](docs/concepts/evidence-first.md) and [SAFETY_MODEL.md](SAFETY_MODEL.md).
+See [docs/concepts/evidence-first.md](docs/concepts/evidence-first.md) and [steering-docs/SAFETY_MODEL.md](steering-docs/SAFETY_MODEL.md).
 
 ## Architecture
 
@@ -213,5 +213,5 @@ These are not all current capabilities. The v0.1 priority remains the evidence k
 - [API](docs/api.md)
 - [Testing](docs/testing.md)
 - [Future Phases](docs/future.md)
-- [Roadmap](ROADMAP.md)
-- [Agent Collaboration Contract](AGENT_COLLABORATION_CONTRACT.md)
+- [Roadmap](steering-docs/ROADMAP.md)
+- [Agent Collaboration Contract](steering-docs/AGENT_COLLABORATION_CONTRACT.md)

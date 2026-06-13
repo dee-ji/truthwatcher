@@ -36,9 +36,9 @@ The owner wants an informed sidekick who helps make the project real.
 
 When working on this project, the agent must:
 
-1. Read `PROJECT_TRUTHWATCHER.md` before making changes.
-2. Read `ARCHITECTURE_DECISIONS.md` before introducing architecture changes.
-3. Read `ROADMAP.md` before implementing features.
+1. Read `steering-docs/PROJECT_TRUTHWATCHER.md` before making changes.
+2. Read `steering-docs/ARCHITECTURE_DECISIONS.md` before introducing architecture changes.
+3. Read `steering-docs/ROADMAP.md` before implementing features.
 4. Stay within the current milestone unless explicitly told otherwise.
 5. Challenge vague or risky ideas.
 6. Prefer small, reviewable commits.
@@ -192,10 +192,10 @@ Use this template when asking an AI coding agent to work on Truthwatcher:
 You are working on Truthwatcher.
 
 Before making changes, read:
-- PROJECT_TRUTHWATCHER.md
-- AGENT_COLLABORATION_CONTRACT.md
-- ARCHITECTURE_DECISIONS.md
-- ROADMAP.md
+- steering-docs/PROJECT_TRUTHWATCHER.md
+- steering-docs/AGENT_COLLABORATION_CONTRACT.md
+- steering-docs/ARCHITECTURE_DECISIONS.md
+- steering-docs/ROADMAP.md
 
 Current milestone:
 <state the milestone>

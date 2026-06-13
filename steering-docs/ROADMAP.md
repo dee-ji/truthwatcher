@@ -6,26 +6,28 @@ Goal: prevent scope drift and agent hallucination.
 
 Deliverables:
 
-- PROJECT_TRUTHWATCHER.md
-- ROADMAP.md
-- ARCHITECTURE_DECISIONS.md
-- DATA_MODEL.md
-- AGENT_INSTRUCTIONS.md
-- SAFETY_MODEL.md
-- MVP_SPEC.md
+- steering-docs/PROJECT_TRUTHWATCHER.md
+- steering-docs/ROADMAP.md
+- steering-docs/ARCHITECTURE_DECISIONS.md
+- steering-docs/DATA_MODEL.md
+- steering-docs/AGENT_INSTRUCTIONS.md
+- steering-docs/SAFETY_MODEL.md
+- steering-docs/MVP_SPEC.md
 
 Rules:
 
 - Every coding session must start by reading these files.
-- Every major design decision must update ARCHITECTURE_DECISIONS.md.
+- Every major design decision must update steering-docs/ARCHITECTURE_DECISIONS.md.
 - Every Codex/agent task must be small and bounded.
 
 Completed:
 
 - Repository guardrails added: `.gitignore`, `Makefile`, and `CONTRIBUTING.md`; local `.editorconfig` files are ignored.
+- Root Markdown cleanup completed by moving steering and prompt-pack documents into `steering-docs/` while keeping `README.md` and `CONTRIBUTING.md` at the repository root.
 
 Next steps:
 - Continue with Phase 1 single-binary kernel tasks.
+- Keep new steering documents under `steering-docs/` unless they are public root entry points.
 
 ## Phase 1: Single-Binary Kernel
 
