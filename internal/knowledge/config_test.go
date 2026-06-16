@@ -110,6 +110,19 @@ func TestCheckProviderReportsDisabledGitHub(t *testing.T) {
 	}
 }
 
+func TestCheckProviderReportsEnabledGitHubAsMisconfigured(t *testing.T) {
+	provider := Provider{Name: "mistspren-github", Type: "github", Enabled: true, Repo: "github.com/dee-ji/mistspren"}
+
+	result := CheckProvider(provider, nil, nil)
+
+	if result.Status != StatusMisconfigured {
+		t.Fatalf("status = %q, want %q", result.Status, StatusMisconfigured)
+	}
+	if !strings.Contains(result.Detail, "future remote workflows") {
+		t.Fatalf("detail = %q, want future workflow boundary", result.Detail)
+	}
+}
+
 func TestCheckProviderReportsNonDirectoryAsMisconfigured(t *testing.T) {
 	provider := Provider{Name: "mistspren-local", Type: "filesystem", Enabled: true, Root: "/tmp/mistspren"}
 

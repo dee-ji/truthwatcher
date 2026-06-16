@@ -93,7 +93,8 @@ func CheckProvider(provider Provider, lookup func(string) (string, bool), stat f
 			result.Detail = "github provider repo is required"
 			return result
 		}
-		result.Status = StatusAvailable
+		result.Status = StatusMisconfigured
+		result.Detail = "github providers are reserved for future remote workflows and must stay disabled"
 		return result
 	default:
 		result.Status = StatusMisconfigured

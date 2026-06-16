@@ -57,7 +57,7 @@ knowledge:
         - agent-loop-context
 ```
 
-Filesystem providers are preferred for local Codex and GoLand workflows because they use the checked-out sibling repo directly. GitHub provider references are allowed for future remote agent workflows, but they stay disabled by default.
+Filesystem providers are preferred for local Codex and GoLand workflows because they use the checked-out sibling repo directly. GitHub provider references are allowed for future remote agent workflows, but they stay disabled by default. If a GitHub provider is enabled before that workflow exists, validation reports it as `misconfigured`.
 
 ## Validation
 
