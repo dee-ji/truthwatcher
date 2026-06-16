@@ -196,15 +196,158 @@ func (s PersistenceService) persistIdentityCandidates(ctx context.Context, disco
 	}
 	service := NewIdentityCandidateService(s.identityCandidates)
 	params := identityCandidatesFromResult(discoveryRunID, result)
+	index, err := newAssetIndex(ctx, s.assets)
+	if err != nil {
+		return nil, err
+	}
 	created := make([]IdentityCandidate, 0, len(params))
 	for _, candidate := range params {
+		decision := evaluateIdentityCandidate(candidate, index)
+		candidate.ReviewState = IdentityReviewPending
+		candidate.Metadata = identityCandidateDecisionMetadata(candidate.Metadata, decision)
 		item, err := service.CreateIdentityCandidate(ctx, candidate)
 		if err != nil {
 			return nil, err
 		}
+		if decision.AutoAccept {
+			if err := service.AutoAcceptIdentityCandidate(ctx, AutoAcceptIdentityCandidateParams{
+				IdentityCandidateID: item.ID,
+				Rationale:           decision.Explanation,
+				Metadata:            identityCandidateAutoReviewMetadata(item, decision),
+			}); err != nil {
+				return nil, err
+			}
+			item.ReviewState = IdentityReviewAutoAccepted
+			item.Metadata = candidate.Metadata
+		}
 		created = append(created, item)
 	}
 	return created, nil
+}
+
+type identityCandidateDecision struct {
+	AutoAccept  bool
+	Rule        string
+	Explanation string
+	Conflict    string
+}
+
+func evaluateIdentityCandidate(candidate CreateIdentityCandidateParams, index *assetIndex) identityCandidateDecision {
+	if candidate.Strength != assets.IdentityStrengthStrong {
+		return identityCandidateDecision{
+			Rule:        "queue_non_strong_candidate",
+			Explanation: "queued for review because hostname, name, weak, or provisional identity evidence is not silently authoritative",
+		}
+	}
+	if !hasAutoAcceptableStrongIdentifier(candidate) {
+		return identityCandidateDecision{
+			Rule:        "queue_strong_identifier_outside_initial_auto_accept_scope",
+			Explanation: "queued for review because this strong identity is outside the initial vendor+serial or system-MAC auto-acceptance scope",
+		}
+	}
+	if conflict := candidateAssetConflict(candidate, index); conflict != "" {
+		return identityCandidateDecision{
+			Rule:        "queue_plausible_canonical_asset_conflict",
+			Explanation: "queued for review because existing canonical asset state could plausibly conflict with this identity candidate",
+			Conflict:    conflict,
+		}
+	}
+	return identityCandidateDecision{
+		AutoAccept:  true,
+		Rule:        "auto_accept_strong_no_plausible_conflict",
+		Explanation: "auto-accepted because candidate is evidence-backed strong vendor+serial or system-MAC identity with no plausible canonical asset conflict",
+	}
+}
+
+func hasAutoAcceptableStrongIdentifier(candidate CreateIdentityCandidateParams) bool {
+	if candidate.Vendor != nil && candidate.Serial != nil {
+		return true
+	}
+	if candidate.SystemMAC != nil {
+		return true
+	}
+	key := assets.NormalizeIdentityKey(candidate.CandidateIdentityKey)
+	return strings.Contains(key, ":vendor_serial:") || strings.Contains(key, ":system_mac:")
+}
+
+func candidateAssetConflict(candidate CreateIdentityCandidateParams, index *assetIndex) string {
+	if index == nil {
+		return ""
+	}
+	candidateKey := assets.NormalizeIdentityKey(candidate.CandidateIdentityKey)
+	for _, item := range index.byIdentity {
+		assetKey := assets.NormalizeIdentityKey(item.IdentityKey)
+		if assetKey == candidateKey {
+			if conflictsWithCanonicalAttributes(candidate, item) {
+				return "candidate attributes differ from canonical asset with the same identity key"
+			}
+			continue
+		}
+		if candidate.Serial != nil && item.Serial != nil && normalizedComparable(*candidate.Serial) == normalizedComparable(*item.Serial) {
+			return "candidate serial is already present on a different canonical asset"
+		}
+		if candidate.SystemMAC != nil && item.SystemMAC != nil && normalizedComparable(*candidate.SystemMAC) == normalizedComparable(*item.SystemMAC) {
+			return "candidate system MAC is already present on a different canonical asset"
+		}
+	}
+	return ""
+}
+
+func conflictsWithCanonicalAttributes(candidate CreateIdentityCandidateParams, item assets.Asset) bool {
+	return optionalComparableConflict(candidate.Vendor, item.Vendor) ||
+		optionalComparableConflict(candidate.Serial, item.Serial) ||
+		optionalComparableConflict(candidate.SystemMAC, item.SystemMAC)
+}
+
+func optionalComparableConflict(candidate *string, existing *string) bool {
+	if candidate == nil || existing == nil {
+		return false
+	}
+	return normalizedComparable(*candidate) != normalizedComparable(*existing)
+}
+
+func normalizedComparable(value string) string {
+	return strings.ToLower(strings.TrimSpace(value))
+}
+
+func identityCandidateDecisionMetadata(metadata json.RawMessage, decision identityCandidateDecision) json.RawMessage {
+	payload := map[string]any{}
+	if len(metadata) > 0 {
+		_ = json.Unmarshal(metadata, &payload)
+	}
+	if payload == nil {
+		payload = map[string]any{}
+	}
+	payload["identity_review_rule"] = decision.Rule
+	payload["identity_review_explanation"] = decision.Explanation
+	if decision.AutoAccept {
+		payload["identity_review_state"] = IdentityReviewAutoAccepted
+	} else {
+		payload["identity_review_state"] = IdentityReviewPending
+	}
+	if decision.Conflict != "" {
+		payload["identity_review_conflict"] = decision.Conflict
+	}
+	encoded, err := json.Marshal(payload)
+	if err != nil {
+		return metadata
+	}
+	return encoded
+}
+
+func identityCandidateAutoReviewMetadata(candidate IdentityCandidate, decision identityCandidateDecision) json.RawMessage {
+	payload := map[string]any{
+		"decision_type":          "deterministic_auto_acceptance",
+		"identity_review_rule":   decision.Rule,
+		"candidate_identity_key": candidate.CandidateIdentityKey,
+		"asset_type":             candidate.AssetType,
+		"strength":               candidate.Strength,
+	}
+	encoded, err := json.Marshal(payload)
+	if err != nil {
+		return json.RawMessage(`{}`)
+	}
+	return encoded
 }
 
 type assetIndex struct {

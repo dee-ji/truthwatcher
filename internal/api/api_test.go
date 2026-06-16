@@ -1322,6 +1322,35 @@ func (f *fakeIdentityCandidateRepository) ReviewIdentityCandidate(ctx context.Co
 	return parser.IdentityCandidateReview{}, assets.ErrNotFound
 }
 
+func (f *fakeIdentityCandidateRepository) AutoAcceptIdentityCandidate(ctx context.Context, params parser.AutoAcceptIdentityCandidateParams) error {
+	for i := range f.items {
+		if f.items[i].ID != params.IdentityCandidateID {
+			continue
+		}
+		if f.items[i].ReviewState != parser.IdentityReviewPending {
+			return nil
+		}
+		previous := f.items[i].ReviewState
+		f.items[i].ReviewState = parser.IdentityReviewAutoAccepted
+		f.reviews = append(f.reviews, parser.IdentityCandidateReview{
+			ID:                   "review-" + params.IdentityCandidateID,
+			IdentityCandidateID:  params.IdentityCandidateID,
+			DiscoveryRunID:       f.items[i].DiscoveryRunID,
+			EvidenceID:           f.items[i].EvidenceID,
+			Reviewer:             "parser:auto_acceptance",
+			Action:               parser.IdentityReviewActionAutoAccept,
+			PreviousReviewState:  previous,
+			ResultingReviewState: parser.IdentityReviewAutoAccepted,
+			Rationale:            params.Rationale,
+			Effect:               parser.IdentityReviewEffect(parser.IdentityReviewActionAutoAccept),
+			Metadata:             params.Metadata,
+			CreatedAt:            time.Date(2026, 6, 10, 12, 0, 0, 0, time.UTC),
+		})
+		return nil
+	}
+	return assets.ErrNotFound
+}
+
 func (f *fakeParseResultRepository) ListParseResultsByDiscoveryRun(ctx context.Context, discoveryRunID string) ([]parser.ParseRecord, error) {
 	var result []parser.ParseRecord
 	for _, item := range f.records {

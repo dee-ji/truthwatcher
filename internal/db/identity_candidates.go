@@ -172,6 +172,38 @@ WHERE id = $1
 }
 
 func (r IdentityCandidateRepository) ReviewIdentityCandidate(ctx context.Context, params parser.ReviewIdentityCandidateParams) (parser.IdentityCandidateReview, error) {
+	return r.recordIdentityCandidateReview(ctx, recordIdentityCandidateReviewParams{
+		IdentityCandidateID: params.IdentityCandidateID,
+		Reviewer:            params.Reviewer,
+		Action:              params.Action,
+		Rationale:           params.Rationale,
+		Metadata:            params.Metadata,
+		OnlyFromPending:     false,
+	})
+}
+
+func (r IdentityCandidateRepository) AutoAcceptIdentityCandidate(ctx context.Context, params parser.AutoAcceptIdentityCandidateParams) error {
+	_, err := r.recordIdentityCandidateReview(ctx, recordIdentityCandidateReviewParams{
+		IdentityCandidateID: params.IdentityCandidateID,
+		Reviewer:            "parser:auto_acceptance",
+		Action:              parser.IdentityReviewActionAutoAccept,
+		Rationale:           params.Rationale,
+		Metadata:            params.Metadata,
+		OnlyFromPending:     true,
+	})
+	return err
+}
+
+type recordIdentityCandidateReviewParams struct {
+	IdentityCandidateID string
+	Reviewer            string
+	Action              parser.IdentityReviewAction
+	Rationale           string
+	Metadata            json.RawMessage
+	OnlyFromPending     bool
+}
+
+func (r IdentityCandidateRepository) recordIdentityCandidateReview(ctx context.Context, params recordIdentityCandidateReviewParams) (parser.IdentityCandidateReview, error) {
 	if r.db == nil {
 		return parser.IdentityCandidateReview{}, fmt.Errorf("database is required")
 	}
@@ -193,6 +225,9 @@ FOR UPDATE
 	}
 	if err != nil {
 		return parser.IdentityCandidateReview{}, fmt.Errorf("get identity candidate for review: %w", err)
+	}
+	if params.OnlyFromPending && candidate.ReviewState != parser.IdentityReviewPending {
+		return parser.IdentityCandidateReview{}, nil
 	}
 
 	resultingState := parser.ResultingReviewState(params.Action)

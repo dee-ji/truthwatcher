@@ -149,6 +149,9 @@ func TestParseDiscoveryRunPersistsIdentityCandidates(t *testing.T) {
 	if hostname.ReviewState != IdentityReviewPending {
 		t.Fatalf("hostname review state = %q, want pending", hostname.ReviewState)
 	}
+	if !metadataContains(t, hostname.Metadata, "identity_review_rule", "queue_non_strong_candidate") {
+		t.Fatalf("hostname metadata = %s, want queue rule", hostname.Metadata)
+	}
 	if hostname.Hostname == nil || *hostname.Hostname != "mx-edge-01" {
 		t.Fatalf("hostname attribute = %#v, want mx-edge-01", hostname.Hostname)
 	}
@@ -160,11 +163,76 @@ func TestParseDiscoveryRunPersistsIdentityCandidates(t *testing.T) {
 	if strong.Strength != assets.IdentityStrengthStrong {
 		t.Fatalf("strong strength = %q, want strong", strong.Strength)
 	}
+	if strong.ReviewState != IdentityReviewAutoAccepted {
+		t.Fatalf("strong review state = %q, want auto_accepted", strong.ReviewState)
+	}
 	if strong.Serial == nil || *strong.Serial != "JN1234ABCDEF" {
 		t.Fatalf("strong serial = %#v, want JN1234ABCDEF", strong.Serial)
 	}
+	if !metadataContains(t, strong.Metadata, "identity_review_rule", "auto_accept_strong_no_plausible_conflict") {
+		t.Fatalf("strong metadata = %s, want auto acceptance rule", strong.Metadata)
+	}
+	review, ok := findIdentityCandidateReview(identityRepo.reviews, strong.ID)
+	if !ok {
+		t.Fatalf("review audit for %q not found in %#v", strong.ID, identityRepo.reviews)
+	}
+	if review.Action != IdentityReviewActionAutoAccept {
+		t.Fatalf("review action = %q, want auto_accept", review.Action)
+	}
+	if review.ResultingReviewState != IdentityReviewAutoAccepted {
+		t.Fatalf("review state = %q, want auto_accepted", review.ResultingReviewState)
+	}
+	if !strings.Contains(review.Effect, "no canonical asset merge or identity rewrite") {
+		t.Fatalf("review effect = %q, want non-destructive effect", review.Effect)
+	}
 	if len(result.IdentityCandidates) != len(identityRepo.items) {
 		t.Fatalf("result candidates = %d, repo candidates = %d", len(result.IdentityCandidates), len(identityRepo.items))
+	}
+}
+
+func TestParseDiscoveryRunQueuesConflictingStrongIdentityCandidate(t *testing.T) {
+	runID := "11111111-1111-4111-8111-111111111111"
+	item := persistenceFixtureEvidence(t, "evidence-inventory", runID, PlatformJunos, CommandShowChassisHardware, "junos-mx", "show_chassis_hardware.txt")
+	assetRepo := &persistenceAssetRepository{
+		assets: []assets.Asset{{
+			ID:          "asset-existing",
+			Type:        "device",
+			IdentityKey: "device:hostname:mx-edge-01",
+			Serial:      stringPtr("JN1234ABCDEF"),
+			Metadata:    json.RawMessage(`{"identity_strength":"provisional"}`),
+		}},
+	}
+	identityRepo := &persistenceIdentityCandidateRepository{}
+	service := NewPersistenceService(PersistenceOptions{
+		Evidence:           persistenceEvidenceRepository{items: []evidence.Evidence{item}},
+		Assets:             assets.NewService(assetRepo),
+		ParseResults:       &persistenceParseRepository{},
+		IdentityCandidates: identityRepo,
+		Registry:           BuiltInRegistry(),
+	})
+
+	if _, err := service.ParseDiscoveryRun(context.Background(), ParseDiscoveryRunParams{
+		DiscoveryRunID: runID,
+		Platform:       PlatformJunos,
+	}); err != nil {
+		t.Fatalf("ParseDiscoveryRun returned error: %v", err)
+	}
+
+	strong := findIdentityCandidate(t, identityRepo.items, "chassis:vendor_serial:juniper:jn1234abcdef")
+	if strong.ReviewState != IdentityReviewPending {
+		t.Fatalf("strong conflicting review state = %q, want pending", strong.ReviewState)
+	}
+	if !metadataContains(t, strong.Metadata, "identity_review_rule", "queue_plausible_canonical_asset_conflict") {
+		t.Fatalf("strong metadata = %s, want conflict queue rule", strong.Metadata)
+	}
+	if !strings.Contains(string(strong.Metadata), "different canonical asset") {
+		t.Fatalf("strong metadata = %s, want conflict explanation", strong.Metadata)
+	}
+	if _, ok := findIdentityCandidateReview(identityRepo.reviews, strong.ID); ok {
+		t.Fatalf("queued conflicting candidate has auto review audit: %#v", identityRepo.reviews)
+	}
+	if assetRepo.assets[0].IdentityKey != "device:hostname:mx-edge-01" {
+		t.Fatalf("existing identity key = %q, want unchanged hostname identity", assetRepo.assets[0].IdentityKey)
 	}
 }
 
@@ -275,7 +343,8 @@ func (r *persistenceParseRepository) CreateParseResult(ctx context.Context, para
 }
 
 type persistenceIdentityCandidateRepository struct {
-	items []IdentityCandidate
+	items   []IdentityCandidate
+	reviews []IdentityCandidateReview
 }
 
 func (r *persistenceIdentityCandidateRepository) CreateIdentityCandidate(ctx context.Context, params CreateIdentityCandidateParams) (IdentityCandidate, error) {
@@ -350,7 +419,7 @@ func (r *persistenceIdentityCandidateRepository) ReviewIdentityCandidate(ctx con
 		previous := r.items[i].ReviewState
 		resulting := ResultingReviewState(params.Action)
 		r.items[i].ReviewState = resulting
-		return IdentityCandidateReview{
+		review := IdentityCandidateReview{
 			ID:                   "identity-review-" + params.IdentityCandidateID,
 			IdentityCandidateID:  params.IdentityCandidateID,
 			DiscoveryRunID:       r.items[i].DiscoveryRunID,
@@ -363,9 +432,40 @@ func (r *persistenceIdentityCandidateRepository) ReviewIdentityCandidate(ctx con
 			Effect:               IdentityReviewEffect(params.Action),
 			Metadata:             params.Metadata,
 			CreatedAt:            time.Date(2026, 6, 10, 12, 0, 0, 0, time.UTC),
-		}, nil
+		}
+		r.reviews = append(r.reviews, review)
+		return review, nil
 	}
 	return IdentityCandidateReview{}, assets.ErrNotFound
+}
+
+func (r *persistenceIdentityCandidateRepository) AutoAcceptIdentityCandidate(ctx context.Context, params AutoAcceptIdentityCandidateParams) error {
+	for i := range r.items {
+		if r.items[i].ID != params.IdentityCandidateID {
+			continue
+		}
+		if r.items[i].ReviewState != IdentityReviewPending {
+			return nil
+		}
+		previous := r.items[i].ReviewState
+		r.items[i].ReviewState = IdentityReviewAutoAccepted
+		r.reviews = append(r.reviews, IdentityCandidateReview{
+			ID:                   "identity-review-" + params.IdentityCandidateID,
+			IdentityCandidateID:  params.IdentityCandidateID,
+			DiscoveryRunID:       r.items[i].DiscoveryRunID,
+			EvidenceID:           r.items[i].EvidenceID,
+			Reviewer:             "parser:auto_acceptance",
+			Action:               IdentityReviewActionAutoAccept,
+			PreviousReviewState:  previous,
+			ResultingReviewState: IdentityReviewAutoAccepted,
+			Rationale:            params.Rationale,
+			Effect:               IdentityReviewEffect(IdentityReviewActionAutoAccept),
+			Metadata:             params.Metadata,
+			CreatedAt:            time.Date(2026, 6, 10, 12, 0, 0, 0, time.UTC),
+		})
+		return nil
+	}
+	return assets.ErrNotFound
 }
 
 func (r *persistenceParseRepository) ListParseResultsByDiscoveryRun(ctx context.Context, discoveryRunID string) ([]ParseRecord, error) {
@@ -533,6 +633,25 @@ func countIdentityCandidate(items []IdentityCandidate, evidenceID string, parser
 		}
 	}
 	return count
+}
+
+func findIdentityCandidateReview(items []IdentityCandidateReview, candidateID string) (IdentityCandidateReview, bool) {
+	for _, item := range items {
+		if item.IdentityCandidateID == candidateID {
+			return item, true
+		}
+	}
+	return IdentityCandidateReview{}, false
+}
+
+func metadataContains(t *testing.T, metadata json.RawMessage, key string, want string) bool {
+	t.Helper()
+	var payload map[string]any
+	if err := json.Unmarshal(metadata, &payload); err != nil {
+		t.Fatalf("decode metadata %s: %v", metadata, err)
+	}
+	got, ok := payload[key].(string)
+	return ok && got == want
 }
 
 func stringPtr(value string) *string {

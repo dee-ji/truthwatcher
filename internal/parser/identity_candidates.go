@@ -26,6 +26,7 @@ type IdentityReviewAction string
 
 const (
 	IdentityReviewActionAccept              IdentityReviewAction = "accept"
+	IdentityReviewActionAutoAccept          IdentityReviewAction = "auto_accept"
 	IdentityReviewActionReject              IdentityReviewAction = "reject"
 	IdentityReviewActionDefer               IdentityReviewAction = "defer"
 	IdentityReviewActionRequestMoreEvidence IdentityReviewAction = "request_more_evidence"
@@ -84,6 +85,7 @@ type IdentityCandidateRepository interface {
 	GetIdentityCandidate(context.Context, string) (IdentityCandidate, error)
 	ListIdentityCandidates(context.Context, IdentityCandidateFilters) ([]IdentityCandidate, error)
 	ReviewIdentityCandidate(context.Context, ReviewIdentityCandidateParams) (IdentityCandidateReview, error)
+	AutoAcceptIdentityCandidate(context.Context, AutoAcceptIdentityCandidateParams) error
 }
 
 type IdentityCandidateService struct {
@@ -94,6 +96,12 @@ type ReviewIdentityCandidateParams struct {
 	IdentityCandidateID string
 	Reviewer            string
 	Action              IdentityReviewAction
+	Rationale           string
+	Metadata            json.RawMessage
+}
+
+type AutoAcceptIdentityCandidateParams struct {
+	IdentityCandidateID string
 	Rationale           string
 	Metadata            json.RawMessage
 }
@@ -208,6 +216,9 @@ func (s IdentityCandidateService) ReviewIdentityCandidate(ctx context.Context, p
 	if !params.Action.Valid() {
 		return IdentityCandidateReview{}, fmt.Errorf("invalid identity review action %q", params.Action)
 	}
+	if params.Action == IdentityReviewActionAutoAccept {
+		return IdentityCandidateReview{}, fmt.Errorf("auto_accept is reserved for deterministic parser decisions")
+	}
 	if params.Rationale == "" {
 		return IdentityCandidateReview{}, fmt.Errorf("rationale is required")
 	}
@@ -216,6 +227,25 @@ func (s IdentityCandidateService) ReviewIdentityCandidate(ctx context.Context, p
 		return IdentityCandidateReview{}, fmt.Errorf("metadata must be valid JSON")
 	}
 	return s.repo.ReviewIdentityCandidate(ctx, params)
+}
+
+func (s IdentityCandidateService) AutoAcceptIdentityCandidate(ctx context.Context, params AutoAcceptIdentityCandidateParams) error {
+	if s.repo == nil {
+		return fmt.Errorf("identity candidate repository is required")
+	}
+	params.IdentityCandidateID = strings.TrimSpace(params.IdentityCandidateID)
+	params.Rationale = strings.TrimSpace(params.Rationale)
+	if params.IdentityCandidateID == "" {
+		return fmt.Errorf("identity_candidate_id is required")
+	}
+	if params.Rationale == "" {
+		return fmt.Errorf("rationale is required")
+	}
+	params.Metadata = defaultIdentityCandidateJSON(params.Metadata)
+	if !json.Valid(params.Metadata) {
+		return fmt.Errorf("metadata must be valid JSON")
+	}
+	return s.repo.AutoAcceptIdentityCandidate(ctx, params)
 }
 
 func (s IdentityReviewState) Valid() bool {
@@ -229,7 +259,7 @@ func (s IdentityReviewState) Valid() bool {
 
 func (a IdentityReviewAction) Valid() bool {
 	switch a {
-	case IdentityReviewActionAccept, IdentityReviewActionReject, IdentityReviewActionDefer, IdentityReviewActionRequestMoreEvidence:
+	case IdentityReviewActionAccept, IdentityReviewActionAutoAccept, IdentityReviewActionReject, IdentityReviewActionDefer, IdentityReviewActionRequestMoreEvidence:
 		return true
 	default:
 		return false
@@ -238,6 +268,8 @@ func (a IdentityReviewAction) Valid() bool {
 
 func ResultingReviewState(action IdentityReviewAction) IdentityReviewState {
 	switch action {
+	case IdentityReviewActionAutoAccept:
+		return IdentityReviewAutoAccepted
 	case IdentityReviewActionAccept:
 		return IdentityReviewAccepted
 	case IdentityReviewActionReject:
@@ -253,6 +285,8 @@ func ResultingReviewState(action IdentityReviewAction) IdentityReviewState {
 
 func IdentityReviewEffect(action IdentityReviewAction) string {
 	switch action {
+	case IdentityReviewActionAutoAccept:
+		return "deterministically auto-accepted evidence-backed strong identity candidate; no canonical asset merge or identity rewrite performed"
 	case IdentityReviewActionAccept:
 		return "review accepted candidate as evidence-backed identity clue; no canonical asset merge or identity rewrite performed"
 	case IdentityReviewActionReject:
