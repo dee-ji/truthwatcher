@@ -11,6 +11,29 @@ Before modifying code, read these files:
 5. steering-docs/SAFETY_MODEL.md
 6. steering-docs/MVP_SPEC.md
 
+## Optional External Knowledge Preflight
+
+Before consulting optional external knowledge providers such as Mistspren, run:
+
+```sh
+truthwatcher dev check-knowledge
+```
+
+If the local binary has not been built yet, use:
+
+```sh
+go run ./cmd/truthwatcher dev check-knowledge
+```
+
+Use the command output as the source of truth for whether a provider is available:
+
+- `available`: the agent may consult the provider for development-time memory, ADR, architecture decision, or agent loop context.
+- `missing`: the agent must continue using Truthwatcher-local docs and code only.
+- `disabled`: the agent must not consult that provider.
+- `misconfigured`: the agent must treat the provider as unavailable and avoid guessing.
+
+Do not fail a coding task just because Mistspren or another optional provider is missing. Do not modify runtime code to make an optional knowledge provider required.
+
 ## Prime Directive
 
 Do not turn this project into a generic AI app, chat app, NMS, observability system, or config automation platform.

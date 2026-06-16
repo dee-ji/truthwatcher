@@ -237,7 +237,10 @@ These are not all current capabilities. The v0.1 priority remains the evidence k
 ./bin/truthwatcher server --help
 ./bin/truthwatcher migrate --help
 ./bin/truthwatcher discover fake --help
+./bin/truthwatcher dev check-knowledge
 ```
+
+For optional local agent context from the sibling Mistspren repository, see [docs/local-knowledge.md](docs/local-knowledge.md). Mistspren is development-time context only and is not required for production runtime workflows.
 
 ## License
 
@@ -252,6 +255,7 @@ See [LICENSE](LICENSE) for the full license text.
 - [Install](docs/install.md)
 - [API](docs/api.md)
 - [Testing](docs/testing.md)
+- [Local Knowledge Providers](docs/local-knowledge.md)
 - [Future Phases](docs/future.md)
 - [Roadmap](steering-docs/ROADMAP.md)
 - [Agent Collaboration Contract](steering-docs/AGENT_COLLABORATION_CONTRACT.md)

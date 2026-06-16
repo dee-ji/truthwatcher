@@ -9,6 +9,7 @@ import (
 	"log/slog"
 	"net"
 	"net/http"
+	"os"
 	"strings"
 	"time"
 
@@ -21,6 +22,7 @@ import (
 	"truthwatcher/internal/evidence"
 	"truthwatcher/internal/extensibility"
 	"truthwatcher/internal/graph"
+	"truthwatcher/internal/knowledge"
 	"truthwatcher/internal/logging"
 	"truthwatcher/internal/parser"
 	"truthwatcher/internal/policy"
@@ -77,6 +79,8 @@ func (a App) Run(ctx context.Context, args []string, stdout, stderr io.Writer) e
 		return a.runExport(ctx, args[1:], stdout, stderr)
 	case "import":
 		return a.runImport(ctx, args[1:], stdout, stderr)
+	case "dev":
+		return a.runDev(ctx, args[1:], stdout, stderr)
 	default:
 		printUsage(stderr)
 		return fmt.Errorf("unknown command %q", args[0])
@@ -561,6 +565,69 @@ func (a App) runImportJSON(ctx context.Context, args []string, stdout, stderr io
 	return nil
 }
 
+func (a App) runDev(ctx context.Context, args []string, stdout, stderr io.Writer) error {
+	if len(args) == 0 {
+		return fmt.Errorf("usage: truthwatcher dev check-knowledge")
+	}
+	if isHelpArg(args[0]) {
+		printDevHelp(stdout)
+		return nil
+	}
+
+	switch args[0] {
+	case "check-knowledge":
+		return a.runDevCheckKnowledge(ctx, args[1:], stdout, stderr)
+	default:
+		return fmt.Errorf("usage: truthwatcher dev check-knowledge")
+	}
+}
+
+func (a App) runDevCheckKnowledge(_ context.Context, args []string, stdout, stderr io.Writer) error {
+	if wantsHelp(args) {
+		printDevCheckKnowledgeHelp(stdout)
+		return nil
+	}
+
+	configPath := knowledge.DefaultConfigPath
+	flags := flag.NewFlagSet("dev check-knowledge", flag.ContinueOnError)
+	flags.SetOutput(stderr)
+	flags.StringVar(&configPath, "config", configPath, "development config file")
+	if err := flags.Parse(args); err != nil {
+		return err
+	}
+	if flags.NArg() != 0 {
+		return fmt.Errorf("dev check-knowledge accepts flags only")
+	}
+
+	cfg, err := knowledge.LoadFile(configPath)
+	if err != nil {
+		if errors.Is(err, os.ErrNotExist) {
+			fmt.Fprintf(stdout, "no knowledge providers configured; config file %s was not found\n", configPath)
+			return nil
+		}
+		return err
+	}
+
+	results := knowledge.CheckProviders(cfg, os.LookupEnv, os.Stat)
+	if len(results) == 0 {
+		fmt.Fprintln(stdout, "no knowledge providers configured")
+		return nil
+	}
+
+	fmt.Fprintln(stdout, "provider\ttype\tenabled\ttarget\tstatus")
+	for _, result := range results {
+		target := result.Target
+		if strings.TrimSpace(target) == "" {
+			target = "-"
+		}
+		fmt.Fprintf(stdout, "%s\t%s\t%t\t%s\t%s\n", result.Name, result.Type, result.Enabled, target, result.Status)
+		if result.Detail != "" {
+			fmt.Fprintf(stdout, "  detail: %s\n", result.Detail)
+		}
+	}
+	return nil
+}
+
 func serveHTTP(ctx context.Context, cfg config.Config, logger *slog.Logger, stdout io.Writer) error {
 	if logger == nil {
 		logger = slog.New(slog.NewTextHandler(io.Discard, nil))
@@ -697,6 +764,7 @@ func printUsage(w io.Writer) {
   truthwatcher parse discovery-run --id <id> --platform junos
   truthwatcher export json --output <path>
   truthwatcher import json --input <path>
+  truthwatcher dev check-knowledge
 
 Commands:
   version   Print the Truthwatcher version.
@@ -706,6 +774,7 @@ Commands:
   parse     Persist parser output from stored evidence.
   export    Export a local JSON graph snapshot.
   import    Validate local JSON snapshot import candidates.
+  dev       Run local development helper commands.
 
 Run "truthwatcher <command> --help" for command details.
 `)
@@ -846,5 +915,30 @@ This command does not persist records or treat imported data as observed proof.
 
 Flags:
   --input  Source path for the JSON snapshot.
+`)
+}
+
+func printDevHelp(w io.Writer) {
+	fmt.Fprint(w, `Usage:
+  truthwatcher dev check-knowledge
+
+Run local development helper commands. Dev commands must not be required for
+production startup or normal runtime workflows.
+
+Subcommands:
+  check-knowledge  Resolve optional external knowledge providers.
+`)
+}
+
+func printDevCheckKnowledgeHelp(w io.Writer) {
+	fmt.Fprint(w, `Usage:
+  truthwatcher dev check-knowledge [--config truthwatcher.yaml]
+
+Read the local development config, expand environment variables such as
+MISTSPREN_HOME, and report optional knowledge provider status without requiring
+those providers to exist.
+
+Flags:
+  --config  Development config file. Defaults to truthwatcher.yaml.
 `)
 }

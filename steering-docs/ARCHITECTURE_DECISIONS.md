@@ -143,3 +143,19 @@ Decision: Use `golang.org/x/crypto/ssh` for the optional SSH collector boundary.
 Reason: The Go standard library does not include an SSH client. `golang.org/x/crypto/ssh` is the well-known Go SSH implementation maintained in the Go extended libraries, and it keeps the collector dependency focused on protocol transport rather than a larger automation framework.
 
 Implication: SSH collection remains behind the existing `Collector` interface. Commands must still come from discovery profiles and pass policy before execution. The first implementation supports one configured credential source per run, uses known_hosts verification by default, and does not perform credential guessing, brute force, terminal server traversal, configuration commands, or write-capable automation.
+
+## ADR-014: Optional External Knowledge Providers for Agentic Development
+
+Status: Accepted
+
+Decision: Truthwatcher supports optional external knowledge providers through configuration. The preferred local development provider is Mistspren discovered through `MISTSPREN_HOME`. GitHub providers may be added later for remote workflows. Truthwatcher runtime remains independent from these providers.
+
+Reason: Agentic development benefits from reusable memory, ADRs, architecture decisions, and loop context, but those materials are not part of the production evidence kernel. Keeping the provider boundary configuration-only lets local agents discover helpful context while preserving the single-binary runtime and avoiding a plugin system before it is needed.
+
+Implication:
+
+- Mistspren is optional development-time context only.
+- Production Truthwatcher must not import, shell out to, vendor, or require Mistspren.
+- Local filesystem providers are preferred for Codex and GoLand workflows.
+- GitHub providers can be described for future remote agent workflows, but stay disabled by default.
+- Missing external knowledge providers must not fail application startup.

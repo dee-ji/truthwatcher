@@ -89,6 +89,16 @@ func TestCommandHelpDoesNotRequireRuntimeDependencies(t *testing.T) {
 			args: []string{"import", "json", "--help"},
 			want: []string{"Usage:", "truthwatcher import json", "does not persist records"},
 		},
+		{
+			name: "dev",
+			args: []string{"dev", "--help"},
+			want: []string{"Usage:", "truthwatcher dev check-knowledge", "development helper"},
+		},
+		{
+			name: "dev check-knowledge",
+			args: []string{"dev", "check-knowledge", "--help"},
+			want: []string{"Usage:", "truthwatcher dev check-knowledge", "MISTSPREN_HOME"},
+		},
 	}
 
 	for _, tt := range tests {
@@ -319,6 +329,115 @@ func TestImportJSONValidatesCandidatesWithoutDatabase(t *testing.T) {
 		if !strings.Contains(output, want) {
 			t.Fatalf("stdout = %q, want substring %q", output, want)
 		}
+	}
+	if stderr.Len() != 0 {
+		t.Fatalf("stderr = %q, want empty", stderr.String())
+	}
+}
+
+func TestDevCheckKnowledgeReportsProviders(t *testing.T) {
+	configPath := filepath.Join(t.TempDir(), "truthwatcher.yaml")
+	mistsprenPath := t.TempDir()
+	data := `project:
+  name: truthwatcher
+  repo: github.com/dee-ji/truthwatcher
+  local_path: ${TRUTHWATCHER_HOME}
+
+knowledge:
+  providers:
+    - name: mistspren-local
+      type: filesystem
+      enabled: true
+      root: ${MISTSPREN_HOME}
+      purpose:
+        - memory
+
+    - name: mistspren-github
+      type: github
+      enabled: false
+      repo: github.com/dee-ji/mistspren
+      branch: main
+`
+	if err := os.WriteFile(configPath, []byte(data), 0o600); err != nil {
+		t.Fatalf("write config: %v", err)
+	}
+	t.Setenv("MISTSPREN_HOME", mistsprenPath)
+	t.Setenv("TRUTHWATCHER_HOME", t.TempDir())
+
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	err := New().Run(context.Background(), []string{"dev", "check-knowledge", "--config", configPath}, &stdout, &stderr)
+	if err != nil {
+		t.Fatalf("dev check-knowledge returned error: %v", err)
+	}
+	output := stdout.String()
+	for _, want := range []string{
+		"provider\ttype\tenabled\ttarget\tstatus",
+		"mistspren-local\tfilesystem\ttrue\t" + mistsprenPath + "\tavailable",
+		"mistspren-github\tgithub\tfalse\tgithub.com/dee-ji/mistspren\tdisabled",
+	} {
+		if !strings.Contains(output, want) {
+			t.Fatalf("stdout = %q, want substring %q", output, want)
+		}
+	}
+	if stderr.Len() != 0 {
+		t.Fatalf("stderr = %q, want empty", stderr.String())
+	}
+}
+
+func TestDevCheckKnowledgeReportsMissingMistsprenHome(t *testing.T) {
+	configPath := filepath.Join(t.TempDir(), "truthwatcher.yaml")
+	data := `knowledge:
+  providers:
+    - name: mistspren-local
+      type: filesystem
+      enabled: true
+      root: ${MISTSPREN_HOME}
+`
+	if err := os.WriteFile(configPath, []byte(data), 0o600); err != nil {
+		t.Fatalf("write config: %v", err)
+	}
+	original, hadOriginal := os.LookupEnv("MISTSPREN_HOME")
+	if err := os.Unsetenv("MISTSPREN_HOME"); err != nil {
+		t.Fatalf("unset MISTSPREN_HOME: %v", err)
+	}
+	t.Cleanup(func() {
+		if hadOriginal {
+			_ = os.Setenv("MISTSPREN_HOME", original)
+			return
+		}
+		_ = os.Unsetenv("MISTSPREN_HOME")
+	})
+
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	err := New().Run(context.Background(), []string{"dev", "check-knowledge", "--config", configPath}, &stdout, &stderr)
+	if err != nil {
+		t.Fatalf("dev check-knowledge returned error: %v", err)
+	}
+	output := stdout.String()
+	if !strings.Contains(output, "mistspren-local\tfilesystem\ttrue\t-\tmissing") {
+		t.Fatalf("stdout = %q, want missing provider", output)
+	}
+	if !strings.Contains(output, "missing environment variable: MISTSPREN_HOME") {
+		t.Fatalf("stdout = %q, want missing env detail", output)
+	}
+	if stderr.Len() != 0 {
+		t.Fatalf("stderr = %q, want empty", stderr.String())
+	}
+}
+
+func TestDevCheckKnowledgeMissingConfigDoesNotFail(t *testing.T) {
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+
+	missingPath := filepath.Join(t.TempDir(), "missing.yaml")
+	err := New().Run(context.Background(), []string{"dev", "check-knowledge", "--config", missingPath}, &stdout, &stderr)
+	if err != nil {
+		t.Fatalf("dev check-knowledge returned error: %v", err)
+	}
+	if !strings.Contains(stdout.String(), "no knowledge providers configured") {
+		t.Fatalf("stdout = %q, want no providers message", stdout.String())
 	}
 	if stderr.Len() != 0 {
 		t.Fatalf("stderr = %q, want empty", stderr.String())

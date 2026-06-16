@@ -197,6 +197,11 @@ Before making changes, read:
 - steering-docs/ARCHITECTURE_DECISIONS.md
 - steering-docs/ROADMAP.md
 
+Before consulting optional external knowledge providers:
+- Run `truthwatcher dev check-knowledge`.
+- Consult only providers reported as `available`.
+- Continue with Truthwatcher-local docs and code when providers are `missing`, `disabled`, or `misconfigured`.
+
 Current milestone:
 <state the milestone>
 
@@ -207,6 +212,7 @@ Constraints:
 - Keep Truthwatcher read-only and evidence-first.
 - Do not add unrelated features.
 - Do not introduce Docker, Kubernetes, chat, observability, or service activation.
+- Do not make optional external knowledge providers part of runtime startup.
 - Use Go and PostgreSQL.
 - Prefer simple, testable code.
 - Challenge the request if it conflicts with the project documents.
