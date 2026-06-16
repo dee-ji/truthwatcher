@@ -468,6 +468,54 @@ func (r *persistenceIdentityCandidateRepository) AutoAcceptIdentityCandidate(ctx
 	return assets.ErrNotFound
 }
 
+func (r *persistenceIdentityCandidateRepository) ListIdentityReviewHandoffEntries(ctx context.Context, filters IdentityReviewHandoffFilters) ([]IdentityReviewHandoffEntry, error) {
+	var result []IdentityReviewHandoffEntry
+	for _, item := range r.items {
+		if filters.DiscoveryRunID != "" && item.DiscoveryRunID != filters.DiscoveryRunID {
+			continue
+		}
+		if filters.EvidenceID != "" && item.EvidenceID != filters.EvidenceID {
+			continue
+		}
+		entry := IdentityReviewHandoffEntry{
+			Candidate: item,
+			EvidenceReference: IdentityEvidenceRef{
+				EvidenceID:     item.EvidenceID,
+				DiscoveryRunID: item.DiscoveryRunID,
+				Present:        true,
+			},
+			ParserSource: IdentityParserSource{
+				ParserName: item.ParserName,
+				Metadata:   item.Metadata,
+			},
+		}
+		if review, ok := r.latestReviewForCandidate(item.ID); ok {
+			entry.LatestReview = &review
+		}
+		result = append(result, entry)
+	}
+	return result, nil
+}
+
+func (r *persistenceIdentityCandidateRepository) ListOrphanedIdentityCandidateReviews(ctx context.Context) ([]IdentityCandidateReview, error) {
+	return nil, nil
+}
+
+func (r *persistenceIdentityCandidateRepository) latestReviewForCandidate(candidateID string) (IdentityCandidateReview, bool) {
+	var latest IdentityCandidateReview
+	found := false
+	for _, review := range r.reviews {
+		if review.IdentityCandidateID != candidateID {
+			continue
+		}
+		if !found || review.CreatedAt.After(latest.CreatedAt) || (review.CreatedAt.Equal(latest.CreatedAt) && review.ID > latest.ID) {
+			latest = review
+			found = true
+		}
+	}
+	return latest, found
+}
+
 func (r *persistenceParseRepository) ListParseResultsByDiscoveryRun(ctx context.Context, discoveryRunID string) ([]ParseRecord, error) {
 	var result []ParseRecord
 	for _, item := range r.records {

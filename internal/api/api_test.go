@@ -1185,6 +1185,180 @@ func TestReviewIdentityCandidateActionsAreAudited(t *testing.T) {
 	}
 }
 
+func TestIdentityReviewHandoffReport(t *testing.T) {
+	repo := &fakeIdentityCandidateRepository{
+		items: []parser.IdentityCandidate{
+			{
+				ID:                   "candidate-reviewed",
+				DiscoveryRunID:       "11111111-1111-4111-8111-111111111111",
+				EvidenceID:           "evidence-reviewed",
+				ParserName:           "junos_show_version",
+				AssetType:            "device",
+				CandidateIdentityKey: "device:hostname:mx-edge-01",
+				Strength:             assets.IdentityStrengthProvisional,
+				Confidence:           0.55,
+				Reason:               "hostname is not globally unique and may change",
+				ReviewState:          parser.IdentityReviewAccepted,
+				Metadata:             json.RawMessage(`{"identity_review_explanation":"reviewed by operator"}`),
+				CreatedAt:            time.Date(2026, 6, 10, 12, 0, 0, 0, time.UTC),
+			},
+			{
+				ID:                   "candidate-auto",
+				DiscoveryRunID:       "11111111-1111-4111-8111-111111111111",
+				EvidenceID:           "evidence-auto",
+				ParserName:           "junos_show_chassis_hardware",
+				AssetType:            "chassis",
+				CandidateIdentityKey: "chassis:vendor_serial:juniper:jn1234abcdef",
+				Strength:             assets.IdentityStrengthStrong,
+				Confidence:           0.85,
+				Reason:               "identity key uses a durable identifier",
+				Serial:               stringPtr("JN1234ABCDEF"),
+				ReviewState:          parser.IdentityReviewAutoAccepted,
+				Metadata:             json.RawMessage(`{"identity_review_explanation":"auto-accepted no conflict"}`),
+				CreatedAt:            time.Date(2026, 6, 10, 12, 1, 0, 0, time.UTC),
+			},
+			{
+				ID:                   "candidate-pending",
+				DiscoveryRunID:       "11111111-1111-4111-8111-111111111111",
+				EvidenceID:           "evidence-missing",
+				ParserName:           "junos_show_lldp_neighbors",
+				AssetType:            "device",
+				CandidateIdentityKey: "device:hostname:spine-01",
+				Strength:             assets.IdentityStrengthProvisional,
+				Confidence:           0.65,
+				Reason:               "hostname is not globally unique and may change",
+				ReviewState:          parser.IdentityReviewPending,
+				Metadata:             json.RawMessage(`{"identity_review_explanation":"queued conflict needs review"}`),
+				CreatedAt:            time.Date(2026, 6, 10, 12, 2, 0, 0, time.UTC),
+			},
+		},
+		reviews: []parser.IdentityCandidateReview{
+			{
+				ID:                   "review-reviewed",
+				IdentityCandidateID:  "candidate-reviewed",
+				DiscoveryRunID:       "11111111-1111-4111-8111-111111111111",
+				EvidenceID:           "evidence-reviewed",
+				Reviewer:             "netops",
+				Action:               parser.IdentityReviewActionAccept,
+				PreviousReviewState:  parser.IdentityReviewPending,
+				ResultingReviewState: parser.IdentityReviewAccepted,
+				Rationale:            "operator accepted hostname identity for handoff context",
+				Effect:               parser.IdentityReviewEffect(parser.IdentityReviewActionAccept),
+				Metadata:             json.RawMessage(`{"ticket":"TW-1"}`),
+				CreatedAt:            time.Date(2026, 6, 10, 13, 0, 0, 0, time.UTC),
+			},
+			{
+				ID:                   "review-auto",
+				IdentityCandidateID:  "candidate-auto",
+				DiscoveryRunID:       "11111111-1111-4111-8111-111111111111",
+				EvidenceID:           "evidence-auto",
+				Reviewer:             "parser:auto_acceptance",
+				Action:               parser.IdentityReviewActionAutoAccept,
+				PreviousReviewState:  parser.IdentityReviewPending,
+				ResultingReviewState: parser.IdentityReviewAutoAccepted,
+				Rationale:            "auto-accepted because durable identity has no plausible conflict",
+				Effect:               parser.IdentityReviewEffect(parser.IdentityReviewActionAutoAccept),
+				Metadata:             json.RawMessage(`{"decision_type":"deterministic_auto_acceptance"}`),
+				CreatedAt:            time.Date(2026, 6, 10, 13, 1, 0, 0, time.UTC),
+			},
+			{
+				ID:                   "review-orphan",
+				IdentityCandidateID:  "candidate-missing",
+				DiscoveryRunID:       "11111111-1111-4111-8111-111111111111",
+				EvidenceID:           "evidence-reviewed",
+				Reviewer:             "netops",
+				Action:               parser.IdentityReviewActionReject,
+				PreviousReviewState:  parser.IdentityReviewPending,
+				ResultingReviewState: parser.IdentityReviewRejected,
+				Rationale:            "orphan fixture",
+				Effect:               parser.IdentityReviewEffect(parser.IdentityReviewActionReject),
+				Metadata:             json.RawMessage(`{}`),
+				CreatedAt:            time.Date(2026, 6, 10, 13, 2, 0, 0, time.UTC),
+			},
+		},
+		evidencePresent: map[string]bool{
+			"evidence-reviewed": true,
+			"evidence-auto":     true,
+			"evidence-missing":  false,
+		},
+	}
+	service := parser.NewIdentityCandidateService(repo)
+	handler := NewHandler(Options{
+		Version:            "test-version",
+		IdentityCandidates: &service,
+	})
+
+	response := httptest.NewRecorder()
+	request := httptest.NewRequest(http.MethodGet, "/api/v1/identity-candidates/handoff-report", nil)
+	handler.ServeHTTP(response, request)
+
+	if response.Code != http.StatusOK {
+		t.Fatalf("status = %d, want %d; body=%s", response.Code, http.StatusOK, response.Body.String())
+	}
+
+	body := decodeResponseData[struct {
+		Report parser.IdentityReviewHandoffReport `json:"identity_review_handoff"`
+	}](t, response)
+	if body.Report.ReportType != "identity_review_handoff" {
+		t.Fatalf("report type = %q, want identity_review_handoff", body.Report.ReportType)
+	}
+	if !body.Report.DerivedOutput {
+		t.Fatal("report is not labeled as derived output")
+	}
+	if !strings.Contains(body.Report.Boundary, "not an accepted ADR") {
+		t.Fatalf("boundary = %q, want Mistspren non-authoritative label", body.Report.Boundary)
+	}
+	if got, want := len(body.Report.Entries), 3; got != want {
+		t.Fatalf("entry count = %d, want %d", got, want)
+	}
+
+	reviewed := findHandoffEntry(t, body.Report.Entries, "candidate-reviewed")
+	if reviewed.LatestReview == nil || reviewed.LatestReview.ID != "review-reviewed" {
+		t.Fatalf("reviewed latest review = %#v, want review-reviewed", reviewed.LatestReview)
+	}
+	if reviewed.HandoffStatus != "ready_for_mistspren_review" {
+		t.Fatalf("reviewed handoff status = %q, want ready", reviewed.HandoffStatus)
+	}
+	if reviewed.EvidenceReference.EvidenceID != "evidence-reviewed" || !reviewed.EvidenceReference.Present {
+		t.Fatalf("reviewed evidence ref = %#v, want present evidence-reviewed", reviewed.EvidenceReference)
+	}
+	if !strings.Contains(reviewed.IdentityEffect, "no canonical asset merge") {
+		t.Fatalf("reviewed effect = %q, want non-destructive effect", reviewed.IdentityEffect)
+	}
+
+	auto := findHandoffEntry(t, body.Report.Entries, "candidate-auto")
+	if auto.LatestReview == nil || auto.LatestReview.Action != parser.IdentityReviewActionAutoAccept {
+		t.Fatalf("auto latest review = %#v, want auto_accept", auto.LatestReview)
+	}
+	if !strings.Contains(auto.ReviewSummary, "auto-accepted") {
+		t.Fatalf("auto summary = %q, want auto acceptance rationale", auto.ReviewSummary)
+	}
+
+	pending := findHandoffEntry(t, body.Report.Entries, "candidate-pending")
+	if pending.HandoffStatus != "unresolved_pending_review" {
+		t.Fatalf("pending handoff status = %q, want unresolved", pending.HandoffStatus)
+	}
+	if pending.LatestReview != nil {
+		t.Fatalf("pending latest review = %#v, want nil", pending.LatestReview)
+	}
+	if pending.EvidenceReference.Present {
+		t.Fatal("pending missing evidence reference is marked present")
+	}
+	if len(pending.IntegrityWarnings) == 0 {
+		t.Fatal("pending missing evidence entry has no integrity warnings")
+	}
+
+	if body.Report.Integrity.MissingEvidenceReferences != 1 {
+		t.Fatalf("missing evidence count = %d, want 1", body.Report.Integrity.MissingEvidenceReferences)
+	}
+	if body.Report.Integrity.OrphanedReviewRecords != 1 {
+		t.Fatalf("orphan count = %d, want 1", body.Report.Integrity.OrphanedReviewRecords)
+	}
+	if body.Report.Integrity.UnresolvedPendingEntries != 1 {
+		t.Fatalf("pending count = %d, want 1", body.Report.Integrity.UnresolvedPendingEntries)
+	}
+}
+
 func TestIdentityCandidatesEndpointRequiresRepository(t *testing.T) {
 	handler := NewHandler(Options{Version: "test-version"})
 
@@ -1233,8 +1407,9 @@ func (f *fakeParseResultRepository) CreateParseResult(ctx context.Context, param
 }
 
 type fakeIdentityCandidateRepository struct {
-	items   []parser.IdentityCandidate
-	reviews []parser.IdentityCandidateReview
+	items           []parser.IdentityCandidate
+	reviews         []parser.IdentityCandidateReview
+	evidencePresent map[string]bool
 }
 
 func (f *fakeIdentityCandidateRepository) CreateIdentityCandidate(ctx context.Context, params parser.CreateIdentityCandidateParams) (parser.IdentityCandidate, error) {
@@ -1349,6 +1524,71 @@ func (f *fakeIdentityCandidateRepository) AutoAcceptIdentityCandidate(ctx contex
 		return nil
 	}
 	return assets.ErrNotFound
+}
+
+func (f *fakeIdentityCandidateRepository) ListIdentityReviewHandoffEntries(ctx context.Context, filters parser.IdentityReviewHandoffFilters) ([]parser.IdentityReviewHandoffEntry, error) {
+	var result []parser.IdentityReviewHandoffEntry
+	for _, item := range f.items {
+		if filters.DiscoveryRunID != "" && item.DiscoveryRunID != filters.DiscoveryRunID {
+			continue
+		}
+		if filters.EvidenceID != "" && item.EvidenceID != filters.EvidenceID {
+			continue
+		}
+		present := true
+		if f.evidencePresent != nil {
+			present = f.evidencePresent[item.EvidenceID]
+		}
+		entry := parser.IdentityReviewHandoffEntry{
+			Candidate: item,
+			EvidenceReference: parser.IdentityEvidenceRef{
+				EvidenceID:     item.EvidenceID,
+				DiscoveryRunID: item.DiscoveryRunID,
+				Present:        present,
+			},
+			ParserSource: parser.IdentityParserSource{
+				ParserName: item.ParserName,
+				Metadata:   item.Metadata,
+			},
+		}
+		if review, ok := f.latestReviewForCandidate(item.ID); ok {
+			entry.LatestReview = &review
+		}
+		result = append(result, entry)
+	}
+	return result, nil
+}
+
+func (f *fakeIdentityCandidateRepository) ListOrphanedIdentityCandidateReviews(ctx context.Context) ([]parser.IdentityCandidateReview, error) {
+	var result []parser.IdentityCandidateReview
+	for _, review := range f.reviews {
+		found := false
+		for _, item := range f.items {
+			if item.ID == review.IdentityCandidateID {
+				found = true
+				break
+			}
+		}
+		if !found {
+			result = append(result, review)
+		}
+	}
+	return result, nil
+}
+
+func (f *fakeIdentityCandidateRepository) latestReviewForCandidate(candidateID string) (parser.IdentityCandidateReview, bool) {
+	var latest parser.IdentityCandidateReview
+	found := false
+	for _, review := range f.reviews {
+		if review.IdentityCandidateID != candidateID {
+			continue
+		}
+		if !found || review.CreatedAt.After(latest.CreatedAt) || (review.CreatedAt.Equal(latest.CreatedAt) && review.ID > latest.ID) {
+			latest = review
+			found = true
+		}
+	}
+	return latest, found
 }
 
 func (f *fakeParseResultRepository) ListParseResultsByDiscoveryRun(ctx context.Context, discoveryRunID string) ([]parser.ParseRecord, error) {
@@ -1914,6 +2154,17 @@ func testEvidence(id string) evidence.Evidence {
 
 func stringPtr(value string) *string {
 	return &value
+}
+
+func findHandoffEntry(t *testing.T, entries []parser.IdentityReviewHandoffEntry, candidateID string) parser.IdentityReviewHandoffEntry {
+	t.Helper()
+	for _, entry := range entries {
+		if entry.Candidate.ID == candidateID {
+			return entry
+		}
+	}
+	t.Fatalf("handoff entry for candidate %q not found in %#v", candidateID, entries)
+	return parser.IdentityReviewHandoffEntry{}
 }
 
 func (f fakeGraphAssetReader) GetAsset(ctx context.Context, id string) (assets.Asset, error) {

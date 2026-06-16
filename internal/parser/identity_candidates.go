@@ -80,12 +80,19 @@ type IdentityCandidateFilters struct {
 	CandidateIdentityKey string
 }
 
+type IdentityReviewHandoffFilters struct {
+	DiscoveryRunID string
+	EvidenceID     string
+}
+
 type IdentityCandidateRepository interface {
 	CreateIdentityCandidate(context.Context, CreateIdentityCandidateParams) (IdentityCandidate, error)
 	GetIdentityCandidate(context.Context, string) (IdentityCandidate, error)
 	ListIdentityCandidates(context.Context, IdentityCandidateFilters) ([]IdentityCandidate, error)
 	ReviewIdentityCandidate(context.Context, ReviewIdentityCandidateParams) (IdentityCandidateReview, error)
 	AutoAcceptIdentityCandidate(context.Context, AutoAcceptIdentityCandidateParams) error
+	ListIdentityReviewHandoffEntries(context.Context, IdentityReviewHandoffFilters) ([]IdentityReviewHandoffEntry, error)
+	ListOrphanedIdentityCandidateReviews(context.Context) ([]IdentityCandidateReview, error)
 }
 
 type IdentityCandidateService struct {
@@ -119,6 +126,47 @@ type IdentityCandidateReview struct {
 	Effect               string               `json:"effect"`
 	Metadata             json.RawMessage      `json:"metadata"`
 	CreatedAt            time.Time            `json:"created_at"`
+}
+
+type IdentityReviewHandoffReport struct {
+	ReportType              string                       `json:"report_type"`
+	Boundary                string                       `json:"boundary"`
+	DerivedOutput           bool                         `json:"derived_output"`
+	GeneratedAt             time.Time                    `json:"generated_at"`
+	Entries                 []IdentityReviewHandoffEntry `json:"entries"`
+	Integrity               IdentityReviewIntegrity      `json:"integrity"`
+	NonDestructiveGuarantee string                       `json:"non_destructive_guarantee"`
+}
+
+type IdentityReviewHandoffEntry struct {
+	HandoffStatus       string                   `json:"handoff_status"`
+	OutputLabel         string                   `json:"output_label"`
+	Candidate           IdentityCandidate        `json:"candidate"`
+	LatestReview        *IdentityCandidateReview `json:"latest_review,omitempty"`
+	EvidenceReference   IdentityEvidenceRef      `json:"evidence_reference"`
+	ParserSource        IdentityParserSource     `json:"parser_source"`
+	ReviewSummary       string                   `json:"review_summary"`
+	IdentityEffect      string                   `json:"identity_effect"`
+	MistsprenIntakeNote string                   `json:"mistspren_intake_note"`
+	IntegrityWarnings   []string                 `json:"integrity_warnings,omitempty"`
+}
+
+type IdentityEvidenceRef struct {
+	EvidenceID     string `json:"evidence_id"`
+	DiscoveryRunID string `json:"discovery_run_id"`
+	Present        bool   `json:"present"`
+}
+
+type IdentityParserSource struct {
+	ParserName string          `json:"parser_name"`
+	Metadata   json.RawMessage `json:"metadata"`
+}
+
+type IdentityReviewIntegrity struct {
+	MissingEvidenceReferences int      `json:"missing_evidence_references"`
+	OrphanedReviewRecords     int      `json:"orphaned_review_records"`
+	UnresolvedPendingEntries  int      `json:"unresolved_pending_entries"`
+	Warnings                  []string `json:"warnings,omitempty"`
 }
 
 func NewIdentityCandidateService(repo IdentityCandidateRepository) IdentityCandidateService {
@@ -200,6 +248,50 @@ func (s IdentityCandidateService) ListIdentityCandidates(ctx context.Context, fi
 	return s.repo.ListIdentityCandidates(ctx, filters)
 }
 
+func (s IdentityCandidateService) IdentityReviewHandoffReport(ctx context.Context, filters IdentityReviewHandoffFilters) (IdentityReviewHandoffReport, error) {
+	if s.repo == nil {
+		return IdentityReviewHandoffReport{}, fmt.Errorf("identity candidate repository is required")
+	}
+	filters.DiscoveryRunID = strings.TrimSpace(filters.DiscoveryRunID)
+	filters.EvidenceID = strings.TrimSpace(filters.EvidenceID)
+	entries, err := s.repo.ListIdentityReviewHandoffEntries(ctx, filters)
+	if err != nil {
+		return IdentityReviewHandoffReport{}, err
+	}
+	orphaned, err := s.repo.ListOrphanedIdentityCandidateReviews(ctx)
+	if err != nil {
+		return IdentityReviewHandoffReport{}, err
+	}
+	report := IdentityReviewHandoffReport{
+		ReportType:              "identity_review_handoff",
+		Boundary:                "Truthwatcher derived review output for Mistspren intake/workbench review; not an accepted ADR or authoritative Mistspren decision",
+		DerivedOutput:           true,
+		GeneratedAt:             time.Now().UTC(),
+		Entries:                 entries,
+		NonDestructiveGuarantee: "report generation is read-only and does not merge canonical assets, rewrite assets.identity_key, or write to Mistspren",
+	}
+	for i := range report.Entries {
+		normalizeIdentityReviewHandoffEntry(&report.Entries[i])
+		if !report.Entries[i].EvidenceReference.Present {
+			report.Integrity.MissingEvidenceReferences++
+		}
+		if report.Entries[i].Candidate.ReviewState == IdentityReviewPending {
+			report.Integrity.UnresolvedPendingEntries++
+		}
+	}
+	report.Integrity.OrphanedReviewRecords = len(orphaned)
+	if report.Integrity.MissingEvidenceReferences > 0 {
+		report.Integrity.Warnings = append(report.Integrity.Warnings, "one or more identity candidates reference missing evidence")
+	}
+	if report.Integrity.OrphanedReviewRecords > 0 {
+		report.Integrity.Warnings = append(report.Integrity.Warnings, "one or more identity candidate reviews do not resolve to a candidate")
+	}
+	if report.Integrity.UnresolvedPendingEntries > 0 {
+		report.Integrity.Warnings = append(report.Integrity.Warnings, "one or more identity candidates remain pending and require review")
+	}
+	return report, nil
+}
+
 func (s IdentityCandidateService) ReviewIdentityCandidate(ctx context.Context, params ReviewIdentityCandidateParams) (IdentityCandidateReview, error) {
 	if s.repo == nil {
 		return IdentityCandidateReview{}, fmt.Errorf("identity candidate repository is required")
@@ -246,6 +338,43 @@ func (s IdentityCandidateService) AutoAcceptIdentityCandidate(ctx context.Contex
 		return fmt.Errorf("metadata must be valid JSON")
 	}
 	return s.repo.AutoAcceptIdentityCandidate(ctx, params)
+}
+
+func normalizeIdentityReviewHandoffEntry(entry *IdentityReviewHandoffEntry) {
+	entry.OutputLabel = "derived_identity_review_output_not_raw_evidence"
+	entry.EvidenceReference.EvidenceID = entry.Candidate.EvidenceID
+	entry.EvidenceReference.DiscoveryRunID = entry.Candidate.DiscoveryRunID
+	entry.ParserSource.ParserName = entry.Candidate.ParserName
+	entry.ParserSource.Metadata = defaultIdentityCandidateJSON(entry.Candidate.Metadata)
+	if entry.Candidate.ReviewState == IdentityReviewPending {
+		entry.HandoffStatus = "unresolved_pending_review"
+		entry.ReviewSummary = identityReviewExplanation(entry.Candidate.Metadata, "pending identity candidate requires Truthwatcher review before Mistspren intake")
+		entry.IdentityEffect = "no review decision recorded; no canonical asset merge or identity rewrite performed"
+		entry.MistsprenIntakeNote = "do not treat this candidate as a reviewed identity decision"
+	} else {
+		entry.HandoffStatus = "ready_for_mistspren_review"
+		entry.ReviewSummary = identityReviewExplanation(entry.Candidate.Metadata, "reviewed identity candidate is ready for Mistspren workbench inspection")
+		entry.IdentityEffect = "review state recorded; no canonical asset merge or identity rewrite performed"
+		entry.MistsprenIntakeNote = "derived Truthwatcher review output for intake review only"
+	}
+	if entry.LatestReview != nil {
+		entry.ReviewSummary = entry.LatestReview.Rationale
+		entry.IdentityEffect = entry.LatestReview.Effect
+	}
+	if !entry.EvidenceReference.Present {
+		entry.IntegrityWarnings = append(entry.IntegrityWarnings, "candidate evidence reference is missing")
+	}
+}
+
+func identityReviewExplanation(metadata json.RawMessage, fallback string) string {
+	var payload map[string]any
+	if err := json.Unmarshal(metadata, &payload); err != nil {
+		return fallback
+	}
+	if value, ok := payload["identity_review_explanation"].(string); ok && strings.TrimSpace(value) != "" {
+		return value
+	}
+	return fallback
 }
 
 func (s IdentityReviewState) Valid() bool {

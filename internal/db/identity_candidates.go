@@ -153,6 +153,93 @@ FROM identity_candidates
 	return results, nil
 }
 
+func (r IdentityCandidateRepository) ListIdentityReviewHandoffEntries(ctx context.Context, filters parser.IdentityReviewHandoffFilters) ([]parser.IdentityReviewHandoffEntry, error) {
+	if r.db == nil {
+		return nil, fmt.Errorf("database is required")
+	}
+
+	query := `
+SELECT
+    c.id, c.discovery_run_id, c.evidence_id, c.parser_name, c.asset_type, c.candidate_identity_key, c.strength, c.confidence, c.reason, c.vendor, c.model, c.serial, c.system_mac, c.hostname, c.proposed_asset_id, c.review_state, c.metadata, c.created_at,
+    r.id, r.identity_candidate_id, r.discovery_run_id, r.evidence_id, r.reviewer, r.action, r.previous_review_state, r.resulting_review_state, r.rationale, r.effect, r.metadata, r.created_at,
+    e.id IS NOT NULL
+FROM identity_candidates c
+LEFT JOIN LATERAL (
+    SELECT id, identity_candidate_id, discovery_run_id, evidence_id, reviewer, action, previous_review_state, resulting_review_state, rationale, effect, metadata, created_at
+    FROM identity_candidate_reviews
+    WHERE identity_candidate_id = c.id
+    ORDER BY created_at DESC, id DESC
+    LIMIT 1
+) r ON true
+LEFT JOIN evidence e ON e.id = c.evidence_id
+`
+	var conditions []string
+	var args []any
+	addFilter := func(condition string, value any) {
+		args = append(args, value)
+		conditions = append(conditions, fmt.Sprintf(condition, len(args)))
+	}
+	if strings.TrimSpace(filters.DiscoveryRunID) != "" {
+		addFilter("c.discovery_run_id = $%d", filters.DiscoveryRunID)
+	}
+	if strings.TrimSpace(filters.EvidenceID) != "" {
+		addFilter("c.evidence_id = $%d", filters.EvidenceID)
+	}
+	if len(conditions) > 0 {
+		query += "WHERE " + strings.Join(conditions, " AND ") + "\n"
+	}
+	query += "ORDER BY c.created_at DESC, c.id DESC"
+
+	rows, err := r.db.QueryContext(ctx, query, args...)
+	if err != nil {
+		return nil, fmt.Errorf("list identity review handoff entries: %w", err)
+	}
+	defer rows.Close()
+
+	var results []parser.IdentityReviewHandoffEntry
+	for rows.Next() {
+		entry, err := scanIdentityReviewHandoffEntry(rows)
+		if err != nil {
+			return nil, fmt.Errorf("scan identity review handoff entry: %w", err)
+		}
+		results = append(results, entry)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("read identity review handoff entries: %w", err)
+	}
+	return results, nil
+}
+
+func (r IdentityCandidateRepository) ListOrphanedIdentityCandidateReviews(ctx context.Context) ([]parser.IdentityCandidateReview, error) {
+	if r.db == nil {
+		return nil, fmt.Errorf("database is required")
+	}
+	rows, err := r.db.QueryContext(ctx, `
+SELECT r.id, r.identity_candidate_id, r.discovery_run_id, r.evidence_id, r.reviewer, r.action, r.previous_review_state, r.resulting_review_state, r.rationale, r.effect, r.metadata, r.created_at
+FROM identity_candidate_reviews r
+LEFT JOIN identity_candidates c ON c.id = r.identity_candidate_id
+WHERE c.id IS NULL
+ORDER BY r.created_at DESC, r.id DESC
+`)
+	if err != nil {
+		return nil, fmt.Errorf("list orphaned identity candidate reviews: %w", err)
+	}
+	defer rows.Close()
+
+	var results []parser.IdentityCandidateReview
+	for rows.Next() {
+		item, err := scanIdentityCandidateReview(rows)
+		if err != nil {
+			return nil, fmt.Errorf("scan orphaned identity candidate review: %w", err)
+		}
+		results = append(results, item)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("read orphaned identity candidate reviews: %w", err)
+	}
+	return results, nil
+}
+
 func (r IdentityCandidateRepository) GetIdentityCandidate(ctx context.Context, id string) (parser.IdentityCandidate, error) {
 	if r.db == nil {
 		return parser.IdentityCandidate{}, fmt.Errorf("database is required")
@@ -346,4 +433,100 @@ func scanIdentityCandidateReview(s scanner) (parser.IdentityCandidateReview, err
 		return parser.IdentityCandidateReview{}, err
 	}
 	return item, nil
+}
+
+func scanIdentityReviewHandoffEntry(s scanner) (parser.IdentityReviewHandoffEntry, error) {
+	var candidate parser.IdentityCandidate
+	var vendor sql.NullString
+	var model sql.NullString
+	var serial sql.NullString
+	var systemMAC sql.NullString
+	var hostname sql.NullString
+	var proposedAssetID sql.NullString
+	var reviewID sql.NullString
+	var reviewCandidateID sql.NullString
+	var reviewDiscoveryRunID sql.NullString
+	var reviewEvidenceID sql.NullString
+	var reviewer sql.NullString
+	var action sql.NullString
+	var previousState sql.NullString
+	var resultingState sql.NullString
+	var rationale sql.NullString
+	var effect sql.NullString
+	var reviewMetadata []byte
+	var reviewCreatedAt sql.NullTime
+	var evidencePresent bool
+
+	if err := s.Scan(
+		&candidate.ID,
+		&candidate.DiscoveryRunID,
+		&candidate.EvidenceID,
+		&candidate.ParserName,
+		&candidate.AssetType,
+		&candidate.CandidateIdentityKey,
+		&candidate.Strength,
+		&candidate.Confidence,
+		&candidate.Reason,
+		&vendor,
+		&model,
+		&serial,
+		&systemMAC,
+		&hostname,
+		&proposedAssetID,
+		&candidate.ReviewState,
+		&candidate.Metadata,
+		&candidate.CreatedAt,
+		&reviewID,
+		&reviewCandidateID,
+		&reviewDiscoveryRunID,
+		&reviewEvidenceID,
+		&reviewer,
+		&action,
+		&previousState,
+		&resultingState,
+		&rationale,
+		&effect,
+		&reviewMetadata,
+		&reviewCreatedAt,
+		&evidencePresent,
+	); err != nil {
+		return parser.IdentityReviewHandoffEntry{}, err
+	}
+	candidate.Vendor = nullableStringPtr(vendor)
+	candidate.Model = nullableStringPtr(model)
+	candidate.Serial = nullableStringPtr(serial)
+	candidate.SystemMAC = nullableStringPtr(systemMAC)
+	candidate.Hostname = nullableStringPtr(hostname)
+	candidate.ProposedAssetID = nullableStringPtr(proposedAssetID)
+
+	entry := parser.IdentityReviewHandoffEntry{
+		Candidate: candidate,
+		EvidenceReference: parser.IdentityEvidenceRef{
+			EvidenceID:     candidate.EvidenceID,
+			DiscoveryRunID: candidate.DiscoveryRunID,
+			Present:        evidencePresent,
+		},
+		ParserSource: parser.IdentityParserSource{
+			ParserName: candidate.ParserName,
+			Metadata:   candidate.Metadata,
+		},
+	}
+	if reviewID.Valid {
+		review := parser.IdentityCandidateReview{
+			ID:                   reviewID.String,
+			IdentityCandidateID:  reviewCandidateID.String,
+			DiscoveryRunID:       reviewDiscoveryRunID.String,
+			EvidenceID:           reviewEvidenceID.String,
+			Reviewer:             reviewer.String,
+			Action:               parser.IdentityReviewAction(action.String),
+			PreviousReviewState:  parser.IdentityReviewState(previousState.String),
+			ResultingReviewState: parser.IdentityReviewState(resultingState.String),
+			Rationale:            rationale.String,
+			Effect:               effect.String,
+			Metadata:             json.RawMessage(reviewMetadata),
+			CreatedAt:            reviewCreatedAt.Time,
+		}
+		entry.LatestReview = &review
+	}
+	return entry, nil
 }

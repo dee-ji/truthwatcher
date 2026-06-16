@@ -356,6 +356,65 @@ Lists pending identity candidates for review. This is a read-only queue view; it
 
 Supports the same optional filters as `GET /api/v1/identity-candidates`, except `review_state` is fixed to `pending`.
 
+### `GET /api/v1/identity-candidates/handoff-report`
+
+Returns a concise read-only identity-review handoff summary for Mistspren intake/workbench review. The report is derived review output, not raw evidence, not an accepted ADR, and not an authoritative Mistspren decision.
+
+Optional query filters:
+
+- `discovery_run_id`
+- `evidence_id`
+
+Response `data`:
+
+```json
+{
+  "identity_review_handoff": {
+    "report_type": "identity_review_handoff",
+    "boundary": "Truthwatcher derived review output for Mistspren intake/workbench review; not an accepted ADR or authoritative Mistspren decision",
+    "derived_output": true,
+    "entries": [
+      {
+        "handoff_status": "ready_for_mistspren_review",
+        "output_label": "derived_identity_review_output_not_raw_evidence",
+        "candidate": {
+          "id": "33333333-3333-4333-8333-333333333333",
+          "evidence_id": "22222222-2222-4222-8222-222222222222",
+          "parser_name": "junos_show_chassis_hardware",
+          "candidate_identity_key": "chassis:vendor_serial:juniper:jn1234abcdef",
+          "review_state": "auto_accepted"
+        },
+        "latest_review": {
+          "id": "44444444-4444-4444-8444-444444444444",
+          "action": "auto_accept",
+          "rationale": "auto-accepted because durable identity has no plausible conflict",
+          "effect": "deterministically auto-accepted evidence-backed strong identity candidate; no canonical asset merge or identity rewrite performed"
+        },
+        "evidence_reference": {
+          "evidence_id": "22222222-2222-4222-8222-222222222222",
+          "discovery_run_id": "11111111-1111-4111-8111-111111111111",
+          "present": true
+        },
+        "parser_source": {
+          "parser_name": "junos_show_chassis_hardware"
+        },
+        "review_summary": "auto-accepted because durable identity has no plausible conflict",
+        "identity_effect": "deterministically auto-accepted evidence-backed strong identity candidate; no canonical asset merge or identity rewrite performed",
+        "mistspren_intake_note": "derived Truthwatcher review output for intake review only"
+      }
+    ],
+    "integrity": {
+      "missing_evidence_references": 0,
+      "orphaned_review_records": 0,
+      "unresolved_pending_entries": 0
+    },
+    "non_destructive_guarantee": "report generation is read-only and does not merge canonical assets, rewrite assets.identity_key, or write to Mistspren"
+  }
+}
+```
+
+Pending candidates are included as `unresolved_pending_review` entries so conflicts and incomplete decisions are not hidden.
+
 ### `POST /api/v1/identity-candidates/{id}/review`
 
 Records a non-destructive review decision for one identity candidate and writes an audit row tied to the candidate, discovery run, and evidence record.

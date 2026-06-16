@@ -72,6 +72,27 @@ func handleListPendingIdentityCandidates(service *parser.IdentityCandidateServic
 	}
 }
 
+func handleIdentityReviewHandoffReport(service *parser.IdentityCandidateService) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if service == nil {
+			writeError(w, http.StatusServiceUnavailable, "identity candidate repository is not configured")
+			return
+		}
+
+		query := r.URL.Query()
+		report, err := service.IdentityReviewHandoffReport(r.Context(), parser.IdentityReviewHandoffFilters{
+			DiscoveryRunID: query.Get("discovery_run_id"),
+			EvidenceID:     query.Get("evidence_id"),
+		})
+		if err != nil {
+			writeError(w, http.StatusBadRequest, err.Error())
+			return
+		}
+
+		writeData(w, http.StatusOK, map[string]parser.IdentityReviewHandoffReport{"identity_review_handoff": report})
+	}
+}
+
 func handleReviewIdentityCandidate(service *parser.IdentityCandidateService) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if service == nil {
