@@ -70,6 +70,21 @@ func TestCommandHelpDoesNotRequireRuntimeDependencies(t *testing.T) {
 			want: []string{"Usage:", "truthwatcher discover fake", "read-only policy engine"},
 		},
 		{
+			name: "devices",
+			args: []string{"devices", "--help"},
+			want: []string{"Usage:", "truthwatcher devices add", "local device registry"},
+		},
+		{
+			name: "devices add",
+			args: []string{"devices", "add", "--help"},
+			want: []string{"Usage:", "truthwatcher devices add", "does not run discovery"},
+		},
+		{
+			name: "devices list",
+			args: []string{"devices", "list", "--help"},
+			want: []string{"Usage:", "truthwatcher devices list", "does not run discovery"},
+		},
+		{
 			name: "export",
 			args: []string{"export", "--help"},
 			want: []string{"Usage:", "truthwatcher export json", "assets, facts, relationships"},
@@ -235,6 +250,46 @@ func TestDiscoverFakeRequiresDatabaseURL(t *testing.T) {
 	err := app.Run(context.Background(), []string{"discover", "fake", "--target", "fixture://junos-mx"}, &stdout, &stderr)
 	if err == nil {
 		t.Fatal("discover fake without database url returned nil error")
+	}
+	if !strings.Contains(err.Error(), config.EnvDatabaseURL) {
+		t.Fatalf("error = %q, want database url env name", err.Error())
+	}
+}
+
+func TestDevicesAddRequiresDatabaseURL(t *testing.T) {
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+
+	app := App{
+		Version: "test-version",
+		loadConfig: func() (config.Config, error) {
+			return config.Default(), nil
+		},
+	}
+
+	err := app.Run(context.Background(), []string{"devices", "add", "--name", "mx-edge-01"}, &stdout, &stderr)
+	if err == nil {
+		t.Fatal("devices add without database url returned nil error")
+	}
+	if !strings.Contains(err.Error(), config.EnvDatabaseURL) {
+		t.Fatalf("error = %q, want database url env name", err.Error())
+	}
+}
+
+func TestDevicesListRequiresDatabaseURL(t *testing.T) {
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+
+	app := App{
+		Version: "test-version",
+		loadConfig: func() (config.Config, error) {
+			return config.Default(), nil
+		},
+	}
+
+	err := app.Run(context.Background(), []string{"devices", "list"}, &stdout, &stderr)
+	if err == nil {
+		t.Fatal("devices list without database url returned nil error")
 	}
 	if !strings.Contains(err.Error(), config.EnvDatabaseURL) {
 		t.Fatalf("error = %q, want database url env name", err.Error())

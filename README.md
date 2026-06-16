@@ -88,6 +88,13 @@ Run fake fixture-backed discovery without touching a network:
 ./bin/truthwatcher discover fake --target fixture://junos-mx
 ```
 
+Register a local device seed without running discovery:
+
+```sh
+./bin/truthwatcher devices add --name mx-edge-01 --management-address 192.0.2.10 --platform junos
+./bin/truthwatcher devices list
+```
+
 See [docs/install.md](docs/install.md) for the full local install flow.
 
 ## Example Workflow
@@ -237,6 +244,8 @@ These are not all current capabilities. The v0.1 priority remains the evidence k
 ./bin/truthwatcher server --help
 ./bin/truthwatcher migrate --help
 ./bin/truthwatcher discover fake --help
+./bin/truthwatcher devices add --help
+./bin/truthwatcher devices list --help
 ./bin/truthwatcher dev check-knowledge
 ```
 

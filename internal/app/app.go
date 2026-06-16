@@ -18,6 +18,7 @@ import (
 	"truthwatcher/internal/audit"
 	"truthwatcher/internal/config"
 	"truthwatcher/internal/db"
+	"truthwatcher/internal/devices"
 	"truthwatcher/internal/discovery"
 	"truthwatcher/internal/evidence"
 	"truthwatcher/internal/extensibility"
@@ -73,6 +74,8 @@ func (a App) Run(ctx context.Context, args []string, stdout, stderr io.Writer) e
 		return a.runMigrate(ctx, args[1:], stdout)
 	case "discover":
 		return a.runDiscover(ctx, args[1:], stdout, stderr)
+	case "devices":
+		return a.runDevices(ctx, args[1:], stdout, stderr)
 	case "parse":
 		return a.runParse(ctx, args[1:], stdout, stderr)
 	case "export":
@@ -320,6 +323,139 @@ func (a App) runDiscoverFake(ctx context.Context, args []string, stdout, stderr 
 	}
 
 	fmt.Fprintf(stdout, "completed discovery run %s with %d evidence records\n", result.DiscoveryRun.ID, len(result.Evidence))
+	return nil
+}
+
+func (a App) runDevices(ctx context.Context, args []string, stdout, stderr io.Writer) error {
+	if len(args) == 0 {
+		return fmt.Errorf("usage: truthwatcher devices add|list")
+	}
+	if isHelpArg(args[0]) {
+		printDevicesHelp(stdout)
+		return nil
+	}
+
+	switch args[0] {
+	case "add":
+		return a.runDevicesAdd(ctx, args[1:], stdout, stderr)
+	case "list":
+		return a.runDevicesList(ctx, args[1:], stdout, stderr)
+	default:
+		return fmt.Errorf("usage: truthwatcher devices add|list")
+	}
+}
+
+func (a App) runDevicesAdd(ctx context.Context, args []string, stdout, stderr io.Writer) error {
+	if wantsHelp(args) {
+		printDevicesAddHelp(stdout)
+		return nil
+	}
+
+	loadConfig := a.loadConfig
+	if loadConfig == nil {
+		loadConfig = config.Load
+	}
+
+	cfg, err := loadConfig()
+	if err != nil {
+		return err
+	}
+
+	var name string
+	var managementAddress string
+	var platform string
+	var vendor string
+	var model string
+	flags := flag.NewFlagSet("devices add", flag.ContinueOnError)
+	flags.SetOutput(stderr)
+	flags.StringVar(&name, "name", "", "device name")
+	flags.StringVar(&managementAddress, "management-address", "", "management IP address or DNS name")
+	flags.StringVar(&platform, "platform", "", "platform hint, for example junos or iosxr")
+	flags.StringVar(&vendor, "vendor", "", "vendor hint")
+	flags.StringVar(&model, "model", "", "model hint")
+	if err := flags.Parse(args); err != nil {
+		return err
+	}
+	if flags.NArg() != 0 {
+		return fmt.Errorf("devices add accepts flags only")
+	}
+	if strings.TrimSpace(cfg.DatabaseURL) == "" {
+		return fmt.Errorf("%s is required for devices add", config.EnvDatabaseURL)
+	}
+
+	conn, err := db.Open(ctx, cfg.DatabaseURL)
+	if err != nil {
+		return err
+	}
+	defer conn.Close()
+
+	service := devices.NewService(db.NewDeviceRepository(conn))
+	device, err := service.CreateDevice(ctx, devices.CreateDeviceParams{
+		Name:              name,
+		ManagementAddress: optionalString(managementAddress),
+		Platform:          optionalString(platform),
+		Vendor:            optionalString(vendor),
+		Model:             optionalString(model),
+	})
+	if err != nil {
+		return err
+	}
+
+	fmt.Fprintf(stdout, "registered device %s %q\n", device.ID, device.Name)
+	return nil
+}
+
+func (a App) runDevicesList(ctx context.Context, args []string, stdout, stderr io.Writer) error {
+	if wantsHelp(args) {
+		printDevicesListHelp(stdout)
+		return nil
+	}
+
+	loadConfig := a.loadConfig
+	if loadConfig == nil {
+		loadConfig = config.Load
+	}
+
+	cfg, err := loadConfig()
+	if err != nil {
+		return err
+	}
+
+	flags := flag.NewFlagSet("devices list", flag.ContinueOnError)
+	flags.SetOutput(stderr)
+	if err := flags.Parse(args); err != nil {
+		return err
+	}
+	if flags.NArg() != 0 {
+		return fmt.Errorf("devices list accepts no arguments")
+	}
+	if strings.TrimSpace(cfg.DatabaseURL) == "" {
+		return fmt.Errorf("%s is required for devices list", config.EnvDatabaseURL)
+	}
+
+	conn, err := db.Open(ctx, cfg.DatabaseURL)
+	if err != nil {
+		return err
+	}
+	defer conn.Close()
+
+	service := devices.NewService(db.NewDeviceRepository(conn))
+	items, err := service.ListDevices(ctx)
+	if err != nil {
+		return err
+	}
+
+	fmt.Fprintln(stdout, "id\tname\tmanagement_address\tplatform\tvendor\tmodel")
+	for _, item := range items {
+		fmt.Fprintf(stdout, "%s\t%s\t%s\t%s\t%s\t%s\n",
+			item.ID,
+			item.Name,
+			stringValue(item.ManagementAddress),
+			stringValue(item.Platform),
+			stringValue(item.Vendor),
+			stringValue(item.Model),
+		)
+	}
 	return nil
 }
 
@@ -741,6 +877,24 @@ func parseDiscoveryTasks(taskList string) ([]policy.Task, error) {
 	return tasks, nil
 }
 
+func optionalString(value string) *string {
+	value = strings.TrimSpace(value)
+	if value == "" {
+		return nil
+	}
+	return &value
+}
+
+func stringValue(value *string) string {
+	if value == nil {
+		return "-"
+	}
+	if strings.TrimSpace(*value) == "" {
+		return "-"
+	}
+	return *value
+}
+
 func wantsHelp(args []string) bool {
 	for _, arg := range args {
 		if isHelpArg(arg) {
@@ -761,6 +915,8 @@ func printUsage(w io.Writer) {
   truthwatcher migrate up
   truthwatcher migrate status
   truthwatcher discover fake --target fixture://junos-mx
+  truthwatcher devices add --name mx-edge-01 --management-address 192.0.2.10
+  truthwatcher devices list
   truthwatcher parse discovery-run --id <id> --platform junos
   truthwatcher export json --output <path>
   truthwatcher import json --input <path>
@@ -771,6 +927,7 @@ Commands:
   server    Start the HTTP server skeleton.
   migrate   Run or inspect database migrations.
   discover  Run a local fixture-backed discovery.
+  devices   Manage the local device registry.
   parse     Persist parser output from stored evidence.
   export    Export a local JSON graph snapshot.
   import    Validate local JSON snapshot import candidates.
@@ -841,6 +998,47 @@ Flags:
   --profile   Built-in discovery profile. Inferred from target when omitted.
   --tasks     Comma-separated safe discovery tasks. Defaults to fixture-backed basics.
   --fixtures  Fixture root directory. Defaults to examples/fixtures.
+`)
+}
+
+func printDevicesHelp(w io.Writer) {
+	fmt.Fprint(w, `Usage:
+  truthwatcher devices add --name mx-edge-01 [--management-address 192.0.2.10]
+  truthwatcher devices list
+
+Manage the local device registry. This does not run discovery or contact
+network devices.
+
+Subcommands:
+  add   Register a device seed in PostgreSQL.
+  list  List registered devices.
+`)
+}
+
+func printDevicesAddHelp(w io.Writer) {
+	fmt.Fprint(w, `Usage:
+  truthwatcher devices add --name mx-edge-01 [--management-address 192.0.2.10]
+
+Register a local device seed. This command stores operator-provided registry
+data only; it does not run discovery, parse evidence, or contact a device.
+TRUTHWATCHER_DATABASE_URL is required.
+
+Flags:
+  --name                Device name.
+  --management-address  Management IP address or DNS name.
+  --platform            Platform hint, for example junos or iosxr.
+  --vendor              Vendor hint.
+  --model               Model hint.
+`)
+}
+
+func printDevicesListHelp(w io.Writer) {
+	fmt.Fprint(w, `Usage:
+  truthwatcher devices list
+
+List locally registered devices. This command reads the device registry only
+and does not run discovery.
+TRUTHWATCHER_DATABASE_URL is required.
 `)
 }
 
