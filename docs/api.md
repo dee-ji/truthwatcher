@@ -318,7 +318,7 @@ Optional query filters:
 
 - `discovery_run_id`
 - `evidence_id`
-- `review_state`: `pending`, `auto_accepted`, `accepted`, `rejected`, or `superseded`
+- `review_state`: `pending`, `auto_accepted`, `accepted`, `rejected`, `superseded`, `deferred`, or `more_evidence_requested`
 - `strength`: `strong`, `provisional`, or `weak`
 - `candidate_identity_key`
 
@@ -344,6 +344,60 @@ Response `data`:
   ]
 }
 ```
+
+### `GET /api/v1/identity-candidates/review-queue`
+
+Lists pending identity candidates for review. This is a read-only queue view; it does not execute discovery, merge assets, or rewrite canonical identity.
+
+Supports the same optional filters as `GET /api/v1/identity-candidates`, except `review_state` is fixed to `pending`.
+
+### `POST /api/v1/identity-candidates/{id}/review`
+
+Records a non-destructive review decision for one identity candidate and writes an audit row tied to the candidate, discovery run, and evidence record.
+
+Allowed `action` values:
+
+- `accept`
+- `reject`
+- `defer`
+- `request_more_evidence`
+
+Request:
+
+```json
+{
+  "reviewer": "netops",
+  "action": "request_more_evidence",
+  "rationale": "neighbor name needs corroborating inventory evidence",
+  "metadata": {
+    "ticket": "TW-123"
+  }
+}
+```
+
+Response `data`:
+
+```json
+{
+  "identity_candidate_review": {
+    "id": "44444444-4444-4444-8444-444444444444",
+    "identity_candidate_id": "33333333-3333-4333-8333-333333333333",
+    "discovery_run_id": "11111111-1111-4111-8111-111111111111",
+    "evidence_id": "22222222-2222-4222-8222-222222222222",
+    "reviewer": "netops",
+    "action": "request_more_evidence",
+    "previous_review_state": "pending",
+    "resulting_review_state": "more_evidence_requested",
+    "rationale": "neighbor name needs corroborating inventory evidence",
+    "effect": "review requested more evidence for candidate; no discovery execution, canonical asset merge, or identity rewrite performed",
+    "metadata": {
+      "ticket": "TW-123"
+    }
+  }
+}
+```
+
+Review actions only update the candidate review state and append audit metadata. They do not merge assets, rewrite `assets.identity_key`, or expose any new collector execution path.
 
 ## Evidence
 

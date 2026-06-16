@@ -1034,6 +1034,157 @@ func TestListIdentityCandidates(t *testing.T) {
 	}
 }
 
+func TestListIdentityCandidateReviewQueue(t *testing.T) {
+	service := parser.NewIdentityCandidateService(&fakeIdentityCandidateRepository{
+		items: []parser.IdentityCandidate{
+			{
+				ID:                   "candidate-pending",
+				DiscoveryRunID:       "11111111-1111-4111-8111-111111111111",
+				EvidenceID:           "evidence-a",
+				ParserName:           "junos_show_version",
+				AssetType:            "device",
+				CandidateIdentityKey: "device:hostname:mx-edge-01",
+				Strength:             assets.IdentityStrengthProvisional,
+				Confidence:           0.55,
+				Reason:               "hostname is not globally unique and may change",
+				ReviewState:          parser.IdentityReviewPending,
+				Metadata:             json.RawMessage(`{}`),
+				CreatedAt:            time.Date(2026, 6, 10, 12, 0, 0, 0, time.UTC),
+			},
+			{
+				ID:                   "candidate-accepted",
+				DiscoveryRunID:       "11111111-1111-4111-8111-111111111111",
+				EvidenceID:           "evidence-b",
+				ParserName:           "junos_show_chassis_hardware",
+				AssetType:            "chassis",
+				CandidateIdentityKey: "chassis:vendor_serial:juniper:jn1234abcdef",
+				Strength:             assets.IdentityStrengthStrong,
+				Confidence:           0.85,
+				Reason:               "identity key uses a durable identifier",
+				ReviewState:          parser.IdentityReviewAccepted,
+				Metadata:             json.RawMessage(`{}`),
+				CreatedAt:            time.Date(2026, 6, 10, 12, 1, 0, 0, time.UTC),
+			},
+		},
+	})
+	handler := NewHandler(Options{
+		Version:            "test-version",
+		IdentityCandidates: &service,
+	})
+
+	response := httptest.NewRecorder()
+	request := httptest.NewRequest(http.MethodGet, "/api/v1/identity-candidates/review-queue", nil)
+	handler.ServeHTTP(response, request)
+
+	if response.Code != http.StatusOK {
+		t.Fatalf("status = %d, want %d; body=%s", response.Code, http.StatusOK, response.Body.String())
+	}
+
+	body := decodeResponseData[struct {
+		IdentityCandidates []parser.IdentityCandidate `json:"identity_candidates"`
+	}](t, response)
+	if got, want := len(body.IdentityCandidates), 1; got != want {
+		t.Fatalf("queued candidate count = %d, want %d", got, want)
+	}
+	if body.IdentityCandidates[0].ID != "candidate-pending" {
+		t.Fatalf("candidate id = %q, want candidate-pending", body.IdentityCandidates[0].ID)
+	}
+}
+
+func TestReviewIdentityCandidateActionsAreAudited(t *testing.T) {
+	repo := &fakeIdentityCandidateRepository{
+		items: []parser.IdentityCandidate{
+			{
+				ID:                   "candidate-accept",
+				DiscoveryRunID:       "11111111-1111-4111-8111-111111111111",
+				EvidenceID:           "evidence-a",
+				ParserName:           "junos_show_version",
+				AssetType:            "device",
+				CandidateIdentityKey: "device:hostname:mx-edge-01",
+				Strength:             assets.IdentityStrengthProvisional,
+				Confidence:           0.55,
+				Reason:               "hostname is not globally unique and may change",
+				ReviewState:          parser.IdentityReviewPending,
+				Metadata:             json.RawMessage(`{}`),
+			},
+			{
+				ID:                   "candidate-more-evidence",
+				DiscoveryRunID:       "11111111-1111-4111-8111-111111111111",
+				EvidenceID:           "evidence-b",
+				ParserName:           "junos_show_lldp_neighbors",
+				AssetType:            "device",
+				CandidateIdentityKey: "device:hostname:spine-01",
+				Strength:             assets.IdentityStrengthProvisional,
+				Confidence:           0.75,
+				Reason:               "hostname is not globally unique and may change",
+				ReviewState:          parser.IdentityReviewPending,
+				Metadata:             json.RawMessage(`{}`),
+			},
+		},
+	}
+	service := parser.NewIdentityCandidateService(repo)
+	handler := NewHandler(Options{
+		Version:            "test-version",
+		IdentityCandidates: &service,
+	})
+
+	tests := []struct {
+		id        string
+		body      string
+		wantState parser.IdentityReviewState
+	}{
+		{
+			id:        "candidate-accept",
+			body:      `{"reviewer":"netops","action":"accept","rationale":"hostname aligns with fixture evidence","metadata":{"ticket":"TW-1"}}`,
+			wantState: parser.IdentityReviewAccepted,
+		},
+		{
+			id:        "candidate-more-evidence",
+			body:      `{"reviewer":"netops","action":"request_more_evidence","rationale":"neighbor name needs corroborating inventory evidence"}`,
+			wantState: parser.IdentityReviewMoreEvidence,
+		},
+	}
+
+	for _, tt := range tests {
+		response := httptest.NewRecorder()
+		request := httptest.NewRequest(http.MethodPost, "/api/v1/identity-candidates/"+tt.id+"/review", strings.NewReader(tt.body))
+		request.Header.Set("X-Request-ID", "req-review")
+		handler.ServeHTTP(response, request)
+
+		if response.Code != http.StatusOK {
+			t.Fatalf("%s status = %d, want %d; body=%s", tt.id, response.Code, http.StatusOK, response.Body.String())
+		}
+
+		body := decodeResponseData[struct {
+			Review parser.IdentityCandidateReview `json:"identity_candidate_review"`
+		}](t, response)
+		if body.Review.IdentityCandidateID != tt.id {
+			t.Fatalf("review candidate id = %q, want %q", body.Review.IdentityCandidateID, tt.id)
+		}
+		if body.Review.EvidenceID == "" {
+			t.Fatal("review evidence id is empty")
+		}
+		if body.Review.Reviewer != "netops" {
+			t.Fatalf("reviewer = %q, want netops", body.Review.Reviewer)
+		}
+		if body.Review.ResultingReviewState != tt.wantState {
+			t.Fatalf("resulting state = %q, want %q", body.Review.ResultingReviewState, tt.wantState)
+		}
+		if !strings.Contains(body.Review.Effect, "merge") || !strings.Contains(body.Review.Effect, "identity rewrite") {
+			t.Fatalf("effect = %q, want non-destructive merge/rewrite statement", body.Review.Effect)
+		}
+	}
+	if got, want := len(repo.reviews), 2; got != want {
+		t.Fatalf("audit review count = %d, want %d", got, want)
+	}
+	if repo.items[0].ReviewState != parser.IdentityReviewAccepted {
+		t.Fatalf("first candidate state = %q, want accepted", repo.items[0].ReviewState)
+	}
+	if repo.items[1].ReviewState != parser.IdentityReviewMoreEvidence {
+		t.Fatalf("second candidate state = %q, want more_evidence_requested", repo.items[1].ReviewState)
+	}
+}
+
 func TestIdentityCandidatesEndpointRequiresRepository(t *testing.T) {
 	handler := NewHandler(Options{Version: "test-version"})
 
@@ -1082,7 +1233,8 @@ func (f *fakeParseResultRepository) CreateParseResult(ctx context.Context, param
 }
 
 type fakeIdentityCandidateRepository struct {
-	items []parser.IdentityCandidate
+	items   []parser.IdentityCandidate
+	reviews []parser.IdentityCandidateReview
 }
 
 func (f *fakeIdentityCandidateRepository) CreateIdentityCandidate(ctx context.Context, params parser.CreateIdentityCandidateParams) (parser.IdentityCandidate, error) {
@@ -1110,6 +1262,15 @@ func (f *fakeIdentityCandidateRepository) CreateIdentityCandidate(ctx context.Co
 	return item, nil
 }
 
+func (f *fakeIdentityCandidateRepository) GetIdentityCandidate(ctx context.Context, id string) (parser.IdentityCandidate, error) {
+	for _, item := range f.items {
+		if item.ID == id {
+			return item, nil
+		}
+	}
+	return parser.IdentityCandidate{}, assets.ErrNotFound
+}
+
 func (f *fakeIdentityCandidateRepository) ListIdentityCandidates(ctx context.Context, filters parser.IdentityCandidateFilters) ([]parser.IdentityCandidate, error) {
 	var result []parser.IdentityCandidate
 	for _, item := range f.items {
@@ -1131,6 +1292,34 @@ func (f *fakeIdentityCandidateRepository) ListIdentityCandidates(ctx context.Con
 		result = append(result, item)
 	}
 	return result, nil
+}
+
+func (f *fakeIdentityCandidateRepository) ReviewIdentityCandidate(ctx context.Context, params parser.ReviewIdentityCandidateParams) (parser.IdentityCandidateReview, error) {
+	for i := range f.items {
+		if f.items[i].ID != params.IdentityCandidateID {
+			continue
+		}
+		previous := f.items[i].ReviewState
+		resulting := parser.ResultingReviewState(params.Action)
+		f.items[i].ReviewState = resulting
+		review := parser.IdentityCandidateReview{
+			ID:                   "review-" + params.IdentityCandidateID,
+			IdentityCandidateID:  params.IdentityCandidateID,
+			DiscoveryRunID:       f.items[i].DiscoveryRunID,
+			EvidenceID:           f.items[i].EvidenceID,
+			Reviewer:             params.Reviewer,
+			Action:               params.Action,
+			PreviousReviewState:  previous,
+			ResultingReviewState: resulting,
+			Rationale:            params.Rationale,
+			Effect:               parser.IdentityReviewEffect(params.Action),
+			Metadata:             params.Metadata,
+			CreatedAt:            time.Date(2026, 6, 10, 12, 0, 0, 0, time.UTC),
+		}
+		f.reviews = append(f.reviews, review)
+		return review, nil
+	}
+	return parser.IdentityCandidateReview{}, assets.ErrNotFound
 }
 
 func (f *fakeParseResultRepository) ListParseResultsByDiscoveryRun(ctx context.Context, discoveryRunID string) ([]parser.ParseRecord, error) {

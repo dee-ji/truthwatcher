@@ -310,6 +310,15 @@ func (r *persistenceIdentityCandidateRepository) CreateIdentityCandidate(ctx con
 	return item, nil
 }
 
+func (r *persistenceIdentityCandidateRepository) GetIdentityCandidate(ctx context.Context, id string) (IdentityCandidate, error) {
+	for _, item := range r.items {
+		if item.ID == id {
+			return item, nil
+		}
+	}
+	return IdentityCandidate{}, assets.ErrNotFound
+}
+
 func (r *persistenceIdentityCandidateRepository) ListIdentityCandidates(ctx context.Context, filters IdentityCandidateFilters) ([]IdentityCandidate, error) {
 	var result []IdentityCandidate
 	for _, item := range r.items {
@@ -331,6 +340,32 @@ func (r *persistenceIdentityCandidateRepository) ListIdentityCandidates(ctx cont
 		result = append(result, item)
 	}
 	return result, nil
+}
+
+func (r *persistenceIdentityCandidateRepository) ReviewIdentityCandidate(ctx context.Context, params ReviewIdentityCandidateParams) (IdentityCandidateReview, error) {
+	for i := range r.items {
+		if r.items[i].ID != params.IdentityCandidateID {
+			continue
+		}
+		previous := r.items[i].ReviewState
+		resulting := ResultingReviewState(params.Action)
+		r.items[i].ReviewState = resulting
+		return IdentityCandidateReview{
+			ID:                   "identity-review-" + params.IdentityCandidateID,
+			IdentityCandidateID:  params.IdentityCandidateID,
+			DiscoveryRunID:       r.items[i].DiscoveryRunID,
+			EvidenceID:           r.items[i].EvidenceID,
+			Reviewer:             params.Reviewer,
+			Action:               params.Action,
+			PreviousReviewState:  previous,
+			ResultingReviewState: resulting,
+			Rationale:            params.Rationale,
+			Effect:               IdentityReviewEffect(params.Action),
+			Metadata:             params.Metadata,
+			CreatedAt:            time.Date(2026, 6, 10, 12, 0, 0, 0, time.UTC),
+		}, nil
+	}
+	return IdentityCandidateReview{}, assets.ErrNotFound
 }
 
 func (r *persistenceParseRepository) ListParseResultsByDiscoveryRun(ctx context.Context, discoveryRunID string) ([]ParseRecord, error) {

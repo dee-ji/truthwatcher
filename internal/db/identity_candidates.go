@@ -4,9 +4,11 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"strings"
 
+	"truthwatcher/internal/assets"
 	"truthwatcher/internal/discovery"
 	"truthwatcher/internal/parser"
 )
@@ -151,6 +153,105 @@ FROM identity_candidates
 	return results, nil
 }
 
+func (r IdentityCandidateRepository) GetIdentityCandidate(ctx context.Context, id string) (parser.IdentityCandidate, error) {
+	if r.db == nil {
+		return parser.IdentityCandidate{}, fmt.Errorf("database is required")
+	}
+	item, err := scanIdentityCandidate(r.db.QueryRowContext(ctx, `
+SELECT id, discovery_run_id, evidence_id, parser_name, asset_type, candidate_identity_key, strength, confidence, reason, vendor, model, serial, system_mac, hostname, proposed_asset_id, review_state, metadata, created_at
+FROM identity_candidates
+WHERE id = $1
+`, strings.TrimSpace(id)))
+	if errors.Is(err, sql.ErrNoRows) {
+		return parser.IdentityCandidate{}, assets.ErrNotFound
+	}
+	if err != nil {
+		return parser.IdentityCandidate{}, fmt.Errorf("get identity candidate: %w", err)
+	}
+	return item, nil
+}
+
+func (r IdentityCandidateRepository) ReviewIdentityCandidate(ctx context.Context, params parser.ReviewIdentityCandidateParams) (parser.IdentityCandidateReview, error) {
+	if r.db == nil {
+		return parser.IdentityCandidateReview{}, fmt.Errorf("database is required")
+	}
+
+	tx, err := r.db.BeginTx(ctx, nil)
+	if err != nil {
+		return parser.IdentityCandidateReview{}, fmt.Errorf("begin identity candidate review: %w", err)
+	}
+	defer tx.Rollback()
+
+	candidate, err := scanIdentityCandidate(tx.QueryRowContext(ctx, `
+SELECT id, discovery_run_id, evidence_id, parser_name, asset_type, candidate_identity_key, strength, confidence, reason, vendor, model, serial, system_mac, hostname, proposed_asset_id, review_state, metadata, created_at
+FROM identity_candidates
+WHERE id = $1
+FOR UPDATE
+`, params.IdentityCandidateID))
+	if errors.Is(err, sql.ErrNoRows) {
+		return parser.IdentityCandidateReview{}, assets.ErrNotFound
+	}
+	if err != nil {
+		return parser.IdentityCandidateReview{}, fmt.Errorf("get identity candidate for review: %w", err)
+	}
+
+	resultingState := parser.ResultingReviewState(params.Action)
+	effect := parser.IdentityReviewEffect(params.Action)
+	id, err := discovery.NewID()
+	if err != nil {
+		return parser.IdentityCandidateReview{}, err
+	}
+	if len(params.Metadata) == 0 {
+		params.Metadata = json.RawMessage(`{}`)
+	}
+
+	review, err := scanIdentityCandidateReview(tx.QueryRowContext(ctx, `
+INSERT INTO identity_candidate_reviews (
+    id,
+    identity_candidate_id,
+    discovery_run_id,
+    evidence_id,
+    reviewer,
+    action,
+    previous_review_state,
+    resulting_review_state,
+    rationale,
+    effect,
+    metadata
+)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+RETURNING id, identity_candidate_id, discovery_run_id, evidence_id, reviewer, action, previous_review_state, resulting_review_state, rationale, effect, metadata, created_at
+`,
+		id,
+		candidate.ID,
+		candidate.DiscoveryRunID,
+		candidate.EvidenceID,
+		params.Reviewer,
+		params.Action,
+		candidate.ReviewState,
+		resultingState,
+		params.Rationale,
+		effect,
+		params.Metadata,
+	))
+	if err != nil {
+		return parser.IdentityCandidateReview{}, fmt.Errorf("create identity candidate review: %w", err)
+	}
+
+	if _, err := tx.ExecContext(ctx, `
+UPDATE identity_candidates
+SET review_state = $1
+WHERE id = $2
+`, resultingState, candidate.ID); err != nil {
+		return parser.IdentityCandidateReview{}, fmt.Errorf("update identity candidate review state: %w", err)
+	}
+
+	if err := tx.Commit(); err != nil {
+		return parser.IdentityCandidateReview{}, fmt.Errorf("commit identity candidate review: %w", err)
+	}
+	return review, nil
+}
+
 func scanIdentityCandidate(s scanner) (parser.IdentityCandidate, error) {
 	var item parser.IdentityCandidate
 	var vendor sql.NullString
@@ -188,5 +289,26 @@ func scanIdentityCandidate(s scanner) (parser.IdentityCandidate, error) {
 	item.SystemMAC = nullableStringPtr(systemMAC)
 	item.Hostname = nullableStringPtr(hostname)
 	item.ProposedAssetID = nullableStringPtr(proposedAssetID)
+	return item, nil
+}
+
+func scanIdentityCandidateReview(s scanner) (parser.IdentityCandidateReview, error) {
+	var item parser.IdentityCandidateReview
+	if err := s.Scan(
+		&item.ID,
+		&item.IdentityCandidateID,
+		&item.DiscoveryRunID,
+		&item.EvidenceID,
+		&item.Reviewer,
+		&item.Action,
+		&item.PreviousReviewState,
+		&item.ResultingReviewState,
+		&item.Rationale,
+		&item.Effect,
+		&item.Metadata,
+		&item.CreatedAt,
+	); err != nil {
+		return parser.IdentityCandidateReview{}, err
+	}
 	return item, nil
 }

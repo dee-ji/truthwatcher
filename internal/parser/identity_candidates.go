@@ -18,6 +18,17 @@ const (
 	IdentityReviewAccepted     IdentityReviewState = "accepted"
 	IdentityReviewRejected     IdentityReviewState = "rejected"
 	IdentityReviewSuperseded   IdentityReviewState = "superseded"
+	IdentityReviewDeferred     IdentityReviewState = "deferred"
+	IdentityReviewMoreEvidence IdentityReviewState = "more_evidence_requested"
+)
+
+type IdentityReviewAction string
+
+const (
+	IdentityReviewActionAccept              IdentityReviewAction = "accept"
+	IdentityReviewActionReject              IdentityReviewAction = "reject"
+	IdentityReviewActionDefer               IdentityReviewAction = "defer"
+	IdentityReviewActionRequestMoreEvidence IdentityReviewAction = "request_more_evidence"
 )
 
 type IdentityCandidate struct {
@@ -70,11 +81,36 @@ type IdentityCandidateFilters struct {
 
 type IdentityCandidateRepository interface {
 	CreateIdentityCandidate(context.Context, CreateIdentityCandidateParams) (IdentityCandidate, error)
+	GetIdentityCandidate(context.Context, string) (IdentityCandidate, error)
 	ListIdentityCandidates(context.Context, IdentityCandidateFilters) ([]IdentityCandidate, error)
+	ReviewIdentityCandidate(context.Context, ReviewIdentityCandidateParams) (IdentityCandidateReview, error)
 }
 
 type IdentityCandidateService struct {
 	repo IdentityCandidateRepository
+}
+
+type ReviewIdentityCandidateParams struct {
+	IdentityCandidateID string
+	Reviewer            string
+	Action              IdentityReviewAction
+	Rationale           string
+	Metadata            json.RawMessage
+}
+
+type IdentityCandidateReview struct {
+	ID                   string               `json:"id"`
+	IdentityCandidateID  string               `json:"identity_candidate_id"`
+	DiscoveryRunID       string               `json:"discovery_run_id"`
+	EvidenceID           string               `json:"evidence_id"`
+	Reviewer             string               `json:"reviewer"`
+	Action               IdentityReviewAction `json:"action"`
+	PreviousReviewState  IdentityReviewState  `json:"previous_review_state"`
+	ResultingReviewState IdentityReviewState  `json:"resulting_review_state"`
+	Rationale            string               `json:"rationale"`
+	Effect               string               `json:"effect"`
+	Metadata             json.RawMessage      `json:"metadata"`
+	CreatedAt            time.Time            `json:"created_at"`
 }
 
 func NewIdentityCandidateService(repo IdentityCandidateRepository) IdentityCandidateService {
@@ -156,12 +192,77 @@ func (s IdentityCandidateService) ListIdentityCandidates(ctx context.Context, fi
 	return s.repo.ListIdentityCandidates(ctx, filters)
 }
 
+func (s IdentityCandidateService) ReviewIdentityCandidate(ctx context.Context, params ReviewIdentityCandidateParams) (IdentityCandidateReview, error) {
+	if s.repo == nil {
+		return IdentityCandidateReview{}, fmt.Errorf("identity candidate repository is required")
+	}
+	params.IdentityCandidateID = strings.TrimSpace(params.IdentityCandidateID)
+	params.Reviewer = strings.TrimSpace(params.Reviewer)
+	params.Rationale = strings.TrimSpace(params.Rationale)
+	if params.IdentityCandidateID == "" {
+		return IdentityCandidateReview{}, fmt.Errorf("identity_candidate_id is required")
+	}
+	if params.Reviewer == "" {
+		return IdentityCandidateReview{}, fmt.Errorf("reviewer is required")
+	}
+	if !params.Action.Valid() {
+		return IdentityCandidateReview{}, fmt.Errorf("invalid identity review action %q", params.Action)
+	}
+	if params.Rationale == "" {
+		return IdentityCandidateReview{}, fmt.Errorf("rationale is required")
+	}
+	params.Metadata = defaultIdentityCandidateJSON(params.Metadata)
+	if !json.Valid(params.Metadata) {
+		return IdentityCandidateReview{}, fmt.Errorf("metadata must be valid JSON")
+	}
+	return s.repo.ReviewIdentityCandidate(ctx, params)
+}
+
 func (s IdentityReviewState) Valid() bool {
 	switch s {
-	case IdentityReviewPending, IdentityReviewAutoAccepted, IdentityReviewAccepted, IdentityReviewRejected, IdentityReviewSuperseded:
+	case IdentityReviewPending, IdentityReviewAutoAccepted, IdentityReviewAccepted, IdentityReviewRejected, IdentityReviewSuperseded, IdentityReviewDeferred, IdentityReviewMoreEvidence:
 		return true
 	default:
 		return false
+	}
+}
+
+func (a IdentityReviewAction) Valid() bool {
+	switch a {
+	case IdentityReviewActionAccept, IdentityReviewActionReject, IdentityReviewActionDefer, IdentityReviewActionRequestMoreEvidence:
+		return true
+	default:
+		return false
+	}
+}
+
+func ResultingReviewState(action IdentityReviewAction) IdentityReviewState {
+	switch action {
+	case IdentityReviewActionAccept:
+		return IdentityReviewAccepted
+	case IdentityReviewActionReject:
+		return IdentityReviewRejected
+	case IdentityReviewActionDefer:
+		return IdentityReviewDeferred
+	case IdentityReviewActionRequestMoreEvidence:
+		return IdentityReviewMoreEvidence
+	default:
+		return ""
+	}
+}
+
+func IdentityReviewEffect(action IdentityReviewAction) string {
+	switch action {
+	case IdentityReviewActionAccept:
+		return "review accepted candidate as evidence-backed identity clue; no canonical asset merge or identity rewrite performed"
+	case IdentityReviewActionReject:
+		return "review rejected candidate as identity clue; no canonical asset merge or identity rewrite performed"
+	case IdentityReviewActionDefer:
+		return "review deferred candidate decision; no canonical asset merge or identity rewrite performed"
+	case IdentityReviewActionRequestMoreEvidence:
+		return "review requested more evidence for candidate; no discovery execution, canonical asset merge, or identity rewrite performed"
+	default:
+		return ""
 	}
 }
 

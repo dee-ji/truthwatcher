@@ -65,6 +65,8 @@ func NewHandler(opts Options) http.Handler {
 	mux.HandleFunc("GET /api/v1/discovery-runs/{id}/evidence", handleListEvidenceByDiscoveryRun(opts.Evidence))
 	mux.HandleFunc("POST /api/v1/discovery-runs/{id}/parse", handleParseDiscoveryRun(opts.Parser))
 	mux.HandleFunc("GET /api/v1/identity-candidates", handleListIdentityCandidates(opts.IdentityCandidates))
+	mux.HandleFunc("GET /api/v1/identity-candidates/review-queue", handleListPendingIdentityCandidates(opts.IdentityCandidates))
+	mux.HandleFunc("POST /api/v1/identity-candidates/{id}/review", handleReviewIdentityCandidate(opts.IdentityCandidates))
 	mux.HandleFunc("GET /api/v1/evidence/{id}", handleGetEvidence(opts.Evidence))
 	mux.HandleFunc("GET /api/v1/assets", handleListAssets(opts.Assets))
 	mux.HandleFunc("GET /api/v1/assets/provisional-identities", handleListProvisionalIdentityAssets(opts.Assets))
