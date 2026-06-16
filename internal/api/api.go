@@ -26,14 +26,15 @@ import (
 )
 
 type Options struct {
-	Version       string
-	Logger        *slog.Logger
-	DiscoveryRuns *discovery.Service
-	Evidence      *evidence.Service
-	Assets        *assets.Service
-	Graph         *graph.Service
-	Parser        *parser.PersistenceService
-	Audit         *audit.Service
+	Version            string
+	Logger             *slog.Logger
+	DiscoveryRuns      *discovery.Service
+	Evidence           *evidence.Service
+	Assets             *assets.Service
+	Graph              *graph.Service
+	Parser             *parser.PersistenceService
+	IdentityCandidates *parser.IdentityCandidateService
+	Audit              *audit.Service
 }
 
 type responseEnvelope struct {
@@ -63,6 +64,7 @@ func NewHandler(opts Options) http.Handler {
 	mux.HandleFunc("GET /api/v1/discovery-runs/{id}", handleGetDiscoveryRun(opts.DiscoveryRuns))
 	mux.HandleFunc("GET /api/v1/discovery-runs/{id}/evidence", handleListEvidenceByDiscoveryRun(opts.Evidence))
 	mux.HandleFunc("POST /api/v1/discovery-runs/{id}/parse", handleParseDiscoveryRun(opts.Parser))
+	mux.HandleFunc("GET /api/v1/identity-candidates", handleListIdentityCandidates(opts.IdentityCandidates))
 	mux.HandleFunc("GET /api/v1/evidence/{id}", handleGetEvidence(opts.Evidence))
 	mux.HandleFunc("GET /api/v1/assets", handleListAssets(opts.Assets))
 	mux.HandleFunc("GET /api/v1/assets/provisional-identities", handleListProvisionalIdentityAssets(opts.Assets))

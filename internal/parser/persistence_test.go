@@ -116,6 +116,127 @@ func TestParseDiscoveryRunRecordsSkippedWarnings(t *testing.T) {
 	}
 }
 
+func TestParseDiscoveryRunPersistsIdentityCandidates(t *testing.T) {
+	runID := "11111111-1111-4111-8111-111111111111"
+	evidenceItems := []evidence.Evidence{
+		persistenceFixtureEvidence(t, "evidence-version", runID, PlatformJunos, CommandShowVersion, "junos-mx", "show_version.txt"),
+		persistenceFixtureEvidence(t, "evidence-inventory", runID, PlatformJunos, CommandShowChassisHardware, "junos-mx", "show_chassis_hardware.txt"),
+	}
+	identityRepo := &persistenceIdentityCandidateRepository{}
+	service := NewPersistenceService(PersistenceOptions{
+		Evidence:           persistenceEvidenceRepository{items: evidenceItems},
+		Assets:             assets.NewService(&persistenceAssetRepository{}),
+		ParseResults:       &persistenceParseRepository{},
+		IdentityCandidates: identityRepo,
+		Registry:           BuiltInRegistry(),
+	})
+
+	result, err := service.ParseDiscoveryRun(context.Background(), ParseDiscoveryRunParams{
+		DiscoveryRunID: runID,
+		Platform:       PlatformJunos,
+	})
+	if err != nil {
+		t.Fatalf("ParseDiscoveryRun returned error: %v", err)
+	}
+
+	hostname := findIdentityCandidate(t, identityRepo.items, "device:hostname:mx-edge-01")
+	if hostname.EvidenceID != "evidence-version" {
+		t.Fatalf("hostname evidence id = %q, want evidence-version", hostname.EvidenceID)
+	}
+	if hostname.Strength != assets.IdentityStrengthProvisional {
+		t.Fatalf("hostname strength = %q, want provisional", hostname.Strength)
+	}
+	if hostname.ReviewState != IdentityReviewPending {
+		t.Fatalf("hostname review state = %q, want pending", hostname.ReviewState)
+	}
+	if hostname.Hostname == nil || *hostname.Hostname != "mx-edge-01" {
+		t.Fatalf("hostname attribute = %#v, want mx-edge-01", hostname.Hostname)
+	}
+
+	strong := findIdentityCandidate(t, identityRepo.items, "chassis:vendor_serial:juniper:jn1234abcdef")
+	if strong.EvidenceID != "evidence-inventory" {
+		t.Fatalf("strong evidence id = %q, want evidence-inventory", strong.EvidenceID)
+	}
+	if strong.Strength != assets.IdentityStrengthStrong {
+		t.Fatalf("strong strength = %q, want strong", strong.Strength)
+	}
+	if strong.Serial == nil || *strong.Serial != "JN1234ABCDEF" {
+		t.Fatalf("strong serial = %#v, want JN1234ABCDEF", strong.Serial)
+	}
+	if len(result.IdentityCandidates) != len(identityRepo.items) {
+		t.Fatalf("result candidates = %d, repo candidates = %d", len(result.IdentityCandidates), len(identityRepo.items))
+	}
+}
+
+func TestParseDiscoveryRunDeduplicatesIdentityCandidates(t *testing.T) {
+	runID := "11111111-1111-4111-8111-111111111111"
+	item := persistenceFixtureEvidence(t, "evidence-version", runID, PlatformJunos, CommandShowVersion, "junos-mx", "show_version.txt")
+	identityRepo := &persistenceIdentityCandidateRepository{}
+	service := NewPersistenceService(PersistenceOptions{
+		Evidence:           persistenceEvidenceRepository{items: []evidence.Evidence{item}},
+		Assets:             assets.NewService(&persistenceAssetRepository{}),
+		ParseResults:       &persistenceParseRepository{},
+		IdentityCandidates: identityRepo,
+		Registry:           BuiltInRegistry(),
+	})
+
+	for i := 0; i < 2; i++ {
+		if _, err := service.ParseDiscoveryRun(context.Background(), ParseDiscoveryRunParams{
+			DiscoveryRunID: runID,
+			Platform:       PlatformJunos,
+		}); err != nil {
+			t.Fatalf("ParseDiscoveryRun run %d returned error: %v", i+1, err)
+		}
+	}
+
+	if got, want := countIdentityCandidate(identityRepo.items, "evidence-version", "junos_show_version", "device:hostname:mx-edge-01"), 1; got != want {
+		t.Fatalf("candidate count = %d, want %d", got, want)
+	}
+}
+
+func TestParseDiscoveryRunDoesNotRewriteExistingCanonicalAssetIdentity(t *testing.T) {
+	runID := "11111111-1111-4111-8111-111111111111"
+	item := persistenceFixtureEvidence(t, "evidence-version", runID, PlatformJunos, CommandShowVersion, "junos-mx", "show_version.txt")
+	assetRepo := &persistenceAssetRepository{
+		assets: []assets.Asset{{
+			ID:          "asset-existing",
+			Type:        "device",
+			IdentityKey: "device:hostname:mx-edge-01",
+			Vendor:      stringPtr("existing-vendor"),
+			Serial:      stringPtr("existing-serial"),
+			Metadata:    json.RawMessage(`{"identity_strength":"provisional"}`),
+		}},
+	}
+	service := NewPersistenceService(PersistenceOptions{
+		Evidence:           persistenceEvidenceRepository{items: []evidence.Evidence{item}},
+		Assets:             assets.NewService(assetRepo),
+		ParseResults:       &persistenceParseRepository{},
+		IdentityCandidates: &persistenceIdentityCandidateRepository{},
+		Registry:           BuiltInRegistry(),
+	})
+
+	if _, err := service.ParseDiscoveryRun(context.Background(), ParseDiscoveryRunParams{
+		DiscoveryRunID: runID,
+		Platform:       PlatformJunos,
+	}); err != nil {
+		t.Fatalf("ParseDiscoveryRun returned error: %v", err)
+	}
+
+	if got, want := len(assetRepo.assets), 1; got != want {
+		t.Fatalf("asset count = %d, want %d", got, want)
+	}
+	existing := assetRepo.assets[0]
+	if existing.IdentityKey != "device:hostname:mx-edge-01" {
+		t.Fatalf("identity key = %q, want unchanged hostname identity", existing.IdentityKey)
+	}
+	if existing.Vendor == nil || *existing.Vendor != "existing-vendor" {
+		t.Fatalf("vendor = %#v, want existing-vendor", existing.Vendor)
+	}
+	if existing.Serial == nil || *existing.Serial != "existing-serial" {
+		t.Fatalf("serial = %#v, want existing-serial", existing.Serial)
+	}
+}
+
 type persistenceEvidenceRepository struct {
 	items []evidence.Evidence
 }
@@ -151,6 +272,65 @@ func (r *persistenceParseRepository) CreateParseResult(ctx context.Context, para
 	}
 	r.records = append(r.records, record)
 	return record, nil
+}
+
+type persistenceIdentityCandidateRepository struct {
+	items []IdentityCandidate
+}
+
+func (r *persistenceIdentityCandidateRepository) CreateIdentityCandidate(ctx context.Context, params CreateIdentityCandidateParams) (IdentityCandidate, error) {
+	for _, item := range r.items {
+		if item.EvidenceID == params.EvidenceID &&
+			item.ParserName == params.ParserName &&
+			item.CandidateIdentityKey == params.CandidateIdentityKey {
+			return item, nil
+		}
+	}
+	item := IdentityCandidate{
+		ID:                   "identity-candidate-" + string(rune('a'+len(r.items))),
+		DiscoveryRunID:       params.DiscoveryRunID,
+		EvidenceID:           params.EvidenceID,
+		ParserName:           params.ParserName,
+		AssetType:            params.AssetType,
+		CandidateIdentityKey: params.CandidateIdentityKey,
+		Strength:             params.Strength,
+		Confidence:           params.Confidence,
+		Reason:               params.Reason,
+		Vendor:               params.Vendor,
+		Model:                params.Model,
+		Serial:               params.Serial,
+		SystemMAC:            params.SystemMAC,
+		Hostname:             params.Hostname,
+		ProposedAssetID:      params.ProposedAssetID,
+		ReviewState:          params.ReviewState,
+		Metadata:             params.Metadata,
+		CreatedAt:            time.Date(2026, 6, 10, 12, 0, 0, 0, time.UTC),
+	}
+	r.items = append(r.items, item)
+	return item, nil
+}
+
+func (r *persistenceIdentityCandidateRepository) ListIdentityCandidates(ctx context.Context, filters IdentityCandidateFilters) ([]IdentityCandidate, error) {
+	var result []IdentityCandidate
+	for _, item := range r.items {
+		if filters.DiscoveryRunID != "" && item.DiscoveryRunID != filters.DiscoveryRunID {
+			continue
+		}
+		if filters.EvidenceID != "" && item.EvidenceID != filters.EvidenceID {
+			continue
+		}
+		if filters.ReviewState != "" && item.ReviewState != filters.ReviewState {
+			continue
+		}
+		if filters.Strength != "" && item.Strength != filters.Strength {
+			continue
+		}
+		if filters.CandidateIdentityKey != "" && item.CandidateIdentityKey != filters.CandidateIdentityKey {
+			continue
+		}
+		result = append(result, item)
+	}
+	return result, nil
 }
 
 func (r *persistenceParseRepository) ListParseResultsByDiscoveryRun(ctx context.Context, discoveryRunID string) ([]ParseRecord, error) {
@@ -297,4 +477,29 @@ func hasAssetIdentity(items []assets.Asset, identityKey string) bool {
 		}
 	}
 	return false
+}
+
+func findIdentityCandidate(t *testing.T, items []IdentityCandidate, identityKey string) IdentityCandidate {
+	t.Helper()
+	for _, item := range items {
+		if item.CandidateIdentityKey == identityKey {
+			return item
+		}
+	}
+	t.Fatalf("identity candidate %q not found in %#v", identityKey, items)
+	return IdentityCandidate{}
+}
+
+func countIdentityCandidate(items []IdentityCandidate, evidenceID string, parserName string, identityKey string) int {
+	count := 0
+	for _, item := range items {
+		if item.EvidenceID == evidenceID && item.ParserName == parserName && item.CandidateIdentityKey == identityKey {
+			count++
+		}
+	}
+	return count
+}
+
+func stringPtr(value string) *string {
+	return &value
 }

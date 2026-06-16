@@ -58,17 +58,19 @@ type assetStore interface {
 }
 
 type PersistenceOptions struct {
-	Evidence     evidenceLister
-	Assets       assetStore
-	ParseResults ParseResultRepository
-	Registry     Registry
+	Evidence           evidenceLister
+	Assets             assetStore
+	ParseResults       ParseResultRepository
+	IdentityCandidates IdentityCandidateRepository
+	Registry           Registry
 }
 
 type PersistenceService struct {
-	evidence     evidenceLister
-	assets       assetStore
-	parseResults ParseResultRepository
-	registry     Registry
+	evidence           evidenceLister
+	assets             assetStore
+	parseResults       ParseResultRepository
+	identityCandidates IdentityCandidateRepository
+	registry           Registry
 }
 
 func NewPersistenceService(opts PersistenceOptions) PersistenceService {
@@ -77,10 +79,11 @@ func NewPersistenceService(opts PersistenceOptions) PersistenceService {
 		registry = BuiltInRegistry()
 	}
 	return PersistenceService{
-		evidence:     opts.Evidence,
-		assets:       opts.Assets,
-		parseResults: opts.ParseResults,
-		registry:     registry,
+		evidence:           opts.Evidence,
+		assets:             opts.Assets,
+		parseResults:       opts.ParseResults,
+		identityCandidates: opts.IdentityCandidates,
+		registry:           registry,
 	}
 }
 
@@ -90,13 +93,14 @@ type ParseDiscoveryRunParams struct {
 }
 
 type ParseDiscoveryRunResult struct {
-	DiscoveryRunID string                `json:"discovery_run_id"`
-	EvidenceCount  int                   `json:"evidence_count"`
-	ParseResults   []ParseRecord         `json:"parse_results"`
-	Assets         []assets.Asset        `json:"assets"`
-	Facts          []assets.Fact         `json:"facts"`
-	Relationships  []assets.Relationship `json:"relationships"`
-	Warnings       []string              `json:"warnings,omitempty"`
+	DiscoveryRunID     string                `json:"discovery_run_id"`
+	EvidenceCount      int                   `json:"evidence_count"`
+	ParseResults       []ParseRecord         `json:"parse_results"`
+	IdentityCandidates []IdentityCandidate   `json:"identity_candidates,omitempty"`
+	Assets             []assets.Asset        `json:"assets"`
+	Facts              []assets.Fact         `json:"facts"`
+	Relationships      []assets.Relationship `json:"relationships"`
+	Warnings           []string              `json:"warnings,omitempty"`
 }
 
 func (s PersistenceService) ParseDiscoveryRun(ctx context.Context, params ParseDiscoveryRunParams) (ParseDiscoveryRunResult, error) {
@@ -151,6 +155,12 @@ func (s PersistenceService) ParseDiscoveryRun(ctx context.Context, params ParseD
 			continue
 		}
 
+		candidates, err := s.persistIdentityCandidates(ctx, item.DiscoveryRunID, parsed)
+		if err != nil {
+			return result, err
+		}
+		result.IdentityCandidates = append(result.IdentityCandidates, candidates...)
+
 		created, err := persistResult(ctx, s.assets, index, parsed)
 		if err != nil {
 			return result, err
@@ -178,6 +188,23 @@ func (s PersistenceService) ParseDiscoveryRun(ctx context.Context, params ParseD
 	}
 
 	return result, nil
+}
+
+func (s PersistenceService) persistIdentityCandidates(ctx context.Context, discoveryRunID string, result Result) ([]IdentityCandidate, error) {
+	if s.identityCandidates == nil {
+		return nil, nil
+	}
+	service := NewIdentityCandidateService(s.identityCandidates)
+	params := identityCandidatesFromResult(discoveryRunID, result)
+	created := make([]IdentityCandidate, 0, len(params))
+	for _, candidate := range params {
+		item, err := service.CreateIdentityCandidate(ctx, candidate)
+		if err != nil {
+			return nil, err
+		}
+		created = append(created, item)
+	}
+	return created, nil
 }
 
 type assetIndex struct {

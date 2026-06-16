@@ -275,7 +275,7 @@ Response `metadata.audit`:
 
 ### `POST /api/v1/discovery-runs/{id}/parse`
 
-Parses already-stored evidence for one discovery run and persists derived assets, facts, and relationships. This endpoint does not run discovery, does not touch a network, and records parser warnings without deleting raw evidence.
+Parses already-stored evidence for one discovery run and persists derived assets, facts, and relationships. Parser persistence may also record identity candidates for review. This endpoint does not run discovery, does not touch a network, records parser warnings without deleting raw evidence, and does not merge assets or rewrite canonical asset identity.
 
 Request:
 
@@ -300,10 +300,48 @@ Response `data`:
         "warnings": []
       }
     ],
+    "identity_candidates": [],
     "assets": [],
     "facts": [],
     "relationships": []
   }
+}
+```
+
+## Identity Candidates
+
+Identity candidates are read-only review records derived from parser evidence. They preserve parser-derived identity clues separately from canonical assets so hostname, neighbor-name, serial, system MAC, and similar clues can be inspected without silently merging or rewriting assets.
+
+### `GET /api/v1/identity-candidates`
+
+Optional query filters:
+
+- `discovery_run_id`
+- `evidence_id`
+- `review_state`: `pending`, `auto_accepted`, `accepted`, `rejected`, or `superseded`
+- `strength`: `strong`, `provisional`, or `weak`
+- `candidate_identity_key`
+
+Response `data`:
+
+```json
+{
+  "identity_candidates": [
+    {
+      "id": "33333333-3333-4333-8333-333333333333",
+      "discovery_run_id": "11111111-1111-4111-8111-111111111111",
+      "evidence_id": "22222222-2222-4222-8222-222222222222",
+      "parser_name": "junos_show_version",
+      "asset_type": "device",
+      "candidate_identity_key": "device:hostname:mx-edge-01",
+      "strength": "provisional",
+      "confidence": 0.55,
+      "reason": "hostname is not globally unique and may change",
+      "hostname": "mx-edge-01",
+      "review_state": "pending",
+      "metadata": {}
+    }
+  ]
 }
 ```
 

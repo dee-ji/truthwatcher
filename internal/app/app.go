@@ -531,10 +531,11 @@ func (a App) runParseDiscoveryRun(ctx context.Context, args []string, stdout, st
 	evidenceService := evidence.NewService(db.NewEvidenceRepository(conn))
 	assetService := assets.NewService(db.NewAssetRepository(conn))
 	parseService := parser.NewPersistenceService(parser.PersistenceOptions{
-		Evidence:     evidenceService,
-		Assets:       assetService,
-		ParseResults: db.NewParseResultRepository(conn),
-		Registry:     parser.BuiltInRegistry(),
+		Evidence:           evidenceService,
+		Assets:             assetService,
+		ParseResults:       db.NewParseResultRepository(conn),
+		IdentityCandidates: db.NewIdentityCandidateRepository(conn),
+		Registry:           parser.BuiltInRegistry(),
 	})
 	result, err := parseService.ParseDiscoveryRun(ctx, parser.ParseDiscoveryRunParams{
 		DiscoveryRunID: discoveryRunID,
@@ -782,6 +783,7 @@ func serveHTTP(ctx context.Context, cfg config.Config, logger *slog.Logger, stdo
 	var assetStore *assets.Service
 	var graphStore *graph.Service
 	var parserStore *parser.PersistenceService
+	var identityCandidateStore *parser.IdentityCandidateService
 	var auditStore *audit.Service
 	if strings.TrimSpace(cfg.DatabaseURL) != "" {
 		conn, err := db.Open(ctx, cfg.DatabaseURL)
@@ -800,11 +802,14 @@ func serveHTTP(ctx context.Context, cfg config.Config, logger *slog.Logger, stdo
 		assetStore = &assetService
 		graphService := graph.NewService(assetService)
 		graphStore = &graphService
+		identityCandidateService := parser.NewIdentityCandidateService(db.NewIdentityCandidateRepository(conn))
+		identityCandidateStore = &identityCandidateService
 		parserService := parser.NewPersistenceService(parser.PersistenceOptions{
-			Evidence:     evidenceService,
-			Assets:       assetService,
-			ParseResults: db.NewParseResultRepository(conn),
-			Registry:     parser.BuiltInRegistry(),
+			Evidence:           evidenceService,
+			Assets:             assetService,
+			ParseResults:       db.NewParseResultRepository(conn),
+			IdentityCandidates: db.NewIdentityCandidateRepository(conn),
+			Registry:           parser.BuiltInRegistry(),
 		})
 		parserStore = &parserService
 	}
@@ -817,14 +822,15 @@ func serveHTTP(ctx context.Context, cfg config.Config, logger *slog.Logger, stdo
 
 	server := &http.Server{
 		Handler: api.NewHandler(api.Options{
-			Version:       Version,
-			Logger:        logger,
-			DiscoveryRuns: discoveryRuns,
-			Evidence:      evidenceStore,
-			Assets:        assetStore,
-			Graph:         graphStore,
-			Parser:        parserStore,
-			Audit:         auditStore,
+			Version:            Version,
+			Logger:             logger,
+			DiscoveryRuns:      discoveryRuns,
+			Evidence:           evidenceStore,
+			Assets:             assetStore,
+			Graph:              graphStore,
+			Parser:             parserStore,
+			IdentityCandidates: identityCandidateStore,
+			Audit:              auditStore,
 		}),
 		ReadHeaderTimeout: 5 * time.Second,
 	}
