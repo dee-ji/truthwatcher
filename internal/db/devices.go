@@ -29,16 +29,18 @@ func (r DeviceRepository) CreateDevice(ctx context.Context, params devices.Creat
 	}
 
 	result, err := scanDevice(r.db.QueryRowContext(ctx, `
-INSERT INTO devices (id, name, management_address, platform, vendor, model)
-VALUES ($1, $2, $3, $4, $5, $6)
-RETURNING id, name, management_address, platform, vendor, model, created_at, updated_at
+INSERT INTO devices (id, hostname, vendor, model, serial_number, management_ip, role, site)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+RETURNING id, hostname, vendor, model, serial_number, management_ip, role, site, created_at, updated_at
 `,
 		id,
-		params.Name,
-		params.ManagementAddress,
-		params.Platform,
+		params.Hostname,
 		params.Vendor,
 		params.Model,
+		params.SerialNumber,
+		params.ManagementIP,
+		params.Role,
+		params.Site,
 	))
 	if err != nil {
 		return devices.Device{}, fmt.Errorf("create device: %w", err)
@@ -53,9 +55,9 @@ func (r DeviceRepository) ListDevices(ctx context.Context) ([]devices.Device, er
 	}
 
 	rows, err := r.db.QueryContext(ctx, `
-SELECT id, name, management_address, platform, vendor, model, created_at, updated_at
+SELECT id, hostname, vendor, model, serial_number, management_ip, role, site, created_at, updated_at
 FROM devices
-ORDER BY name ASC, id ASC
+ORDER BY hostname ASC, id ASC
 `)
 	if err != nil {
 		return nil, fmt.Errorf("list devices: %w", err)
@@ -83,18 +85,22 @@ type deviceScanner interface {
 
 func scanDevice(scanner deviceScanner) (devices.Device, error) {
 	var item devices.Device
-	var managementAddress sql.NullString
-	var platform sql.NullString
 	var vendor sql.NullString
 	var model sql.NullString
+	var serialNumber sql.NullString
+	var managementIP sql.NullString
+	var role sql.NullString
+	var site sql.NullString
 
 	err := scanner.Scan(
 		&item.ID,
-		&item.Name,
-		&managementAddress,
-		&platform,
+		&item.Hostname,
 		&vendor,
 		&model,
+		&serialNumber,
+		&managementIP,
+		&role,
+		&site,
 		&item.CreatedAt,
 		&item.UpdatedAt,
 	)
@@ -105,10 +111,12 @@ func scanDevice(scanner deviceScanner) (devices.Device, error) {
 		return devices.Device{}, err
 	}
 
-	item.ManagementAddress = nullableString(managementAddress)
-	item.Platform = nullableString(platform)
 	item.Vendor = nullableString(vendor)
 	item.Model = nullableString(model)
+	item.SerialNumber = nullableString(serialNumber)
+	item.ManagementIP = nullableString(managementIP)
+	item.Role = nullableString(role)
+	item.Site = nullableString(site)
 	return item, nil
 }
 

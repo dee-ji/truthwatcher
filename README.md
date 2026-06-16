@@ -91,7 +91,7 @@ Run fake fixture-backed discovery without touching a network:
 Register a local device seed without running discovery:
 
 ```sh
-./bin/truthwatcher devices add --name mx-edge-01 --management-address 192.0.2.10 --platform junos
+./bin/truthwatcher devices add --hostname mx-edge-01 --management-ip 192.0.2.10 --vendor juniper --role edge --site lab
 ./bin/truthwatcher devices list
 ```
 

@@ -361,18 +361,22 @@ func (a App) runDevicesAdd(ctx context.Context, args []string, stdout, stderr io
 		return err
 	}
 
-	var name string
-	var managementAddress string
-	var platform string
+	var hostname string
 	var vendor string
 	var model string
+	var serialNumber string
+	var managementIP string
+	var role string
+	var site string
 	flags := flag.NewFlagSet("devices add", flag.ContinueOnError)
 	flags.SetOutput(stderr)
-	flags.StringVar(&name, "name", "", "device name")
-	flags.StringVar(&managementAddress, "management-address", "", "management IP address or DNS name")
-	flags.StringVar(&platform, "platform", "", "platform hint, for example junos or iosxr")
+	flags.StringVar(&hostname, "hostname", "", "device hostname")
 	flags.StringVar(&vendor, "vendor", "", "vendor hint")
 	flags.StringVar(&model, "model", "", "model hint")
+	flags.StringVar(&serialNumber, "serial-number", "", "device serial number")
+	flags.StringVar(&managementIP, "management-ip", "", "management IP address or DNS name")
+	flags.StringVar(&role, "role", "", "device role")
+	flags.StringVar(&site, "site", "", "device site")
 	if err := flags.Parse(args); err != nil {
 		return err
 	}
@@ -391,17 +395,19 @@ func (a App) runDevicesAdd(ctx context.Context, args []string, stdout, stderr io
 
 	service := devices.NewService(db.NewDeviceRepository(conn))
 	device, err := service.CreateDevice(ctx, devices.CreateDeviceParams{
-		Name:              name,
-		ManagementAddress: optionalString(managementAddress),
-		Platform:          optionalString(platform),
-		Vendor:            optionalString(vendor),
-		Model:             optionalString(model),
+		Hostname:     hostname,
+		Vendor:       optionalString(vendor),
+		Model:        optionalString(model),
+		SerialNumber: optionalString(serialNumber),
+		ManagementIP: optionalString(managementIP),
+		Role:         optionalString(role),
+		Site:         optionalString(site),
 	})
 	if err != nil {
 		return err
 	}
 
-	fmt.Fprintf(stdout, "registered device %s %q\n", device.ID, device.Name)
+	fmt.Fprintf(stdout, "registered device %s %q\n", device.ID, device.Hostname)
 	return nil
 }
 
@@ -445,15 +451,17 @@ func (a App) runDevicesList(ctx context.Context, args []string, stdout, stderr i
 		return err
 	}
 
-	fmt.Fprintln(stdout, "id\tname\tmanagement_address\tplatform\tvendor\tmodel")
+	fmt.Fprintln(stdout, "id\thostname\tvendor\tmodel\tserial_number\tmanagement_ip\trole\tsite")
 	for _, item := range items {
-		fmt.Fprintf(stdout, "%s\t%s\t%s\t%s\t%s\t%s\n",
+		fmt.Fprintf(stdout, "%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n",
 			item.ID,
-			item.Name,
-			stringValue(item.ManagementAddress),
-			stringValue(item.Platform),
+			item.Hostname,
 			stringValue(item.Vendor),
 			stringValue(item.Model),
+			stringValue(item.SerialNumber),
+			stringValue(item.ManagementIP),
+			stringValue(item.Role),
+			stringValue(item.Site),
 		)
 	}
 	return nil
@@ -915,7 +923,7 @@ func printUsage(w io.Writer) {
   truthwatcher migrate up
   truthwatcher migrate status
   truthwatcher discover fake --target fixture://junos-mx
-  truthwatcher devices add --name mx-edge-01 --management-address 192.0.2.10
+  truthwatcher devices add --hostname mx-edge-01 --management-ip 192.0.2.10
   truthwatcher devices list
   truthwatcher parse discovery-run --id <id> --platform junos
   truthwatcher export json --output <path>
@@ -1003,7 +1011,7 @@ Flags:
 
 func printDevicesHelp(w io.Writer) {
 	fmt.Fprint(w, `Usage:
-  truthwatcher devices add --name mx-edge-01 [--management-address 192.0.2.10]
+  truthwatcher devices add --hostname mx-edge-01 [--management-ip 192.0.2.10]
   truthwatcher devices list
 
 Manage the local device registry. This does not run discovery or contact
@@ -1017,18 +1025,20 @@ Subcommands:
 
 func printDevicesAddHelp(w io.Writer) {
 	fmt.Fprint(w, `Usage:
-  truthwatcher devices add --name mx-edge-01 [--management-address 192.0.2.10]
+  truthwatcher devices add --hostname mx-edge-01 [--management-ip 192.0.2.10]
 
 Register a local device seed. This command stores operator-provided registry
 data only; it does not run discovery, parse evidence, or contact a device.
 TRUTHWATCHER_DATABASE_URL is required.
 
 Flags:
-  --name                Device name.
-  --management-address  Management IP address or DNS name.
-  --platform            Platform hint, for example junos or iosxr.
-  --vendor              Vendor hint.
-  --model               Model hint.
+  --hostname       Device hostname.
+  --vendor         Vendor hint.
+  --model          Model hint.
+  --serial-number  Device serial number.
+  --management-ip  Management IP address or DNS name.
+  --role           Device role.
+  --site           Device site.
 `)
 }
 

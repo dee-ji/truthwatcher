@@ -13,12 +13,14 @@ type fakeRepository struct {
 func (f *fakeRepository) CreateDevice(ctx context.Context, params CreateDeviceParams) (Device, error) {
 	f.createParams = params
 	return Device{
-		ID:                "device-1",
-		Name:              params.Name,
-		ManagementAddress: params.ManagementAddress,
-		Platform:          params.Platform,
-		Vendor:            params.Vendor,
-		Model:             params.Model,
+		ID:           "device-1",
+		Hostname:     params.Hostname,
+		Vendor:       params.Vendor,
+		Model:        params.Model,
+		SerialNumber: params.SerialNumber,
+		ManagementIP: params.ManagementIP,
+		Role:         params.Role,
+		Site:         params.Site,
 	}, nil
 }
 
@@ -26,39 +28,44 @@ func (f *fakeRepository) ListDevices(ctx context.Context) ([]Device, error) {
 	return f.devices, nil
 }
 
-func TestCreateDeviceValidatesName(t *testing.T) {
+func TestCreateDeviceValidatesHostname(t *testing.T) {
 	_, err := NewService(&fakeRepository{}).CreateDevice(context.Background(), CreateDeviceParams{
-		Name: " ",
+		Hostname: " ",
 	})
 	if err == nil {
-		t.Fatal("CreateDevice returned nil error for missing name")
+		t.Fatal("CreateDevice returned nil error for missing hostname")
 	}
 }
 
 func TestCreateDeviceTrimsOptionalFields(t *testing.T) {
 	repo := &fakeRepository{}
-	address := " 192.0.2.10 "
-	platform := " junos "
+	managementIP := " 192.0.2.10 "
+	serialNumber := " ABC123 "
+	role := " edge "
 	empty := " "
 
 	device, err := NewService(repo).CreateDevice(context.Background(), CreateDeviceParams{
-		Name:              " mx-edge-01 ",
-		ManagementAddress: &address,
-		Platform:          &platform,
-		Vendor:            &empty,
+		Hostname:     " mx-edge-01 ",
+		ManagementIP: &managementIP,
+		SerialNumber: &serialNumber,
+		Role:         &role,
+		Vendor:       &empty,
 	})
 	if err != nil {
 		t.Fatalf("CreateDevice returned error: %v", err)
 	}
 
-	if device.Name != "mx-edge-01" {
-		t.Fatalf("Name = %q, want mx-edge-01", device.Name)
+	if device.Hostname != "mx-edge-01" {
+		t.Fatalf("Hostname = %q, want mx-edge-01", device.Hostname)
 	}
-	if repo.createParams.ManagementAddress == nil || *repo.createParams.ManagementAddress != "192.0.2.10" {
-		t.Fatalf("ManagementAddress = %v, want trimmed address", repo.createParams.ManagementAddress)
+	if repo.createParams.ManagementIP == nil || *repo.createParams.ManagementIP != "192.0.2.10" {
+		t.Fatalf("ManagementIP = %v, want trimmed address", repo.createParams.ManagementIP)
 	}
-	if repo.createParams.Platform == nil || *repo.createParams.Platform != "junos" {
-		t.Fatalf("Platform = %v, want junos", repo.createParams.Platform)
+	if repo.createParams.SerialNumber == nil || *repo.createParams.SerialNumber != "ABC123" {
+		t.Fatalf("SerialNumber = %v, want ABC123", repo.createParams.SerialNumber)
+	}
+	if repo.createParams.Role == nil || *repo.createParams.Role != "edge" {
+		t.Fatalf("Role = %v, want edge", repo.createParams.Role)
 	}
 	if repo.createParams.Vendor != nil {
 		t.Fatalf("Vendor = %v, want nil for blank optional field", repo.createParams.Vendor)
@@ -66,7 +73,7 @@ func TestCreateDeviceTrimsOptionalFields(t *testing.T) {
 }
 
 func TestListDevicesUsesRepository(t *testing.T) {
-	repo := &fakeRepository{devices: []Device{{ID: "device-1", Name: "mx-edge-01"}}}
+	repo := &fakeRepository{devices: []Device{{ID: "device-1", Hostname: "mx-edge-01"}}}
 
 	devices, err := NewService(repo).ListDevices(context.Background())
 	if err != nil {
@@ -75,7 +82,7 @@ func TestListDevicesUsesRepository(t *testing.T) {
 	if len(devices) != 1 {
 		t.Fatalf("len = %d, want 1", len(devices))
 	}
-	if devices[0].Name != "mx-edge-01" {
-		t.Fatalf("device name = %q, want mx-edge-01", devices[0].Name)
+	if devices[0].Hostname != "mx-edge-01" {
+		t.Fatalf("device hostname = %q, want mx-edge-01", devices[0].Hostname)
 	}
 }

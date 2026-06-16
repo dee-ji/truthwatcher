@@ -267,7 +267,7 @@ func TestDevicesAddRequiresDatabaseURL(t *testing.T) {
 		},
 	}
 
-	err := app.Run(context.Background(), []string{"devices", "add", "--name", "mx-edge-01"}, &stdout, &stderr)
+	err := app.Run(context.Background(), []string{"devices", "add", "--hostname", "mx-edge-01"}, &stdout, &stderr)
 	if err == nil {
 		t.Fatal("devices add without database url returned nil error")
 	}
