@@ -1,0 +1,35 @@
+name: Feature request
+description: Propose a scoped improvement aligned with the roadmap
+title: "feature: "
+labels: ["enhancement"]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: What user or maintainer problem does this solve?
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposal
+      description: Describe the smallest useful change.
+    validations:
+      required: true
+  - type: dropdown
+    id: phase
+    attributes:
+      label: Roadmap phase
+      options:
+        - Phase 0 — OSS Foundation
+        - Phase 1 — Network Knowledge Kernel
+        - Phase 2 — Discovery Kernel
+        - Future / unsure
+    validations:
+      required: true
+  - type: textarea
+    id: safety
+    attributes:
+      label: Safety and scope notes
+      description: Explain how this preserves read-only discovery and evidence-first modeling.
