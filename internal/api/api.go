@@ -6,10 +6,12 @@ import (
 	"io"
 	"log/slog"
 	"net/http"
+	"runtime"
 	"runtime/debug"
 	"strconv"
 	"strings"
 	"sync/atomic"
+	"syscall"
 	"time"
 
 	"truthwatcher/internal/agent"
@@ -47,6 +49,46 @@ type errorEnvelope struct {
 	Message string `json:"message"`
 }
 
+type systemInfo struct {
+	Name        string      `json:"name"`
+	Version     string      `json:"version"`
+	Runtime     runtimeInfo `json:"runtime"`
+	Memory      memoryInfo  `json:"memory"`
+	Disk        diskInfo    `json:"disk"`
+	Build       buildInfo   `json:"build"`
+	GeneratedAt time.Time   `json:"generated_at"`
+}
+
+type runtimeInfo struct {
+	GoVersion  string `json:"go_version"`
+	OS         string `json:"os"`
+	Arch       string `json:"arch"`
+	CPUs       int    `json:"cpus"`
+	Goroutines int    `json:"goroutines"`
+}
+
+type memoryInfo struct {
+	AllocBytes      uint64 `json:"alloc_bytes"`
+	TotalAllocBytes uint64 `json:"total_alloc_bytes"`
+	SysBytes        uint64 `json:"sys_bytes"`
+	HeapAllocBytes  uint64 `json:"heap_alloc_bytes"`
+	HeapSysBytes    uint64 `json:"heap_sys_bytes"`
+	NumGC           uint32 `json:"num_gc"`
+}
+
+type diskInfo struct {
+	Path       string `json:"path"`
+	TotalBytes uint64 `json:"total_bytes"`
+	FreeBytes  uint64 `json:"free_bytes"`
+	UsedBytes  uint64 `json:"used_bytes"`
+}
+
+type buildInfo struct {
+	MainPath  string            `json:"main_path"`
+	GoVersion string            `json:"go_version"`
+	Settings  map[string]string `json:"settings"`
+}
+
 var requestCounter uint64
 
 func NewHandler(opts Options) http.Handler {
@@ -58,6 +100,7 @@ func NewHandler(opts Options) http.Handler {
 	mux.HandleFunc("GET /healthz", handleHealthz)
 	mux.HandleFunc("GET /readyz", handleReadyz)
 	mux.HandleFunc("GET /api/v1/version", handleVersion(opts.Version))
+	mux.HandleFunc("GET /api/v1/system-info", handleSystemInfo(opts.Version))
 	mux.HandleFunc("POST /api/v1/discovery-runs", handleCreateDiscoveryRun(opts.DiscoveryRuns))
 	mux.HandleFunc("POST /api/v1/discovery-runs/execute", handleExecuteDiscoveryRun(opts.DiscoveryRuns, opts.Evidence, opts.Audit))
 	mux.HandleFunc("GET /api/v1/discovery-runs", handleListDiscoveryRuns(opts.DiscoveryRuns))
@@ -108,6 +151,65 @@ func handleVersion(version string) http.HandlerFunc {
 			"version": version,
 		})
 	}
+}
+
+func handleSystemInfo(version string) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		var mem runtime.MemStats
+		runtime.ReadMemStats(&mem)
+
+		info := systemInfo{
+			Name:    "truthwatcher",
+			Version: version,
+			Runtime: runtimeInfo{
+				GoVersion:  runtime.Version(),
+				OS:         runtime.GOOS,
+				Arch:       runtime.GOARCH,
+				CPUs:       runtime.NumCPU(),
+				Goroutines: runtime.NumGoroutine(),
+			},
+			Memory: memoryInfo{
+				AllocBytes:      mem.Alloc,
+				TotalAllocBytes: mem.TotalAlloc,
+				SysBytes:        mem.Sys,
+				HeapAllocBytes:  mem.HeapAlloc,
+				HeapSysBytes:    mem.HeapSys,
+				NumGC:           mem.NumGC,
+			},
+			Disk:        collectDiskInfo("."),
+			Build:       collectBuildInfo(),
+			GeneratedAt: time.Now().UTC(),
+		}
+
+		writeData(w, http.StatusOK, map[string]systemInfo{"system_info": info})
+	}
+}
+
+func collectDiskInfo(path string) diskInfo {
+	info := diskInfo{Path: path}
+	var stat syscall.Statfs_t
+	if err := syscall.Statfs(path, &stat); err != nil {
+		return info
+	}
+	blockSize := uint64(stat.Bsize)
+	info.TotalBytes = stat.Blocks * blockSize
+	info.FreeBytes = stat.Bavail * blockSize
+	if info.TotalBytes >= info.FreeBytes {
+		info.UsedBytes = info.TotalBytes - info.FreeBytes
+	}
+	return info
+}
+
+func collectBuildInfo() buildInfo {
+	info := buildInfo{Settings: map[string]string{}}
+	if build, ok := debug.ReadBuildInfo(); ok {
+		info.MainPath = build.Main.Path
+		info.GoVersion = build.GoVersion
+		for _, setting := range build.Settings {
+			info.Settings[setting.Key] = setting.Value
+		}
+	}
+	return info
 }
 
 func handleAgentMessage(assetService *assets.Service, discoveryService *discovery.Service, evidenceService *evidence.Service) http.HandlerFunc {
