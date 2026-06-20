@@ -20,9 +20,11 @@ func TestBuiltInRegistrySelectsFixtureParsers(t *testing.T) {
 		{PlatformJunos, CommandShowVersion, "junos_show_version"},
 		{PlatformJunos, CommandShowChassisHardware, "junos_show_chassis_hardware"},
 		{PlatformJunos, CommandShowLLDPNeighbors, "junos_show_lldp_neighbors"},
+		{PlatformJunos, CommandShowBGPSummary, "junos_show_bgp_summary"},
 		{PlatformIOSXR, CommandShowVersion, "iosxr_show_version"},
 		{PlatformIOSXR, CommandShowInventory, "iosxr_show_inventory"},
 		{PlatformIOSXR, CommandShowLLDPNeighbors, "iosxr_show_lldp_neighbors"},
+		{PlatformIOSXR, CommandShowBGPSummary, "iosxr_show_bgp_summary"},
 	}
 
 	registry := BuiltInRegistry()
@@ -137,6 +139,54 @@ func TestIOSXRShowLLDPNeighborsParser(t *testing.T) {
 	}
 	if got, want := result.Neighbors[0].RemoteSystemName, "spine-01"; got != want {
 		t.Fatalf("remote system = %q, want %q", got, want)
+	}
+}
+
+func TestJunosShowBGPSummaryParser(t *testing.T) {
+	result := parseFixture(t, PlatformJunos, CommandShowBGPSummary, "junos-mx", "show_bgp_summary.txt")
+
+	if got, want := len(result.BGPPeers), 1; got != want {
+		t.Fatalf("bgp peer count = %d, want %d", got, want)
+	}
+	peer := result.BGPPeers[0]
+	if got, want := peer.PeerAddress, "192.0.2.1"; got != want {
+		t.Fatalf("peer address = %q, want %q", got, want)
+	}
+	if got, want := peer.RemoteASN, uint32(65001); got != want {
+		t.Fatalf("remote asn = %d, want %d", got, want)
+	}
+	if peer.AcceptedPrefixes == nil || *peer.AcceptedPrefixes != 12 {
+		t.Fatalf("accepted prefixes = %#v, want 12", peer.AcceptedPrefixes)
+	}
+	if !hasFact(result.Facts, "bgp_peer_count", `3`) {
+		t.Fatalf("bgp_peer_count fact missing: %+v", result.Facts)
+	}
+}
+
+func TestIOSXRShowBGPSummaryParser(t *testing.T) {
+	result := parseFixture(t, PlatformIOSXR, CommandShowBGPSummary, "iosxr-asr", "show_bgp_summary.txt")
+
+	if got, want := len(result.BGPPeers), 1; got != want {
+		t.Fatalf("bgp peer count = %d, want %d", got, want)
+	}
+	peer := result.BGPPeers[0]
+	if got, want := peer.DeviceIdentityKey, "routing_context:router_id:198.51.100.10"; got != want {
+		t.Fatalf("device identity key = %q, want %q", got, want)
+	}
+	if got, want := peer.PeerAddress, "192.0.2.2"; got != want {
+		t.Fatalf("peer address = %q, want %q", got, want)
+	}
+	if got, want := peer.RemoteASN, uint32(65002); got != want {
+		t.Fatalf("remote asn = %d, want %d", got, want)
+	}
+	if peer.AcceptedPrefixes == nil || *peer.AcceptedPrefixes != 18 {
+		t.Fatalf("accepted prefixes = %#v, want 18", peer.AcceptedPrefixes)
+	}
+	if !hasFact(result.Facts, "bgp_router_id", `"198.51.100.10"`) {
+		t.Fatalf("bgp_router_id fact missing: %+v", result.Facts)
+	}
+	if !hasFact(result.Facts, "bgp_local_as", `65000`) {
+		t.Fatalf("bgp_local_as fact missing: %+v", result.Facts)
 	}
 }
 

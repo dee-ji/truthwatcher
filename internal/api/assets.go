@@ -1,12 +1,14 @@
 package api
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"net/http"
 	"sort"
 	"strconv"
 	"strings"
+	"time"
 
 	"truthwatcher/internal/assets"
 	"truthwatcher/internal/evidence"
@@ -30,6 +32,20 @@ type assetFilters struct {
 	Vendor      string
 	Serial      string
 	IdentityKey string
+	Query       string
+}
+
+type assetHistoryEvent struct {
+	EventType      string                 `json:"event_type"`
+	AssetID        string                 `json:"asset_id"`
+	RecordID       string                 `json:"record_id"`
+	Name           string                 `json:"name"`
+	State          assets.ConfidenceState `json:"state"`
+	Confidence     float64                `json:"confidence"`
+	EvidenceID     *string                `json:"evidence_id,omitempty"`
+	RelationshipTo *string                `json:"relationship_to,omitempty"`
+	OccurredAt     string                 `json:"occurred_at"`
+	Details        any                    `json:"details,omitempty"`
 }
 
 func handleListAssets(service *assets.Service) http.HandlerFunc {
@@ -76,6 +92,43 @@ func handleGetAsset(service *assets.Service) http.HandlerFunc {
 		}
 
 		writeData(w, http.StatusOK, map[string]assets.Asset{"asset": item})
+	}
+}
+
+func handleGetAssetHistory(service *assets.Service) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if service == nil {
+			writeError(w, http.StatusServiceUnavailable, "asset repository is not configured")
+			return
+		}
+
+		assetID := r.PathValue("id")
+		item, err := service.GetAsset(r.Context(), assetID)
+		if errors.Is(err, assets.ErrNotFound) {
+			writeError(w, http.StatusNotFound, "asset not found")
+			return
+		}
+		if err != nil {
+			writeError(w, http.StatusInternalServerError, err.Error())
+			return
+		}
+
+		facts, err := service.ListFactsByAsset(r.Context(), assetID)
+		if err != nil {
+			writeError(w, http.StatusInternalServerError, err.Error())
+			return
+		}
+		relationships, err := service.ListRelationships(r.Context())
+		if err != nil {
+			writeError(w, http.StatusInternalServerError, err.Error())
+			return
+		}
+
+		events := assetHistoryEvents(item, facts, filterRelationshipsForAsset(relationships, assetID))
+		writeData(w, http.StatusOK, map[string]any{
+			"asset":   item,
+			"history": events,
+		})
 	}
 }
 
@@ -313,6 +366,7 @@ func parseAssetFilters(r *http.Request) assetFilters {
 		Vendor:      strings.TrimSpace(query.Get("vendor")),
 		Serial:      strings.TrimSpace(query.Get("serial")),
 		IdentityKey: strings.TrimSpace(query.Get("identity_key")),
+		Query:       strings.TrimSpace(query.Get("q")),
 	}
 }
 
@@ -335,9 +389,86 @@ func filterAssets(items []assets.Asset, filters assetFilters) []assets.Asset {
 		if filters.IdentityKey != "" && !strings.EqualFold(item.IdentityKey, filters.IdentityKey) {
 			continue
 		}
+		if filters.Query != "" && !assetMatchesQuery(item, filters.Query) {
+			continue
+		}
 		filtered = append(filtered, item)
 	}
 	return filtered
+}
+
+func assetMatchesQuery(item assets.Asset, query string) bool {
+	needle := strings.ToLower(strings.TrimSpace(query))
+	if needle == "" {
+		return true
+	}
+	values := []string{item.ID, item.Type, item.IdentityKey}
+	for _, value := range []*string{item.Vendor, item.Model, item.Serial, item.SystemMAC} {
+		if value != nil {
+			values = append(values, *value)
+		}
+	}
+	for _, value := range values {
+		if strings.Contains(strings.ToLower(strings.TrimSpace(value)), needle) {
+			return true
+		}
+	}
+	return false
+}
+
+func assetHistoryEvents(item assets.Asset, facts []assets.Fact, relationships []assets.Relationship) []assetHistoryEvent {
+	events := []assetHistoryEvent{{
+		EventType:  "asset_created",
+		AssetID:    item.ID,
+		RecordID:   item.ID,
+		Name:       item.IdentityKey,
+		State:      item.State,
+		Confidence: item.Confidence,
+		OccurredAt: item.CreatedAt.Format(time.RFC3339),
+		Details: map[string]string{
+			"asset_type": item.Type,
+		},
+	}}
+	for _, fact := range facts {
+		events = append(events, assetHistoryEvent{
+			EventType:  "fact_observed",
+			AssetID:    item.ID,
+			RecordID:   fact.ID,
+			Name:       fact.Name,
+			State:      fact.State,
+			Confidence: fact.Confidence,
+			EvidenceID: fact.EvidenceID,
+			OccurredAt: fact.CreatedAt.Format(time.RFC3339),
+			Details: map[string]json.RawMessage{
+				"value": fact.Value,
+			},
+		})
+	}
+	for _, relationship := range relationships {
+		other := relationship.TargetAssetID
+		if relationship.TargetAssetID == item.ID {
+			other = relationship.SourceAssetID
+		}
+		events = append(events, assetHistoryEvent{
+			EventType:      "relationship_observed",
+			AssetID:        item.ID,
+			RecordID:       relationship.ID,
+			Name:           relationship.RelationshipType,
+			State:          relationship.State,
+			Confidence:     relationship.Confidence,
+			EvidenceID:     relationship.EvidenceID,
+			RelationshipTo: &other,
+			OccurredAt:     relationship.CreatedAt.Format(time.RFC3339),
+			Details: map[string]string{
+				"source_asset_id": relationship.SourceAssetID,
+				"target_asset_id": relationship.TargetAssetID,
+			},
+		})
+	}
+	sort.SliceStable(events, func(i, j int) bool {
+		return events[i].OccurredAt > events[j].OccurredAt
+	})
+	return events
 }
 
 func stringPtrEqualFold(value *string, want string) bool {

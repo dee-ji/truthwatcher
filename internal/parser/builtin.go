@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"regexp"
+	"strconv"
 	"strings"
 
 	"truthwatcher/internal/assets"
@@ -19,6 +20,7 @@ const (
 	CommandShowChassisHardware = "show chassis hardware"
 	CommandShowInventory       = "show inventory"
 	CommandShowLLDPNeighbors   = "show lldp neighbors"
+	CommandShowBGPSummary      = "show bgp summary"
 )
 
 // BuiltInRegistry returns the first fixture-driven parser set.
@@ -27,9 +29,11 @@ func BuiltInRegistry() Registry {
 		commandParser{name: "junos_show_version", platform: PlatformJunos, command: CommandShowVersion, parse: parseJunosShowVersion},
 		commandParser{name: "junos_show_chassis_hardware", platform: PlatformJunos, command: CommandShowChassisHardware, parse: parseJunosShowChassisHardware},
 		commandParser{name: "junos_show_lldp_neighbors", platform: PlatformJunos, command: CommandShowLLDPNeighbors, parse: parseJunosShowLLDPNeighbors},
+		commandParser{name: "junos_show_bgp_summary", platform: PlatformJunos, command: CommandShowBGPSummary, parse: parseJunosShowBGPSummary},
 		commandParser{name: "iosxr_show_version", platform: PlatformIOSXR, command: CommandShowVersion, parse: parseIOSXRShowVersion},
 		commandParser{name: "iosxr_show_inventory", platform: PlatformIOSXR, command: CommandShowInventory, parse: parseIOSXRShowInventory},
 		commandParser{name: "iosxr_show_lldp_neighbors", platform: PlatformIOSXR, command: CommandShowLLDPNeighbors, parse: parseIOSXRShowLLDPNeighbors},
+		commandParser{name: "iosxr_show_bgp_summary", platform: PlatformIOSXR, command: CommandShowBGPSummary, parse: parseIOSXRShowBGPSummary},
 	)
 }
 
@@ -294,6 +298,101 @@ func parseIOSXRShowLLDPNeighbors(ctx context.Context, item evidence.Evidence, pa
 	return result, nil
 }
 
+func parseJunosShowBGPSummary(ctx context.Context, item evidence.Evidence, parserName string) (Result, error) {
+	if err := ctx.Err(); err != nil {
+		return Result{}, err
+	}
+
+	result := baseResult(parserName, item.ID)
+	contextIdentity := bgpContextIdentity(item, "")
+	result.Facts = append(result.Facts, stringFact(contextIdentity, "platform", "junos", parserName, 0.65, item.ID))
+	if groups, peers, downPeers, ok := parseJunosBGPSummaryCounts(item.RawOutput); ok {
+		result.Facts = append(result.Facts,
+			intFact(contextIdentity, "bgp_group_count", groups, parserName, 0.75, item.ID),
+			intFact(contextIdentity, "bgp_peer_count", peers, parserName, 0.75, item.ID),
+			intFact(contextIdentity, "bgp_down_peer_count", downPeers, parserName, 0.75, item.ID),
+		)
+	}
+
+	for _, line := range strings.Split(item.RawOutput, "\n") {
+		line = strings.TrimSpace(line)
+		if line == "" || strings.HasPrefix(line, "Groups:") || strings.HasPrefix(line, "Table") || strings.HasPrefix(line, "inet.") || strings.HasPrefix(line, "Peer ") {
+			continue
+		}
+		parts := strings.Fields(line)
+		if len(parts) < 8 || !looksLikeIP(parts[0]) {
+			continue
+		}
+		remoteASN, err := parseUint32(parts[1])
+		if err != nil {
+			result.Warnings = append(result.Warnings, "skipped bgp peer line: "+line)
+			continue
+		}
+		accepted := acceptedPrefixesFromJunosState(parts[len(parts)-1])
+		result.BGPPeers = append(result.BGPPeers, BGPPeer{
+			DeviceIdentityKey: contextIdentity,
+			PeerAddress:       parts[0],
+			RemoteASN:         remoteASN,
+			State:             "established",
+			AcceptedPrefixes:  accepted,
+			Confidence:        0.75,
+			Metadata:          mustJSON(map[string]string{"last_up_down": parts[len(parts)-2]}),
+		})
+	}
+	if len(result.BGPPeers) == 0 {
+		result.Warnings = append(result.Warnings, "no bgp peers parsed")
+	}
+	return result, nil
+}
+
+func parseIOSXRShowBGPSummary(ctx context.Context, item evidence.Evidence, parserName string) (Result, error) {
+	if err := ctx.Err(); err != nil {
+		return Result{}, err
+	}
+
+	result := baseResult(parserName, item.ID)
+	routerID := regexpFind(item.RawOutput, `BGP router identifier\s+([0-9A-Fa-f:.]+)`)
+	localASValue := regexpFind(item.RawOutput, `local AS number\s+([0-9]+)`)
+	contextIdentity := bgpContextIdentity(item, routerID)
+	result.Facts = append(result.Facts, stringFact(contextIdentity, "platform", "iosxr", parserName, 0.65, item.ID))
+	if routerID != "" {
+		result.Facts = append(result.Facts, stringFact(contextIdentity, "bgp_router_id", routerID, parserName, 0.85, item.ID))
+	}
+	if localAS, err := strconv.Atoi(localASValue); err == nil {
+		result.Facts = append(result.Facts, intFact(contextIdentity, "bgp_local_as", localAS, parserName, 0.85, item.ID))
+	}
+
+	for _, line := range strings.Split(item.RawOutput, "\n") {
+		line = strings.TrimSpace(line)
+		if line == "" || strings.HasPrefix(line, "BGP ") || strings.HasPrefix(line, "Neighbor") {
+			continue
+		}
+		parts := strings.Fields(line)
+		if len(parts) < 10 || !looksLikeIP(parts[0]) {
+			continue
+		}
+		remoteASN, err := parseUint32(parts[2])
+		if err != nil {
+			result.Warnings = append(result.Warnings, "skipped bgp peer line: "+line)
+			continue
+		}
+		accepted := intPtrFromString(parts[9])
+		result.BGPPeers = append(result.BGPPeers, BGPPeer{
+			DeviceIdentityKey: contextIdentity,
+			PeerAddress:       parts[0],
+			RemoteASN:         remoteASN,
+			State:             "established",
+			AcceptedPrefixes:  accepted,
+			Confidence:        0.8,
+			Metadata:          mustJSON(map[string]string{"up_down": parts[8]}),
+		})
+	}
+	if len(result.BGPPeers) == 0 {
+		result.Warnings = append(result.Warnings, "no bgp peers parsed")
+	}
+	return result, nil
+}
+
 func baseResult(parserName string, evidenceID string) Result {
 	return Result{ParserName: parserName, EvidenceID: evidenceID}
 }
@@ -321,6 +420,18 @@ func component(componentType string, name string, vendor string, model string, s
 }
 
 func stringFact(assetIdentityKey string, name string, value string, source string, confidence float64, evidenceID string) ParsedFact {
+	encoded, _ := json.Marshal(value)
+	return ParsedFact{
+		AssetIdentityKey: assetIdentityKey,
+		Name:             name,
+		Value:            encoded,
+		Source:           source,
+		Confidence:       confidence,
+		EvidenceID:       evidenceID,
+	}
+}
+
+func intFact(assetIdentityKey string, name string, value int, source string, confidence float64, evidenceID string) ParsedFact {
 	encoded, _ := json.Marshal(value)
 	return ParsedFact{
 		AssetIdentityKey: assetIdentityKey,
@@ -362,6 +473,62 @@ func firstContainingLine(raw string, needle string) string {
 		}
 	}
 	return ""
+}
+
+func parseJunosBGPSummaryCounts(raw string) (int, int, int, bool) {
+	matches := regexp.MustCompile(`Groups:\s+([0-9]+)\s+Peers:\s+([0-9]+)\s+Down peers:\s+([0-9]+)`).FindStringSubmatch(raw)
+	if len(matches) != 4 {
+		return 0, 0, 0, false
+	}
+	groups, groupErr := strconv.Atoi(matches[1])
+	peers, peerErr := strconv.Atoi(matches[2])
+	downPeers, downErr := strconv.Atoi(matches[3])
+	if groupErr != nil || peerErr != nil || downErr != nil {
+		return 0, 0, 0, false
+	}
+	return groups, peers, downPeers, true
+}
+
+func bgpContextIdentity(item evidence.Evidence, routerID string) string {
+	if strings.TrimSpace(routerID) != "" {
+		return assets.MakeIdentityKey("routing_context", "router_id", routerID)
+	}
+	target := strings.TrimPrefix(strings.TrimSpace(item.Target), "fixture://")
+	if target == "" {
+		target = strings.TrimSpace(item.Target)
+	}
+	if target == "" {
+		target = "unknown"
+	}
+	return assets.MakeIdentityKey("routing_context", "target", target)
+}
+
+func looksLikeIP(value string) bool {
+	return regexp.MustCompile(`^[0-9A-Fa-f:.]+$`).MatchString(strings.TrimSpace(value)) && strings.Contains(value, ".")
+}
+
+func parseUint32(value string) (uint32, error) {
+	parsed, err := strconv.ParseUint(strings.TrimSpace(value), 10, 32)
+	if err != nil {
+		return 0, err
+	}
+	return uint32(parsed), nil
+}
+
+func acceptedPrefixesFromJunosState(value string) *int {
+	active, _, ok := strings.Cut(strings.TrimSpace(value), "/")
+	if !ok {
+		return intPtrFromString(value)
+	}
+	return intPtrFromString(active)
+}
+
+func intPtrFromString(value string) *int {
+	parsed, err := strconv.Atoi(strings.TrimSpace(value))
+	if err != nil {
+		return nil
+	}
+	return &parsed
 }
 
 func regexpFind(raw string, pattern string) string {

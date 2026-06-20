@@ -1816,6 +1816,32 @@ func TestListAssetsWithFiltersAndPagination(t *testing.T) {
 	}
 }
 
+func TestListAssetsSupportsFreeTextSearch(t *testing.T) {
+	service := assets.NewService(testAssetRepository())
+	handler := NewHandler(Options{
+		Version: "test-version",
+		Assets:  &service,
+	})
+
+	response := httptest.NewRecorder()
+	request := httptest.NewRequest(http.MethodGet, "/api/v1/assets?q=nyc", nil)
+	handler.ServeHTTP(response, request)
+
+	if response.Code != http.StatusOK {
+		t.Fatalf("status = %d, want %d; body=%s", response.Code, http.StatusOK, response.Body.String())
+	}
+
+	body := decodeResponseData[struct {
+		Assets []assets.Asset `json:"assets"`
+	}](t, response)
+	if got, want := len(body.Assets), 1; got != want {
+		t.Fatalf("asset count = %d, want %d", got, want)
+	}
+	if body.Assets[0].ID != "asset-c" {
+		t.Fatalf("asset id = %q, want asset-c", body.Assets[0].ID)
+	}
+}
+
 func TestListAssetsRejectsInvalidPagination(t *testing.T) {
 	service := assets.NewService(testAssetRepository())
 	handler := NewHandler(Options{
@@ -1830,6 +1856,63 @@ func TestListAssetsRejectsInvalidPagination(t *testing.T) {
 	if response.Code != http.StatusBadRequest {
 		t.Fatalf("status = %d, want %d", response.Code, http.StatusBadRequest)
 	}
+}
+
+func TestGetAssetHistoryIncludesFactsAndRelationships(t *testing.T) {
+	service := assets.NewService(testAssetRepository())
+	handler := NewHandler(Options{
+		Version: "test-version",
+		Assets:  &service,
+	})
+
+	response := httptest.NewRecorder()
+	request := httptest.NewRequest(http.MethodGet, "/api/v1/assets/asset-a/history", nil)
+	handler.ServeHTTP(response, request)
+
+	if response.Code != http.StatusOK {
+		t.Fatalf("status = %d, want %d; body=%s", response.Code, http.StatusOK, response.Body.String())
+	}
+
+	body := decodeResponseData[struct {
+		Asset   assets.Asset           `json:"asset"`
+		History []historyEventResponse `json:"history"`
+	}](t, response)
+	if body.Asset.ID != "asset-a" {
+		t.Fatalf("asset id = %q, want asset-a", body.Asset.ID)
+	}
+	if got, want := len(body.History), 3; got != want {
+		t.Fatalf("history count = %d, want %d", got, want)
+	}
+	if !hasHistoryEvent(body.History, "asset_created", "asset-a", "") {
+		t.Fatalf("history missing asset_created event: %#v", body.History)
+	}
+	if !hasHistoryEvent(body.History, "fact_observed", "fact-a", "evidence-a") {
+		t.Fatalf("history missing fact_observed evidence event: %#v", body.History)
+	}
+	if !hasHistoryEvent(body.History, "relationship_observed", "relationship-a", "evidence-b") {
+		t.Fatalf("history missing relationship_observed evidence event: %#v", body.History)
+	}
+}
+
+type historyEventResponse struct {
+	EventType      string  `json:"event_type"`
+	RecordID       string  `json:"record_id"`
+	Name           string  `json:"name"`
+	EvidenceID     *string `json:"evidence_id"`
+	RelationshipTo *string `json:"relationship_to"`
+}
+
+func hasHistoryEvent(events []historyEventResponse, eventType string, recordID string, evidenceID string) bool {
+	for _, event := range events {
+		if event.EventType != eventType || event.RecordID != recordID {
+			continue
+		}
+		if evidenceID == "" {
+			return event.EvidenceID == nil
+		}
+		return event.EvidenceID != nil && *event.EvidenceID == evidenceID
+	}
+	return false
 }
 
 func TestListProvisionalIdentityAssets(t *testing.T) {

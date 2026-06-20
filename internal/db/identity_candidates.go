@@ -360,6 +360,45 @@ RETURNING id, identity_candidate_id, discovery_run_id, evidence_id, reviewer, ac
 		return parser.IdentityCandidateReview{}, fmt.Errorf("create identity candidate review: %w", err)
 	}
 
+	if params.Action == parser.IdentityReviewActionAccept {
+		if candidate.ProposedAssetID == nil || strings.TrimSpace(*candidate.ProposedAssetID) == "" {
+			return parser.IdentityCandidateReview{}, fmt.Errorf("accepted identity candidate requires proposed_asset_id")
+		}
+		aliasID, err := discovery.NewID()
+		if err != nil {
+			return parser.IdentityCandidateReview{}, err
+		}
+		if _, err := tx.ExecContext(ctx, `
+INSERT INTO identity_aliases (
+    id,
+    asset_id,
+    identity_candidate_id,
+    alias_identity_key,
+    alias_strength,
+    evidence_id,
+    discovery_run_id,
+    reviewer,
+    rationale,
+    metadata
+)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+ON CONFLICT (identity_candidate_id) DO NOTHING
+`,
+			aliasID,
+			*candidate.ProposedAssetID,
+			candidate.ID,
+			candidate.CandidateIdentityKey,
+			candidate.Strength,
+			candidate.EvidenceID,
+			candidate.DiscoveryRunID,
+			params.Reviewer,
+			params.Rationale,
+			params.Metadata,
+		); err != nil {
+			return parser.IdentityCandidateReview{}, fmt.Errorf("create identity alias: %w", err)
+		}
+	}
+
 	if _, err := tx.ExecContext(ctx, `
 UPDATE identity_candidates
 SET review_state = $1

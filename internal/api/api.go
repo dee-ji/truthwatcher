@@ -72,6 +72,7 @@ func NewHandler(opts Options) http.Handler {
 	mux.HandleFunc("GET /api/v1/assets", handleListAssets(opts.Assets))
 	mux.HandleFunc("GET /api/v1/assets/provisional-identities", handleListProvisionalIdentityAssets(opts.Assets))
 	mux.HandleFunc("GET /api/v1/assets/{id}", handleGetAsset(opts.Assets))
+	mux.HandleFunc("GET /api/v1/assets/{id}/history", handleGetAssetHistory(opts.Assets))
 	mux.HandleFunc("GET /api/v1/assets/{id}/facts", handleListAssetFacts(opts.Assets))
 	mux.HandleFunc("GET /api/v1/assets/{id}/relationships", handleListAssetRelationships(opts.Assets))
 	mux.HandleFunc("GET /api/v1/assets/{id}/evidence", handleListAssetEvidence(opts.Assets, opts.Evidence))

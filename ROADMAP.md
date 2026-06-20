@@ -199,7 +199,9 @@ The former steering roadmap tracked completed implementation details that suppor
 * [x] Asset, fact, relationship, and evidence read APIs with filters and pagination
 * [x] Response-shape tests for knowledge APIs
 * [x] Uncertainty fields and deterministic confidence states for assets, facts, and relationships
-* [ ] Human-reviewed identity merge workflow for evidence that describes the same physical device through different keys
+* [x] Human-reviewed identity merge workflow for evidence that describes the same physical device through different keys
+* [x] Asset free-text search across identity and hardware fields
+* [x] Asset history API projection combining asset creation, fact provenance, and relationship provenance
 
 #### Parser Foundation
 
@@ -209,7 +211,7 @@ The former steering roadmap tracked completed implementation details that suppor
 * [x] Parse result records, CLI/API execution paths, and evidence-linked asset/fact/relationship creation
 * [x] Deterministic identity strength handling with strong vendor/serial and system MAC preference
 * [x] Provisional hostname/name/IP identities, conflict review, and weak/provisional identity review APIs
-* [ ] Additional fixture parser coverage where it supports the evidence-kernel workflow
+* [x] Additional fixture parser coverage where it supports the evidence-kernel workflow
 
 ⸻
 
