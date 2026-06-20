@@ -87,6 +87,11 @@ async function renderRoute() {
     return;
   }
 
+  if (route === "/about") {
+    await renderAboutView();
+    return;
+  }
+
   app.innerHTML = `<section class="panel error-state">Page not found.</section>`;
 }
 
@@ -113,6 +118,9 @@ function setActiveNav(route) {
   }
   if (route === "/ask") {
     active = document.querySelector('[data-nav="ask"]');
+  }
+  if (route === "/about") {
+    active = document.querySelector('[data-nav="about"]');
   }
   if (active) {
     active.classList.add("active");
@@ -1524,6 +1532,108 @@ function statusPill(status) {
 function stateBadge(state) {
   const safeState = escapeHTML(state || "unknown");
   return `<span class="status-pill ${safeState}">${safeState}</span>`;
+}
+
+async function renderAboutView() {
+  app.innerHTML = `
+    <section class="section-header">
+      <div>
+        <p class="eyebrow">About this system</p>
+        <h1>Truthwatcher philosophy and glossary</h1>
+        <p>Truthwatcher is an evidence-first network cartography tool. It separates observed evidence, parsed facts, user-provided context, and human-approved action.</p>
+      </div>
+      <a class="button secondary" href="#/">Back to dashboard</a>
+    </section>
+    <section class="about-layout">
+      <article class="detail-panel">
+        <p class="eyebrow">Philosophy</p>
+        <h2>Evidence before inference</h2>
+        <p class="muted">The app treats raw evidence as the durable record. Facts, relationships, graph views, and planner suggestions must remain explainable by evidence or clearly labeled as seeded context.</p>
+        <ul class="principle-list">
+          <li><strong>Read-only by default.</strong><span>Collection and planning features prefer safe observation and human approval over automatic execution.</span></li>
+          <li><strong>Confidence is visible.</strong><span>Modeled knowledge should carry confidence, source, state, and conflict information instead of pretending every claim is equally true.</span></li>
+          <li><strong>Humans own intent.</strong><span>Seeds, reviews, and approvals are explicit human inputs; the system should not silently expand scope or infer permission.</span></li>
+        </ul>
+      </article>
+      <article class="detail-panel" id="system-info-panel">
+        <p class="eyebrow">System stats</p>
+        <div class="empty-state">Loading CPU, memory, disk, and build information...</div>
+      </article>
+    </section>
+    <section class="detail-panel glossary-panel">
+      <p class="eyebrow">Glossary</p>
+      <h2>Terms used across the app</h2>
+      <dl class="glossary-list">
+        ${glossaryTerms.map((term) => `
+          <div>
+            <dt>${escapeHTML(term.term)}</dt>
+            <dd>${escapeHTML(term.definition)}</dd>
+          </div>
+        `).join("")}
+      </dl>
+    </section>
+  `;
+  await loadSystemInfo();
+}
+
+const glossaryTerms = [
+  { term: "Asset", definition: "A modeled network object such as a device, service, architecture context record, or other entity tracked by Truthwatcher." },
+  { term: "Evidence", definition: "Raw observed output or API data collected from an allowed source. Evidence is read-only and remains the primary record." },
+  { term: "Fact", definition: "A specific claim about an asset, usually parsed from evidence or created as explicitly user-seeded context." },
+  { term: "Relationship", definition: "A typed edge between assets, such as a neighbor, ownership, or service relationship." },
+  { term: "Confidence", definition: "A numeric indication of how strongly the system trusts a fact, relationship, or asset identity." },
+  { term: "Discovery run", definition: "A bounded collection attempt with seed input, status, timestamps, and linked evidence." },
+  { term: "Discovery plan", definition: "A read-only proposal for next collection steps. It is not execution and requires human approval." },
+  { term: "Architecture seed", definition: "Known context supplied by a user. Seeds help planning but are labeled as context rather than observed proof." },
+  { term: "Provisional identity", definition: "An identity that may need review or merging before it should be treated as authoritative." },
+  { term: "Graph", definition: "A neighborhood view that renders assets and relationships with confidence visible on edges." },
+];
+
+async function loadSystemInfo() {
+  const panel = document.getElementById("system-info-panel");
+  if (!panel) {
+    return;
+  }
+  try {
+    const payload = await apiGet("/api/v1/system-info");
+    const info = payload?.data?.system_info || {};
+    panel.innerHTML = systemInfoMarkup(info);
+  } catch (error) {
+    panel.innerHTML = `<p class="eyebrow">System stats</p><div class="error-state">${escapeHTML(error.message)}</div>`;
+  }
+}
+
+function systemInfoMarkup(info) {
+  const runtime = info.runtime || {};
+  const memory = info.memory || {};
+  const disk = info.disk || {};
+  const build = info.build || {};
+  return `
+    <p class="eyebrow">System stats</p>
+    <h2>${escapeHTML(info.name || "truthwatcher")} ${escapeHTML(info.version || "unknown")}</h2>
+    <div class="detail-grid compact">
+      <div class="metric"><small>CPUs</small><strong>${escapeHTML(runtime.cpus || "unknown")}</strong></div>
+      <div class="metric"><small>Goroutines</small><strong>${escapeHTML(runtime.goroutines || "unknown")}</strong></div>
+      <div class="metric"><small>Memory alloc</small><strong>${escapeHTML(formatBytes(memory.alloc_bytes))}</strong></div>
+      <div class="metric"><small>Heap sys</small><strong>${escapeHTML(formatBytes(memory.heap_sys_bytes))}</strong></div>
+      <div class="metric"><small>Disk used</small><strong>${escapeHTML(formatBytes(disk.used_bytes))}</strong></div>
+      <div class="metric"><small>Disk free</small><strong>${escapeHTML(formatBytes(disk.free_bytes))}</strong></div>
+    </div>
+    <span class="code-block-label">Runtime</span>
+    <pre class="code-block">${escapeHTML(`${runtime.go_version || "unknown"} ${runtime.os || "unknown"}/${runtime.arch || "unknown"}`)}</pre>
+    <span class="code-block-label">Build details</span>
+    <pre class="code-block">${escapeHTML(JSON.stringify({ main_path: build.main_path || "unknown", go_version: build.go_version || "unknown", settings: build.settings || {}, generated_at: info.generated_at || "unknown" }, null, 2))}</pre>
+  `;
+}
+
+function formatBytes(value) {
+  const bytes = Number(value || 0);
+  if (!Number.isFinite(bytes) || bytes <= 0) {
+    return "0 B";
+  }
+  const units = ["B", "KiB", "MiB", "GiB", "TiB"];
+  const index = Math.min(Math.floor(Math.log(bytes) / Math.log(1024)), units.length - 1);
+  return `${(bytes / (1024 ** index)).toFixed(index === 0 ? 0 : 1)} ${units[index]}`;
 }
 
 function formatDate(value) {

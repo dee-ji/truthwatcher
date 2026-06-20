@@ -108,6 +108,9 @@ func TestServesEmbeddedFrontend(t *testing.T) {
 	if !strings.Contains(response.Body.String(), "#/ask") {
 		t.Fatalf("body does not contain ask navigation: %s", response.Body.String())
 	}
+	if !strings.Contains(response.Body.String(), "#/about") {
+		t.Fatalf("body does not contain about navigation: %s", response.Body.String())
+	}
 }
 
 func TestServesEmbeddedFrontendAsset(t *testing.T) {
@@ -180,6 +183,52 @@ func TestServesEmbeddedFrontendAsset(t *testing.T) {
 	}
 	if !strings.Contains(body, "Deterministic canned responses only") {
 		t.Fatalf("body does not label agent shell as deterministic: %s", body)
+	}
+	if !strings.Contains(body, "renderAboutView") {
+		t.Fatalf("body does not contain about system renderer: %s", body)
+	}
+	if !strings.Contains(body, "/api/v1/system-info") {
+		t.Fatalf("body does not contain system info endpoint: %s", body)
+	}
+	if !strings.Contains(body, "Evidence before inference") {
+		t.Fatalf("body does not contain philosophy copy: %s", body)
+	}
+}
+
+func TestSystemInfo(t *testing.T) {
+	handler := NewHandler(Options{Version: "test-version"})
+
+	response := httptest.NewRecorder()
+	request := httptest.NewRequest(http.MethodGet, "/api/v1/system-info", nil)
+	handler.ServeHTTP(response, request)
+
+	if response.Code != http.StatusOK {
+		t.Fatalf("status = %d, want %d; body=%s", response.Code, http.StatusOK, response.Body.String())
+	}
+
+	body := decodeResponseData[struct {
+		SystemInfo struct {
+			Name    string `json:"name"`
+			Version string `json:"version"`
+			Runtime struct {
+				CPUs int `json:"cpus"`
+			} `json:"runtime"`
+			Disk struct {
+				TotalBytes uint64 `json:"total_bytes"`
+			} `json:"disk"`
+		} `json:"system_info"`
+	}](t, response)
+	if body.SystemInfo.Name != "truthwatcher" {
+		t.Fatalf("name = %q, want truthwatcher", body.SystemInfo.Name)
+	}
+	if body.SystemInfo.Version != "test-version" {
+		t.Fatalf("version = %q, want test-version", body.SystemInfo.Version)
+	}
+	if body.SystemInfo.Runtime.CPUs <= 0 {
+		t.Fatalf("cpus = %d, want positive", body.SystemInfo.Runtime.CPUs)
+	}
+	if body.SystemInfo.Disk.TotalBytes == 0 {
+		t.Fatal("disk total bytes is zero")
 	}
 }
 
