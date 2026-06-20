@@ -6,7 +6,7 @@ Before coding, read these files:
 - steering-docs/SAFETY_MODEL.md
 - steering-docs/MVP_SPEC.md
 - steering-docs/EXTENSIBILITY_MODEL.md
-- steering-docs/ROADMAP.md
+- ROADMAP.md
 
 Act as an informed engineering sidekick. Challenge scope creep. Do not simply agree. If a requested implementation conflicts with the project constitution, stop and explain the conflict.
 
@@ -18,7 +18,7 @@ Rules:
 - Do not build a full chat platform before the evidence kernel exists.
 - Prefer boring, explicit Go code.
 - Add tests where practical.
-- Update steering-docs/ROADMAP.md only with completed work and next steps.
+- Update ROADMAP.md only with completed work and next steps.
 - Do not rewrite vision documents unless directly asked.
 
 

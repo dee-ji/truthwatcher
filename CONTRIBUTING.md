@@ -4,7 +4,7 @@ Truthwatcher is a single-binary, Go-based, evidence-first network cartography pl
 
 ## Before Coding
 
-- Read `steering-docs/PROJECT_TRUTHWATCHER.md`, `steering-docs/AGENT_COLLABORATION_CONTRACT.md`, `steering-docs/ARCHITECTURE_DECISIONS.md`, `steering-docs/DATA_MODEL.md`, `steering-docs/SAFETY_MODEL.md`, `steering-docs/MVP_SPEC.md`, `steering-docs/EXTENSIBILITY_MODEL.md`, and `steering-docs/ROADMAP.md`.
+- Read `steering-docs/PROJECT_TRUTHWATCHER.md`, `steering-docs/AGENT_COLLABORATION_CONTRACT.md`, `steering-docs/ARCHITECTURE_DECISIONS.md`, `steering-docs/DATA_MODEL.md`, `steering-docs/SAFETY_MODEL.md`, `steering-docs/MVP_SPEC.md`, `steering-docs/EXTENSIBILITY_MODEL.md`, and `ROADMAP.md`.
 - Read the active prompt from `prompts/`.
 - Confirm the task fits the current roadmap phase.
 - Challenge requests that add scope before the evidence kernel exists.
@@ -41,4 +41,4 @@ Truthwatcher is a single-binary, Go-based, evidence-first network cartography pl
 - The change preserves read-only safety.
 - The change keeps evidence first.
 - Tests were added or the reason for no tests is clear.
-- `steering-docs/ROADMAP.md` was updated only for completed work and immediate next steps.
+- `ROADMAP.md` was updated only for completed work and immediate next steps.

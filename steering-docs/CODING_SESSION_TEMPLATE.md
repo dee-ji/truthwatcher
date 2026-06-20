@@ -11,7 +11,7 @@ Read:
 - steering-docs/SAFETY_MODEL.md
 - steering-docs/MVP_SPEC.md
 - steering-docs/EXTENSIBILITY_MODEL.md
-- steering-docs/ROADMAP.md
+- ROADMAP.md
 
 Then implement only the task in:
 
@@ -22,6 +22,6 @@ Constraints:
 - Do not introduce new architecture unless required.
 - Do not build future phases.
 - Add tests when practical.
-- Update steering-docs/ROADMAP.md with completed work.
+- Update ROADMAP.md with completed work.
 - Stop after this task.
 ```
