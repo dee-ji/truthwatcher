@@ -463,7 +463,7 @@ Response `data`:
 }
 ```
 
-Review actions only update the candidate review state and append audit metadata. They do not merge assets, rewrite `assets.identity_key`, or expose any new collector execution path.
+Review actions update the candidate review state and append audit metadata. Accepting a candidate requires a `proposed_asset_id`; when an operator accepts that candidate, Truthwatcher records an explicit `identity_aliases` row linking the candidate identity key to that asset. This does not rewrite `assets.identity_key`, does not collapse asset records, and does not expose any new collector execution path.
 
 ## Evidence
 
@@ -553,10 +553,15 @@ Supported exact-match filters:
 - `serial`
 - `identity_key`
 
-Example:
+Supported search filters:
+
+- `q` searches asset ID, asset type, identity key, vendor, model, serial, and system MAC with a case-insensitive substring match.
+
+Examples:
 
 ```text
 GET /api/v1/assets?type=device&vendor=juniper&limit=50&offset=0
+GET /api/v1/assets?q=mx-edge
 ```
 
 Response `data`:
@@ -580,6 +585,37 @@ Response `data`:
     "type": "device",
     "identity_key": "device:serial:aaa"
   }
+}
+```
+
+### `GET /api/v1/assets/{id}/history`
+
+Returns a compact asset history timeline assembled from the asset creation record, observed facts, and relationships. Fact and relationship events include `evidence_id` when provenance is available. This is a read-only projection; it does not mutate asset identity or evidence.
+
+Response `data`:
+
+```json
+{
+  "asset": {
+    "id": "asset-a"
+  },
+  "history": [
+    {
+      "event_type": "asset_created",
+      "record_id": "asset-a"
+    },
+    {
+      "event_type": "fact_observed",
+      "record_id": "fact-a",
+      "evidence_id": "evidence-a"
+    },
+    {
+      "event_type": "relationship_observed",
+      "record_id": "relationship-a",
+      "relationship_to": "asset-b",
+      "evidence_id": "evidence-b"
+    }
+  ]
 }
 ```
 

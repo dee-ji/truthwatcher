@@ -354,7 +354,7 @@ func normalizeIdentityReviewHandoffEntry(entry *IdentityReviewHandoffEntry) {
 	} else {
 		entry.HandoffStatus = "ready_for_mistspren_review"
 		entry.ReviewSummary = identityReviewExplanation(entry.Candidate.Metadata, "reviewed identity candidate is ready for Mistspren workbench inspection")
-		entry.IdentityEffect = "review state recorded; no canonical asset merge or identity rewrite performed"
+		entry.IdentityEffect = "review state recorded; accepted candidates may add explicit identity aliases without rewriting canonical asset identity"
 		entry.MistsprenIntakeNote = "derived Truthwatcher review output for intake review only"
 	}
 	if entry.LatestReview != nil {
@@ -417,7 +417,7 @@ func IdentityReviewEffect(action IdentityReviewAction) string {
 	case IdentityReviewActionAutoAccept:
 		return "deterministically auto-accepted evidence-backed strong identity candidate; no canonical asset merge or identity rewrite performed"
 	case IdentityReviewActionAccept:
-		return "review accepted candidate as evidence-backed identity clue; no canonical asset merge or identity rewrite performed"
+		return "review accepted candidate as evidence-backed alias for the proposed asset; no canonical asset merge or identity rewrite performed"
 	case IdentityReviewActionReject:
 		return "review rejected candidate as identity clue; no canonical asset merge or identity rewrite performed"
 	case IdentityReviewActionDefer:
