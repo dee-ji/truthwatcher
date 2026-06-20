@@ -1,4 +1,4 @@
-.PHONY: fmt test lint build-ui build release-local checksums run
+.PHONY: fmt test lint build-ui build release-local checksums run seed-demo unseed-demo
 
 BINARY := truthwatcher
 GOCACHE_DIR ?= $(CURDIR)/.gocache
@@ -38,3 +38,13 @@ checksums:
 
 run:
 	@$(GO) run ./cmd/truthwatcher $(ARGS)
+
+
+seed-demo:
+	@test -n "$(TRUTHWATCHER_DATABASE_URL)" || (echo "TRUTHWATCHER_DATABASE_URL is required"; exit 1)
+	@$(GO) run ./cmd/truthwatcher migrate up
+	@psql "$(TRUTHWATCHER_DATABASE_URL)" -v ON_ERROR_STOP=1 -f scripts/seed_demo.sql
+
+unseed-demo:
+	@test -n "$(TRUTHWATCHER_DATABASE_URL)" || (echo "TRUTHWATCHER_DATABASE_URL is required"; exit 1)
+	@psql "$(TRUTHWATCHER_DATABASE_URL)" -v ON_ERROR_STOP=1 -f scripts/unseed_demo.sql
