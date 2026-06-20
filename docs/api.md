@@ -277,6 +277,8 @@ Response `metadata.audit`:
 
 Parses already-stored evidence for one discovery run and persists derived assets, facts, and relationships. Parser persistence may also record identity candidates for review. This endpoint does not run discovery, does not touch a network, records parser warnings without deleting raw evidence, and does not merge assets or rewrite canonical asset identity.
 
+Built-in fixture parser coverage currently includes Junos and IOS-XR version, inventory, LLDP neighbor, and BGP summary outputs. BGP summary parsing stores routing-context and peer placeholders, evidence-linked BGP peer facts, and `bgp_peer_of` relationships when the fixture output includes enough peer data.
+
 Request:
 
 ```json

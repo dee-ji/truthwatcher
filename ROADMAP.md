@@ -211,7 +211,7 @@ The former steering roadmap tracked completed implementation details that suppor
 * [x] Parse result records, CLI/API execution paths, and evidence-linked asset/fact/relationship creation
 * [x] Deterministic identity strength handling with strong vendor/serial and system MAC preference
 * [x] Provisional hostname/name/IP identities, conflict review, and weak/provisional identity review APIs
-* [ ] Additional fixture parser coverage where it supports the evidence-kernel workflow
+* [x] Additional fixture parser coverage where it supports the evidence-kernel workflow
 
 ⸻
 

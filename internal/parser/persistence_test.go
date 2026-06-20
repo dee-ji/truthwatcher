@@ -71,6 +71,45 @@ func TestParseDiscoveryRunPersistsParsedModel(t *testing.T) {
 	}
 }
 
+func TestParseDiscoveryRunPersistsBGPPeerModel(t *testing.T) {
+	runID := "11111111-1111-4111-8111-111111111111"
+	evidenceItems := []evidence.Evidence{
+		persistenceFixtureEvidence(t, "evidence-bgp", runID, PlatformIOSXR, CommandShowBGPSummary, "iosxr-asr", "show_bgp_summary.txt"),
+	}
+	assetRepo := &persistenceAssetRepository{}
+	assetService := assets.NewService(assetRepo)
+	service := NewPersistenceService(PersistenceOptions{
+		Evidence:     persistenceEvidenceRepository{items: evidenceItems},
+		Assets:       assetService,
+		ParseResults: &persistenceParseRepository{},
+		Registry:     BuiltInRegistry(),
+	})
+
+	_, err := service.ParseDiscoveryRun(context.Background(), ParseDiscoveryRunParams{
+		DiscoveryRunID: runID,
+		Platform:       PlatformIOSXR,
+	})
+	if err != nil {
+		t.Fatalf("ParseDiscoveryRun returned error: %v", err)
+	}
+
+	if !hasAssetIdentity(assetRepo.assets, "routing_context:router_id:198.51.100.10") {
+		t.Fatalf("routing context asset missing: %#v", assetRepo.assets)
+	}
+	if !hasAssetIdentity(assetRepo.assets, "bgp_peer:ip:192.0.2.2") {
+		t.Fatalf("bgp peer asset missing: %#v", assetRepo.assets)
+	}
+	if !hasPersistedFact(assetRepo.facts, "bgp_remote_as", `65002`, "evidence-bgp") {
+		t.Fatalf("bgp_remote_as fact missing: %#v", assetRepo.facts)
+	}
+	if !hasPersistedFact(assetRepo.facts, "bgp_accepted_prefixes", `18`, "evidence-bgp") {
+		t.Fatalf("bgp_accepted_prefixes fact missing: %#v", assetRepo.facts)
+	}
+	if !hasRelationshipType(assetRepo.relationships, "bgp_peer_of", "evidence-bgp") {
+		t.Fatalf("bgp_peer_of relationship missing: %#v", assetRepo.relationships)
+	}
+}
+
 func TestParseDiscoveryRunRecordsSkippedWarnings(t *testing.T) {
 	runID := "11111111-1111-4111-8111-111111111111"
 	item := evidence.Evidence{
@@ -656,6 +695,30 @@ func persistenceFixtureEvidence(t *testing.T, id string, runID string, platform 
 func hasAssetIdentity(items []assets.Asset, identityKey string) bool {
 	for _, item := range items {
 		if item.IdentityKey == identityKey {
+			return true
+		}
+	}
+	return false
+}
+
+func hasPersistedFact(items []assets.Fact, name string, value string, evidenceID string) bool {
+	for _, item := range items {
+		if item.Name != name || string(item.Value) != value {
+			continue
+		}
+		if item.EvidenceID != nil && *item.EvidenceID == evidenceID {
+			return true
+		}
+	}
+	return false
+}
+
+func hasRelationshipType(items []assets.Relationship, relationshipType string, evidenceID string) bool {
+	for _, item := range items {
+		if item.RelationshipType != relationshipType {
+			continue
+		}
+		if item.EvidenceID != nil && *item.EvidenceID == evidenceID {
 			return true
 		}
 	}

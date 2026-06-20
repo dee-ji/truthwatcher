@@ -507,6 +507,92 @@ func persistResult(ctx context.Context, store assetStore, index *assetIndex, res
 		}
 	}
 
+	for _, item := range result.BGPPeers {
+		if strings.TrimSpace(item.DeviceIdentityKey) == "" || strings.TrimSpace(item.PeerAddress) == "" {
+			continue
+		}
+		source, err := ensurePlaceholderAsset(ctx, store, index, item.DeviceIdentityKey, assets.StateObserved, defaultConfidence(item.Confidence))
+		if err != nil {
+			return out, err
+		}
+		peerIdentity := assets.MakeIdentityKey("bgp_peer", "ip", item.PeerAddress)
+		peer, err := ensurePlaceholderAsset(ctx, store, index, peerIdentity, assets.StateObserved, defaultConfidence(item.Confidence))
+		if err != nil {
+			return out, err
+		}
+		evidenceID := optionalString(result.EvidenceID)
+		if item.RemoteASN != 0 {
+			fact, err := createFactIfNew(ctx, store, assets.CreateFactParams{
+				AssetID:          peer.ID,
+				Name:             "bgp_remote_as",
+				Value:            mustJSON(item.RemoteASN),
+				Source:           result.ParserName,
+				Confidence:       defaultConfidence(item.Confidence),
+				ConfidenceReason: "parsed BGP peer from evidence",
+				State:            assets.StateObserved,
+				EvidenceID:       evidenceID,
+			})
+			if err != nil {
+				return out, err
+			}
+			if fact.ID != "" {
+				out.facts = append(out.facts, fact)
+			}
+		}
+		if strings.TrimSpace(item.State) != "" {
+			fact, err := createFactIfNew(ctx, store, assets.CreateFactParams{
+				AssetID:          peer.ID,
+				Name:             "bgp_session_state",
+				Value:            mustJSON(item.State),
+				Source:           result.ParserName,
+				Confidence:       defaultConfidence(item.Confidence),
+				ConfidenceReason: "parsed BGP peer from evidence",
+				State:            assets.StateObserved,
+				EvidenceID:       evidenceID,
+			})
+			if err != nil {
+				return out, err
+			}
+			if fact.ID != "" {
+				out.facts = append(out.facts, fact)
+			}
+		}
+		if item.AcceptedPrefixes != nil {
+			fact, err := createFactIfNew(ctx, store, assets.CreateFactParams{
+				AssetID:          peer.ID,
+				Name:             "bgp_accepted_prefixes",
+				Value:            mustJSON(*item.AcceptedPrefixes),
+				Source:           result.ParserName,
+				Confidence:       defaultConfidence(item.Confidence),
+				ConfidenceReason: "parsed BGP peer from evidence",
+				State:            assets.StateObserved,
+				EvidenceID:       evidenceID,
+			})
+			if err != nil {
+				return out, err
+			}
+			if fact.ID != "" {
+				out.facts = append(out.facts, fact)
+			}
+		}
+		relationship, err := createRelationshipIfNew(ctx, store, assets.CreateRelationshipParams{
+			SourceAssetID:    source.ID,
+			TargetAssetID:    peer.ID,
+			RelationshipType: "bgp_peer_of",
+			Confidence:       defaultConfidence(item.Confidence),
+			ConfidenceReason: "parsed BGP peer from evidence",
+			State:            assets.StateObserved,
+			EvidenceID:       evidenceID,
+			Metadata:         item.Metadata,
+		})
+		if err != nil {
+			return out, err
+		}
+		if relationship.ID != "" {
+			out.relationships = append(out.relationships, relationship)
+		}
+	}
+
 	return out, nil
 }
 
