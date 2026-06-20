@@ -15,7 +15,7 @@ For every Codex session:
    - `steering-docs/SAFETY_MODEL.md`
    - `steering-docs/MVP_SPEC.md`
    - `steering-docs/EXTENSIBILITY_MODEL.md`
-   - `steering-docs/ROADMAP.md`
+   - `ROADMAP.md`
 3. Copy one prompt at a time into Codex.
 4. Review the diff.
 5. Run tests.

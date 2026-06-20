@@ -5,7 +5,7 @@
 Before modifying code, read these files:
 
 1. steering-docs/PROJECT_TRUTHWATCHER.md
-2. steering-docs/ROADMAP.md
+2. ROADMAP.md
 3. steering-docs/ARCHITECTURE_DECISIONS.md
 4. steering-docs/DATA_MODEL.md
 5. steering-docs/SAFETY_MODEL.md

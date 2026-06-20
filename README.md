@@ -172,7 +172,7 @@ The evidence kernel is moving toward this first complete workflow:
 5. Create assets and relationships with confidence and evidence references.
 6. Display evidence, assets, and graph relationships in the UI.
 
-Some pieces of this target exist today; others are intentionally tracked as separate roadmap work. See [steering-docs/ROADMAP.md](steering-docs/ROADMAP.md) for current completion status.
+Some pieces of this target exist today; others are intentionally tracked as separate roadmap work. See [ROADMAP.md](ROADMAP.md) for current completion status.
 
 ## Safety Model
 
@@ -266,5 +266,5 @@ See [LICENSE](LICENSE) for the full license text.
 - [Testing](docs/testing.md)
 - [Local Knowledge Providers](docs/local-knowledge.md)
 - [Future Phases](docs/future.md)
-- [Roadmap](steering-docs/ROADMAP.md)
+- [Roadmap](ROADMAP.md)
 - [Agent Collaboration Contract](steering-docs/AGENT_COLLABORATION_CONTRACT.md)

@@ -1,6 +1,6 @@
 # Steering Docs
 
-This folder contains Truthwatcher project steering, guardrail, roadmap, and prompt-pack documents.
+This folder contains Truthwatcher project steering, guardrail, and prompt-pack documents. The master roadmap now lives at the repository root.
 
 Root-level Markdown is intentionally kept small:
 
@@ -16,7 +16,7 @@ Root-level Markdown is intentionally kept small:
 - [Safety Model](SAFETY_MODEL.md)
 - [MVP Spec](MVP_SPEC.md)
 - [Extensibility Model](EXTENSIBILITY_MODEL.md)
-- [Roadmap](ROADMAP.md)
+- [Roadmap](../ROADMAP.md)
 
 ## Agent And Prompt-Pack Documents
 

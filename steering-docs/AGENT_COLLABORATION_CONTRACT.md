@@ -38,7 +38,7 @@ When working on this project, the agent must:
 
 1. Read `steering-docs/PROJECT_TRUTHWATCHER.md` before making changes.
 2. Read `steering-docs/ARCHITECTURE_DECISIONS.md` before introducing architecture changes.
-3. Read `steering-docs/ROADMAP.md` before implementing features.
+3. Read `ROADMAP.md` before implementing features.
 4. Stay within the current milestone unless explicitly told otherwise.
 5. Challenge vague or risky ideas.
 6. Prefer small, reviewable commits.
@@ -195,7 +195,7 @@ Before making changes, read:
 - steering-docs/PROJECT_TRUTHWATCHER.md
 - steering-docs/AGENT_COLLABORATION_CONTRACT.md
 - steering-docs/ARCHITECTURE_DECISIONS.md
-- steering-docs/ROADMAP.md
+- ROADMAP.md
 
 Before consulting optional external knowledge providers:
 - Run `truthwatcher dev check-knowledge`.
