@@ -527,14 +527,16 @@ async function renderAssetDetail(id) {
 
   const panel = document.getElementById("asset-detail");
   try {
-    const [assetPayload, factsPayload, relationshipsPayload] = await Promise.all([
+    const [assetPayload, factsPayload, relationshipsPayload, evidencePayload] = await Promise.all([
       apiGet(`/api/v1/assets/${encodeURIComponent(id)}`),
       apiGet(`/api/v1/assets/${encodeURIComponent(id)}/facts?limit=100`),
       apiGet(`/api/v1/assets/${encodeURIComponent(id)}/relationships?limit=100`),
+      apiGet(`/api/v1/assets/${encodeURIComponent(id)}/evidence?limit=100`),
     ]);
     const asset = assetPayload?.data?.asset;
     const facts = factsPayload?.data?.facts || [];
     const relationships = relationshipsPayload?.data?.relationships || [];
+    const evidenceItems = evidencePayload?.data?.evidence || [];
 
     panel.innerHTML = `
       <div class="detail-grid">
@@ -567,6 +569,8 @@ async function renderAssetDetail(id) {
           ${assetRelationshipsMarkup(relationships, asset.id)}
         </div>
       </div>
+      <span class="code-block-label">Evidence</span>
+      ${assetEvidenceMarkup(evidenceItems)}
       <span class="code-block-label">Metadata</span>
       <pre class="code-block">${escapeHTML(JSON.stringify(asset.metadata || {}, null, 2))}</pre>
     `;
@@ -589,6 +593,24 @@ function assetFactsMarkup(facts) {
           <small>${escapeHTML(confidenceLabel(fact))}</small>
           <small>${escapeHTML(fact.confidence_reason || "")}</small>
           ${evidenceButton(fact.evidence_id)}
+        </li>
+      `).join("")}
+    </ul>
+  `;
+}
+
+function assetEvidenceMarkup(evidenceItems) {
+  if (evidenceItems.length === 0) {
+    return `<p class="muted">No evidence is linked to this asset yet.</p>`;
+  }
+  return `
+    <ul class="edge-list">
+      ${evidenceItems.map((item) => `
+        <li>
+          <strong>${escapeHTML(item.command_or_api || item.method || "evidence")}</strong>
+          <span>${escapeHTML(item.target || "unknown target")}</span>
+          <small>${escapeHTML(formatDate(item.collected_at))}</small>
+          ${evidenceButton(item.id)}
         </li>
       `).join("")}
     </ul>
@@ -936,6 +958,16 @@ function splitSeedList(value) {
     .filter(Boolean);
 }
 
+function graphLegendMarkup() {
+  return `
+    <div class="graph-legend" aria-label="Graph legend">
+      <span><i class="legend-root"></i> Root asset</span>
+      <span><i class="legend-peer"></i> Related asset</span>
+      <span>Edge labels show relationship type and confidence.</span>
+    </div>
+  `;
+}
+
 async function renderGraphView() {
   app.innerHTML = `
     <section class="section-header">
@@ -958,14 +990,22 @@ async function renderGraphView() {
           <label for="asset-id">Asset ID</label>
           <input id="asset-id" name="asset_id" placeholder="asset UUID or ID" required>
         </div>
+        <div class="field">
+          <label for="graph-depth">Depth</label>
+          <select id="graph-depth" name="depth">
+            <option value="1">1 hop (focused)</option>
+            <option value="2">2 hops (expanded)</option>
+          </select>
+        </div>
       </div>
       <div class="form-actions">
         <button type="submit">Load graph</button>
-        <span class="muted" id="graph-message">Choose an asset or paste an asset ID.</span>
+        <span class="muted" id="graph-message">Choose an asset or paste an asset ID. Depth is capped at 2 hops for readability.</span>
       </div>
     </form>
     <section class="graph-layout">
       <div class="graph-panel" id="graph-canvas">
+        ${graphLegendMarkup()}
         <div class="empty-state">Select an asset to render its graph.</div>
       </div>
       <aside class="detail-panel graph-detail" id="graph-detail">
@@ -1023,7 +1063,7 @@ async function loadAssetOptions() {
       `).join("")}
     `;
     input.value = assets[0].id;
-    await loadGraph(assets[0].id);
+    await loadGraph(assets[0].id, document.getElementById("graph-depth")?.value || "1");
   } catch (error) {
     select.innerHTML = `<option value="">Asset list unavailable</option>`;
     message.textContent = error.message;
@@ -1034,28 +1074,30 @@ async function submitGraphForm(event) {
   event.preventDefault();
   const formData = new FormData(event.currentTarget);
   const assetID = String(formData.get("asset_id") || "").trim();
+  const depth = String(formData.get("depth") || "1").trim();
   if (!assetID) {
     document.getElementById("graph-message").textContent = "Asset ID is required.";
     return;
   }
-  await loadGraph(assetID);
+  await loadGraph(assetID, depth);
 }
 
-async function loadGraph(assetID) {
+async function loadGraph(assetID, depth = "1") {
   const canvas = document.getElementById("graph-canvas");
   const detail = document.getElementById("graph-detail");
   const message = document.getElementById("graph-message");
-  canvas.innerHTML = `<div class="empty-state">Loading graph...</div>`;
+  canvas.innerHTML = `${graphLegendMarkup()}<div class="empty-state">Loading graph...</div>`;
   detail.innerHTML = `<div class="empty-state">Click a node to show asset details.</div>`;
   message.textContent = `Loading graph for ${assetID}...`;
 
   try {
-    const payload = await apiGet(`/api/v1/assets/${encodeURIComponent(assetID)}/graph`);
+    const params = new URLSearchParams({ depth });
+    const payload = await apiGet(`/api/v1/assets/${encodeURIComponent(assetID)}/graph?${params.toString()}`);
     const graph = payload?.data?.graph || { nodes: [], edges: [] };
     renderGraph(graph);
     message.textContent = `${graph.nodes?.length || 0} nodes, ${graph.edges?.length || 0} edges loaded.`;
   } catch (error) {
-    canvas.innerHTML = `<div class="error-state">${escapeHTML(error.message)}</div>`;
+    canvas.innerHTML = `${graphLegendMarkup()}<div class="error-state">${escapeHTML(error.message)}</div>`;
     message.textContent = error.message;
   }
 }
@@ -1066,7 +1108,7 @@ function renderGraph(graph) {
   const nodes = graph.nodes || [];
   const edges = graph.edges || [];
   if (nodes.length === 0) {
-    canvas.innerHTML = `<div class="empty-state">Graph has no nodes.</div>`;
+    canvas.innerHTML = `${graphLegendMarkup()}<div class="empty-state">Graph has no nodes.</div>`;
     return;
   }
 
@@ -1118,7 +1160,8 @@ function renderGraph(graph) {
   }).join("");
 
   canvas.innerHTML = `
-    <svg class="graph-svg" viewBox="0 0 ${width} ${height}" role="img" aria-label="Asset relationship graph">
+    ${graphLegendMarkup()}
+    <svg class="graph-svg" viewBox="0 0 ${width} ${height}" role="img" aria-label="Asset relationship graph with ${nodes.length} nodes and ${edges.length} edges">
       ${edgeMarkup}
       ${nodeMarkup}
     </svg>

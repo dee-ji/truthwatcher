@@ -62,11 +62,22 @@ type PathCandidate struct {
 }
 
 func (s Service) GetAssetGraph(ctx context.Context, assetID string) (Graph, error) {
+	return s.GetAssetGraphWithDepth(ctx, assetID, 1)
+}
+
+func (s Service) GetAssetGraphWithDepth(ctx context.Context, assetID string, maxDepth int) (Graph, error) {
 	if strings.TrimSpace(assetID) == "" {
 		return Graph{}, fmt.Errorf("asset_id is required")
 	}
 	if s.reader == nil {
 		return Graph{}, fmt.Errorf("asset reader is required")
+	}
+
+	if maxDepth < 1 {
+		maxDepth = 1
+	}
+	if maxDepth > 2 {
+		maxDepth = 2
 	}
 
 	root, err := s.reader.GetAsset(ctx, assetID)
@@ -78,30 +89,54 @@ func (s Service) GetAssetGraph(ctx context.Context, assetID string) (Graph, erro
 		return Graph{}, err
 	}
 
-	graph := Graph{
-		Nodes: []Node{nodeFromAsset(root, facts)},
-	}
+	graph := Graph{Nodes: []Node{nodeFromAsset(root, facts)}}
 	seenNodes := map[string]struct{}{root.ID: {}}
+	seenEdges := map[string]struct{}{}
+	frontier := []string{root.ID}
 
 	relationships, err := s.reader.ListRelationships(ctx)
 	if err != nil {
 		return Graph{}, err
 	}
-	for _, relationship := range relationships {
-		if !touchesAsset(relationship, assetID) {
-			continue
+	for depth := 0; depth < maxDepth; depth++ {
+		nextFrontier := []string{}
+		frontierSet := make(map[string]struct{}, len(frontier))
+		for _, id := range frontier {
+			frontierSet[id] = struct{}{}
 		}
 
-		neighborID := otherAssetID(relationship, assetID)
-		if _, ok := seenNodes[neighborID]; !ok {
-			neighbor, err := s.reader.GetAsset(ctx, neighborID)
-			if err != nil {
-				return Graph{}, err
+		for _, relationship := range relationships {
+			_, sourceInFrontier := frontierSet[relationship.SourceAssetID]
+			_, targetInFrontier := frontierSet[relationship.TargetAssetID]
+			if !sourceInFrontier && !targetInFrontier {
+				continue
 			}
-			graph.Nodes = append(graph.Nodes, nodeFromAsset(neighbor, nil))
-			seenNodes[neighborID] = struct{}{}
+			if _, ok := seenEdges[relationship.ID]; !ok {
+				graph.Edges = append(graph.Edges, edgeFromRelationship(relationship))
+				seenEdges[relationship.ID] = struct{}{}
+			}
+
+			for _, neighborID := range []string{relationship.SourceAssetID, relationship.TargetAssetID} {
+				if _, ok := seenNodes[neighborID]; ok {
+					continue
+				}
+				neighbor, err := s.reader.GetAsset(ctx, neighborID)
+				if err != nil {
+					return Graph{}, err
+				}
+				neighborFacts, err := s.reader.ListFactsByAsset(ctx, neighborID)
+				if err != nil {
+					return Graph{}, err
+				}
+				graph.Nodes = append(graph.Nodes, nodeFromAsset(neighbor, neighborFacts))
+				seenNodes[neighborID] = struct{}{}
+				nextFrontier = append(nextFrontier, neighborID)
+			}
 		}
-		graph.Edges = append(graph.Edges, edgeFromRelationship(relationship))
+		frontier = nextFrontier
+		if len(frontier) == 0 {
+			break
+		}
 	}
 
 	return graph, nil

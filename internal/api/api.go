@@ -444,7 +444,8 @@ func handleGetAssetGraph(service *graph.Service) http.HandlerFunc {
 			return
 		}
 
-		result, err := service.GetAssetGraph(r.Context(), r.PathValue("id"))
+		depth := queryInt(r, "depth", 1, 1, 2)
+		result, err := service.GetAssetGraphWithDepth(r.Context(), r.PathValue("id"), depth)
 		if errors.Is(err, assets.ErrNotFound) {
 			writeError(w, http.StatusNotFound, "asset not found")
 			return
@@ -471,7 +472,8 @@ func handleGetGraphNeighbors(service *graph.Service) http.HandlerFunc {
 			return
 		}
 
-		result, err := service.GetNeighbors(r.Context(), assetID)
+		depth := queryInt(r, "depth", 1, 1, 2)
+		result, err := service.GetAssetGraphWithDepth(r.Context(), assetID, depth)
 		if errors.Is(err, assets.ErrNotFound) {
 			writeError(w, http.StatusNotFound, "asset not found")
 			return
@@ -483,6 +485,24 @@ func handleGetGraphNeighbors(service *graph.Service) http.HandlerFunc {
 
 		writeData(w, http.StatusOK, map[string]graph.Graph{"graph": result})
 	}
+}
+
+func queryInt(r *http.Request, name string, fallback int, minValue int, maxValue int) int {
+	value := strings.TrimSpace(r.URL.Query().Get(name))
+	if value == "" {
+		return fallback
+	}
+	parsed, err := strconv.Atoi(value)
+	if err != nil {
+		return fallback
+	}
+	if parsed < minValue {
+		return minValue
+	}
+	if parsed > maxValue {
+		return maxValue
+	}
+	return parsed
 }
 
 func validateDiscoveryExecutionRequest(collector, target, profileName string, tasks []policy.Task) (string, string, discovery.Profile, []policy.Task, error) {
