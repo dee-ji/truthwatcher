@@ -1,4 +1,4 @@
-.PHONY: fmt test lint build-ui build release-local run
+.PHONY: fmt test lint build-ui build release-local checksums run
 
 BINARY := truthwatcher
 GOCACHE_DIR ?= $(CURDIR)/.gocache
@@ -32,6 +32,9 @@ release-local: test build-ui
 	@GOOS=$(GOOS) GOARCH=$(GOARCH) CGO_ENABLED=0 $(GO) build -trimpath -ldflags "-s -w" -o $(RELEASE_DIR)/$(BINARY) ./cmd/truthwatcher
 	@cp docs/install.md $(RELEASE_DIR)/
 	@printf "local release written to %s\n" "$(RELEASE_DIR)"
+
+checksums:
+	@if [ -d dist ]; then find dist -type f ! -name SHA256SUMS.txt -print0 | sort -z | xargs -0 sha256sum > dist/SHA256SUMS.txt; else echo "dist directory not found"; exit 1; fi
 
 run:
 	@$(GO) run ./cmd/truthwatcher $(ARGS)

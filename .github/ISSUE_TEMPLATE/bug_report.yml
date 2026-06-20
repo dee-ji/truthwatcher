@@ -1,0 +1,49 @@
+name: Bug report
+description: Report a reproducible problem in Truthwatcher
+title: "bug: "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for helping improve Truthwatcher. Do not include secrets, credentials, or sensitive raw network evidence.
+  - type: textarea
+    id: summary
+    attributes:
+      label: Summary
+      description: What happened?
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      description: List the smallest commands, API calls, or UI actions that reproduce the bug.
+      placeholder: |
+        1. Run ...
+        2. Open ...
+        3. See ...
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behavior
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Version or commit
+      placeholder: v0.1.0-alpha.1 or commit SHA
+  - type: textarea
+    id: context
+    attributes:
+      label: Additional context
+      description: Add logs or screenshots if useful. Redact sensitive data.

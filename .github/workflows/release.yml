@@ -1,0 +1,61 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+      - name: Build release artifacts
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p dist
+          for target in linux/amd64 linux/arm64 darwin/amd64 darwin/arm64 windows/amd64; do
+            goos="${target%/*}"
+            goarch="${target#*/}"
+            name="truthwatcher-${GITHUB_REF_NAME}-${goos}-${goarch}"
+            ext=""
+            if [ "$goos" = "windows" ]; then ext=".exe"; fi
+            mkdir -p "dist/${name}"
+            CGO_ENABLED=0 GOOS="$goos" GOARCH="$goarch" go build -trimpath -ldflags "-s -w" -o "dist/${name}/truthwatcher${ext}" ./cmd/truthwatcher
+            cp LICENSE README.md docs/install.md "dist/${name}/"
+            tar -czf "dist/${name}.tar.gz" -C dist "${name}"
+          done
+      - name: Generate checksums
+        run: |
+          cd dist
+          sha256sum *.tar.gz > SHA256SUMS.txt
+      - name: Generate changelog
+        shell: bash
+        run: |
+          set -euo pipefail
+          previous_tag="$(git describe --tags --abbrev=0 "${GITHUB_REF_NAME}^" 2>/dev/null || true)"
+          {
+            echo "# Changelog for ${GITHUB_REF_NAME}"
+            echo
+            if [ -n "$previous_tag" ]; then
+              git log --pretty='- %s (%h)' "${previous_tag}..${GITHUB_REF_NAME}"
+            else
+              git log --pretty='- %s (%h)' "${GITHUB_REF_NAME}"
+            fi
+          } > dist/CHANGELOG.md
+      - uses: softprops/action-gh-release@v2
+        with:
+          body_path: dist/CHANGELOG.md
+          files: |
+            dist/*.tar.gz
+            dist/SHA256SUMS.txt
