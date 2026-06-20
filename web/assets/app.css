@@ -955,3 +955,33 @@ button:disabled {
     max-width: 100%;
   }
 }
+
+.graph-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: .75rem;
+  align-items: center;
+  padding: .85rem 1rem 0;
+  color: var(--muted);
+  font-size: .82rem;
+  font-weight: 700;
+}
+
+.graph-legend i {
+  display: inline-block;
+  width: .75rem;
+  height: .75rem;
+  margin-right: .3rem;
+  border: 2px solid var(--ink);
+  border-radius: 50%;
+  vertical-align: -.08rem;
+}
+
+.graph-legend .legend-root {
+  border-color: var(--accent-dark);
+  background: #f5d0bd;
+}
+
+.graph-legend .legend-peer {
+  background: var(--panel);
+}
