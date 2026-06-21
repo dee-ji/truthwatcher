@@ -32,7 +32,7 @@ type assetFilters struct {
 	Vendor      string
 	Serial      string
 	IdentityKey string
-	Query       string
+	Search      string
 }
 
 type assetHistoryEvent struct {
@@ -70,7 +70,7 @@ func handleListAssets(service *assets.Service) http.HandlerFunc {
 		items = filterAssets(items, filters)
 		paged, metadata := paginate(items, page)
 
-		writeDataWithMetadata(w, http.StatusOK, map[string][]assets.Asset{"assets": paged}, metadata)
+		writeDataWithMetadata(w, http.StatusOK, assetsResponse{Assets: paged}, metadata)
 	}
 }
 
@@ -91,7 +91,7 @@ func handleGetAsset(service *assets.Service) http.HandlerFunc {
 			return
 		}
 
-		writeData(w, http.StatusOK, map[string]assets.Asset{"asset": item})
+		writeData(w, http.StatusOK, assetResponse{Asset: item})
 	}
 }
 
@@ -125,10 +125,7 @@ func handleGetAssetHistory(service *assets.Service) http.HandlerFunc {
 		}
 
 		events := assetHistoryEvents(item, facts, filterRelationshipsForAsset(relationships, assetID))
-		writeData(w, http.StatusOK, map[string]any{
-			"asset":   item,
-			"history": events,
-		})
+		writeData(w, http.StatusOK, assetHistoryResponse{Asset: item, History: events})
 	}
 }
 
@@ -152,7 +149,7 @@ func handleListProvisionalIdentityAssets(service *assets.Service) http.HandlerFu
 		}
 		paged, metadata := paginate(items, page)
 
-		writeDataWithMetadata(w, http.StatusOK, map[string][]assets.Asset{"assets": paged}, metadata)
+		writeDataWithMetadata(w, http.StatusOK, assetsResponse{Assets: paged}, metadata)
 	}
 }
 
@@ -184,7 +181,7 @@ func handleListAssetFacts(service *assets.Service) http.HandlerFunc {
 		}
 		paged, metadata := paginate(items, page)
 
-		writeDataWithMetadata(w, http.StatusOK, map[string][]assets.Fact{"facts": paged}, metadata)
+		writeDataWithMetadata(w, http.StatusOK, factsResponse{Facts: paged}, metadata)
 	}
 }
 
@@ -217,7 +214,7 @@ func handleListAssetRelationships(service *assets.Service) http.HandlerFunc {
 		items := filterRelationshipsForAsset(relationships, assetID)
 		paged, metadata := paginate(items, page)
 
-		writeDataWithMetadata(w, http.StatusOK, map[string][]assets.Relationship{"relationships": paged}, metadata)
+		writeDataWithMetadata(w, http.StatusOK, relationshipsResponse{Relationships: paged}, metadata)
 	}
 }
 
@@ -241,7 +238,7 @@ func handleListConflictingFacts(service *assets.Service) http.HandlerFunc {
 		}
 		paged, metadata := paginate(items, page)
 
-		writeDataWithMetadata(w, http.StatusOK, map[string][]assets.Fact{"facts": paged}, metadata)
+		writeDataWithMetadata(w, http.StatusOK, factsResponse{Facts: paged}, metadata)
 	}
 }
 
@@ -277,7 +274,7 @@ func handleListAssetEvidence(assetService *assets.Service, evidenceService *evid
 		}
 		paged, metadata := paginate(items, page)
 
-		writeDataWithMetadata(w, http.StatusOK, map[string][]evidence.Evidence{"evidence": paged}, metadata)
+		writeDataWithMetadata(w, http.StatusOK, evidenceListResponse{Evidence: paged}, metadata)
 	}
 }
 
@@ -323,7 +320,7 @@ func handleListFactEvidence(assetService *assets.Service, evidenceService *evide
 		}
 		paged, metadata := paginate(items, page)
 
-		writeDataWithMetadata(w, http.StatusOK, map[string][]evidence.Evidence{"evidence": paged}, metadata)
+		writeDataWithMetadata(w, http.StatusOK, evidenceListResponse{Evidence: paged}, metadata)
 	}
 }
 
@@ -366,7 +363,7 @@ func parseAssetFilters(r *http.Request) assetFilters {
 		Vendor:      strings.TrimSpace(query.Get("vendor")),
 		Serial:      strings.TrimSpace(query.Get("serial")),
 		IdentityKey: strings.TrimSpace(query.Get("identity_key")),
-		Query:       strings.TrimSpace(query.Get("q")),
+		Search:      strings.TrimSpace(query.Get("search")),
 	}
 }
 
@@ -389,7 +386,7 @@ func filterAssets(items []assets.Asset, filters assetFilters) []assets.Asset {
 		if filters.IdentityKey != "" && !strings.EqualFold(item.IdentityKey, filters.IdentityKey) {
 			continue
 		}
-		if filters.Query != "" && !assetMatchesQuery(item, filters.Query) {
+		if filters.Search != "" && !assetMatchesQuery(item, filters.Search) {
 			continue
 		}
 		filtered = append(filtered, item)
