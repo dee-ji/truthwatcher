@@ -135,23 +135,16 @@ func NewHandler(opts Options) http.Handler {
 }
 
 func handleHealthz(w http.ResponseWriter, r *http.Request) {
-	writeData(w, http.StatusOK, map[string]string{
-		"status": "ok",
-	})
+	writeData(w, http.StatusOK, healthResponse{Status: "ok"})
 }
 
 func handleReadyz(w http.ResponseWriter, r *http.Request) {
-	writeData(w, http.StatusOK, map[string]string{
-		"status": "ready",
-	})
+	writeData(w, http.StatusOK, readinessResponse{Status: "ready"})
 }
 
 func handleVersion(version string) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		writeData(w, http.StatusOK, map[string]string{
-			"name":    "truthwatcher",
-			"version": version,
-		})
+		writeData(w, http.StatusOK, versionResponse{Name: "truthwatcher", Version: version})
 	}
 }
 
@@ -183,7 +176,7 @@ func handleSystemInfo(version string) http.HandlerFunc {
 			GeneratedAt: time.Now().UTC(),
 		}
 
-		writeData(w, http.StatusOK, map[string]systemInfo{"system_info": info})
+		writeData(w, http.StatusOK, systemInfoResponse{SystemInfo: info})
 	}
 }
 
@@ -252,7 +245,7 @@ func handleAgentMessage(assetService *assets.Service, discoveryService *discover
 			return
 		}
 
-		writeData(w, http.StatusOK, map[string]agent.Response{"agent_message": response})
+		writeData(w, http.StatusOK, agentMessageResponse{AgentMessage: response})
 	}
 }
 
@@ -282,7 +275,7 @@ func handleCreateArchitectureSeed(assetService *assets.Service) http.HandlerFunc
 			return
 		}
 
-		writeData(w, http.StatusCreated, map[string]seeding.Result{"architecture_seed": result})
+		writeData(w, http.StatusCreated, architectureSeedResponse{ArchitectureSeed: result})
 	}
 }
 
@@ -315,7 +308,7 @@ func handleCreateDiscoveryPlan(assetService *assets.Service) http.HandlerFunc {
 			return
 		}
 
-		writeData(w, http.StatusOK, map[string]planner.Plan{"discovery_plan": plan})
+		writeData(w, http.StatusOK, discoveryPlanResponse{DiscoveryPlan: plan})
 	}
 }
 
@@ -330,9 +323,7 @@ func handleCreateDiscoveryRun(service *discovery.Service) http.HandlerFunc {
 			return
 		}
 
-		var request struct {
-			SeedInput json.RawMessage `json:"seed_input"`
-		}
+		var request createDiscoveryRunRequest
 		if r.Body != nil {
 			decoder := json.NewDecoder(r.Body)
 			decoder.DisallowUnknownFields()
@@ -352,7 +343,7 @@ func handleCreateDiscoveryRun(service *discovery.Service) http.HandlerFunc {
 			return
 		}
 
-		writeData(w, http.StatusCreated, map[string]discovery.DiscoveryRun{"discovery_run": run})
+		writeData(w, http.StatusCreated, discoveryRunResponse{DiscoveryRun: run})
 	}
 }
 
@@ -367,13 +358,7 @@ func handleExecuteDiscoveryRun(discoveryRuns *discovery.Service, evidenceStore *
 			return
 		}
 
-		var request struct {
-			Collector   string        `json:"collector"`
-			Target      string        `json:"target"`
-			Profile     string        `json:"profile"`
-			Tasks       []policy.Task `json:"tasks"`
-			FixtureRoot string        `json:"fixture_root"`
-		}
+		var request executeDiscoveryRunRequest
 		decoder := json.NewDecoder(r.Body)
 		decoder.DisallowUnknownFields()
 		if err := decoder.Decode(&request); err != nil {
@@ -412,9 +397,7 @@ func handleExecuteDiscoveryRun(discoveryRuns *discovery.Service, evidenceStore *
 				status = http.StatusBadRequest
 			}
 			writeEnvelope(w, status, responseEnvelope{
-				Data: map[string]discovery.DiscoveryRun{
-					"discovery_run": result.DiscoveryRun,
-				},
+				Data:     discoveryRunResponse{DiscoveryRun: result.DiscoveryRun},
 				Error:    &errorEnvelope{Message: err.Error()},
 				Metadata: discoveryExecutionMetadata(collectorName, target, profile.Name, tasks, result),
 			})
@@ -422,10 +405,7 @@ func handleExecuteDiscoveryRun(discoveryRuns *discovery.Service, evidenceStore *
 		}
 
 		writeEnvelope(w, http.StatusCreated, responseEnvelope{
-			Data: map[string]any{
-				"discovery_run": result.DiscoveryRun,
-				"evidence":      result.Evidence,
-			},
+			Data:     executeDiscoveryRunResponse{DiscoveryRun: result.DiscoveryRun, Evidence: result.Evidence},
 			Metadata: discoveryExecutionMetadata(collectorName, target, profile.Name, tasks, result),
 		})
 	}
@@ -444,7 +424,7 @@ func handleListDiscoveryRuns(service *discovery.Service) http.HandlerFunc {
 			return
 		}
 
-		writeData(w, http.StatusOK, map[string][]discovery.DiscoveryRun{"discovery_runs": runs})
+		writeData(w, http.StatusOK, discoveryRunsResponse{DiscoveryRuns: runs})
 	}
 }
 
@@ -465,7 +445,7 @@ func handleGetDiscoveryRun(service *discovery.Service) http.HandlerFunc {
 			return
 		}
 
-		writeData(w, http.StatusOK, map[string]discovery.DiscoveryRun{"discovery_run": run})
+		writeData(w, http.StatusOK, discoveryRunResponse{DiscoveryRun: run})
 	}
 }
 
@@ -482,7 +462,7 @@ func handleListEvidenceByDiscoveryRun(service *evidence.Service) http.HandlerFun
 			return
 		}
 
-		writeData(w, http.StatusOK, map[string][]evidence.Evidence{"evidence": items})
+		writeData(w, http.StatusOK, evidenceListResponse{Evidence: items})
 	}
 }
 
@@ -493,9 +473,7 @@ func handleParseDiscoveryRun(service *parser.PersistenceService) http.HandlerFun
 			return
 		}
 
-		var request struct {
-			Platform string `json:"platform"`
-		}
+		var request parseDiscoveryRunRequest
 		decoder := json.NewDecoder(r.Body)
 		decoder.DisallowUnknownFields()
 		if err := decoder.Decode(&request); err != nil {
@@ -516,7 +494,7 @@ func handleParseDiscoveryRun(service *parser.PersistenceService) http.HandlerFun
 			return
 		}
 
-		writeData(w, http.StatusOK, map[string]parser.ParseDiscoveryRunResult{"parse_result": result})
+		writeData(w, http.StatusOK, parseDiscoveryRunResponse{ParseResult: result})
 	}
 }
 
@@ -537,7 +515,7 @@ func handleGetEvidence(service *evidence.Service) http.HandlerFunc {
 			return
 		}
 
-		writeData(w, http.StatusOK, map[string]evidence.Evidence{"evidence": item})
+		writeData(w, http.StatusOK, evidenceResponse{Evidence: item})
 	}
 }
 
@@ -559,7 +537,7 @@ func handleGetAssetGraph(service *graph.Service) http.HandlerFunc {
 			return
 		}
 
-		writeData(w, http.StatusOK, map[string]graph.Graph{"graph": result})
+		writeData(w, http.StatusOK, graphResponse{Graph: result})
 	}
 }
 
@@ -587,7 +565,7 @@ func handleGetGraphNeighbors(service *graph.Service) http.HandlerFunc {
 			return
 		}
 
-		writeData(w, http.StatusOK, map[string]graph.Graph{"graph": result})
+		writeData(w, http.StatusOK, graphResponse{Graph: result})
 	}
 }
 

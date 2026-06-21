@@ -557,13 +557,13 @@ Supported exact-match filters:
 
 Supported search filters:
 
-- `q` searches asset ID, asset type, identity key, vendor, model, serial, and system MAC with a case-insensitive substring match.
+- `search` searches asset ID, asset type, identity key, vendor, model, serial, and system MAC with a case-insensitive substring match.
 
 Examples:
 
 ```text
 GET /api/v1/assets?type=device&vendor=juniper&limit=50&offset=0
-GET /api/v1/assets?q=mx-edge
+GET /api/v1/assets?search=mx-edge
 ```
 
 Response `data`:

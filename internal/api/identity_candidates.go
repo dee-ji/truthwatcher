@@ -37,7 +37,7 @@ func handleListIdentityCandidates(service *parser.IdentityCandidateService) http
 		}
 		paged, metadata := paginate(items, page)
 
-		writeDataWithMetadata(w, http.StatusOK, map[string][]parser.IdentityCandidate{"identity_candidates": paged}, metadata)
+		writeDataWithMetadata(w, http.StatusOK, identityCandidatesResponse{IdentityCandidates: paged}, metadata)
 	}
 }
 
@@ -68,7 +68,7 @@ func handleListPendingIdentityCandidates(service *parser.IdentityCandidateServic
 		}
 		paged, metadata := paginate(items, page)
 
-		writeDataWithMetadata(w, http.StatusOK, map[string][]parser.IdentityCandidate{"identity_candidates": paged}, metadata)
+		writeDataWithMetadata(w, http.StatusOK, identityCandidatesResponse{IdentityCandidates: paged}, metadata)
 	}
 }
 
@@ -89,7 +89,7 @@ func handleIdentityReviewHandoffReport(service *parser.IdentityCandidateService)
 			return
 		}
 
-		writeData(w, http.StatusOK, map[string]parser.IdentityReviewHandoffReport{"identity_review_handoff": report})
+		writeData(w, http.StatusOK, identityReviewHandoffResponse{IdentityReviewHandoff: report})
 	}
 }
 
@@ -100,12 +100,7 @@ func handleReviewIdentityCandidate(service *parser.IdentityCandidateService) htt
 			return
 		}
 
-		var request struct {
-			Reviewer  string          `json:"reviewer"`
-			Action    string          `json:"action"`
-			Rationale string          `json:"rationale"`
-			Metadata  json.RawMessage `json:"metadata"`
-		}
+		var request reviewIdentityCandidateRequest
 		decoder := json.NewDecoder(r.Body)
 		decoder.DisallowUnknownFields()
 		if err := decoder.Decode(&request); err != nil {
@@ -138,7 +133,7 @@ func handleReviewIdentityCandidate(service *parser.IdentityCandidateService) htt
 			return
 		}
 
-		writeData(w, http.StatusOK, map[string]parser.IdentityCandidateReview{"identity_candidate_review": review})
+		writeData(w, http.StatusOK, identityCandidateReviewResponse{IdentityCandidateReview: review})
 	}
 }
 

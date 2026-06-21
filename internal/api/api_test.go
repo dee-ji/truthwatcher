@@ -1873,7 +1873,7 @@ func TestListAssetsSupportsFreeTextSearch(t *testing.T) {
 	})
 
 	response := httptest.NewRecorder()
-	request := httptest.NewRequest(http.MethodGet, "/api/v1/assets?q=nyc", nil)
+	request := httptest.NewRequest(http.MethodGet, "/api/v1/assets?search=nyc", nil)
 	handler.ServeHTTP(response, request)
 
 	if response.Code != http.StatusOK {
@@ -2471,8 +2471,51 @@ func TestOpenAPIJSON(t *testing.T) {
 	if spec.Info.Title != "Truthwatcher API" || spec.Info.Version != "test-version" {
 		t.Fatalf("info = %+v, want Truthwatcher API test-version", spec.Info)
 	}
-	if _, ok := spec.Paths["/api/v1/assets/{id}"]; !ok {
-		t.Fatalf("spec does not include asset detail path: %#v", spec.Paths)
+	assetsPath, ok := spec.Paths["/api/v1/assets"].(map[string]any)
+	if !ok {
+		t.Fatalf("spec does not include assets path: %#v", spec.Paths)
+	}
+	assetsGet, ok := assetsPath["get"].(map[string]any)
+	if !ok {
+		t.Fatalf("spec does not include assets GET operation: %#v", assetsPath)
+	}
+	parameters, ok := assetsGet["parameters"].([]any)
+	if !ok {
+		t.Fatalf("assets GET does not include parameters: %#v", assetsGet)
+	}
+	foundSearch := false
+	for _, parameter := range parameters {
+		item, ok := parameter.(map[string]any)
+		if ok && item["name"] == "search" {
+			foundSearch = true
+		}
+		if ok && item["name"] == "q" {
+			t.Fatalf("assets GET still documents q parameter: %#v", parameters)
+		}
+	}
+	if !foundSearch {
+		t.Fatalf("assets GET does not document search parameter: %#v", parameters)
+	}
+	responses, ok := assetsGet["responses"].(map[string]any)
+	if !ok {
+		t.Fatalf("assets GET does not include responses: %#v", assetsGet)
+	}
+	statusOK, ok := responses["200"].(map[string]any)
+	if !ok {
+		t.Fatalf("assets GET does not include 200 response: %#v", responses)
+	}
+	content := statusOK["content"].(map[string]any)
+	jsonContent := content["application/json"].(map[string]any)
+	schema := jsonContent["schema"].(map[string]any)
+	if schema["$ref"] != "#/components/schemas/AssetsResponse" {
+		t.Fatalf("assets GET response schema = %#v, want AssetsResponse ref", schema)
+	}
+	components := responseEnvelopeComponentSchemas(response.Body.Bytes(), t)
+	if _, ok := components["ResponseEnvelope"]; ok {
+		t.Fatalf("spec still exposes generic ResponseEnvelope instead of endpoint-specific response schemas")
+	}
+	if _, ok := components["AssetsResponse"]; !ok {
+		t.Fatalf("spec does not define AssetsResponse component: %#v", components)
 	}
 }
 
@@ -2496,4 +2539,17 @@ func TestDocsServesSwaggerUI(t *testing.T) {
 	if !strings.Contains(body, "/openapi.json") {
 		t.Fatalf("body does not point swagger UI at generated spec endpoint: %s", body)
 	}
+}
+
+func responseEnvelopeComponentSchemas(raw []byte, t *testing.T) map[string]any {
+	t.Helper()
+	var spec struct {
+		Components struct {
+			Schemas map[string]any `json:"schemas"`
+		} `json:"components"`
+	}
+	if err := json.Unmarshal(raw, &spec); err != nil {
+		t.Fatalf("decode openapi components: %v", err)
+	}
+	return spec.Components.Schemas
 }

@@ -1,7 +1,2687 @@
 {
   "components": {
     "schemas": {
-      "ResponseEnvelope": {
+      "AgentMessageResponse": {
+        "properties": {
+          "data": {
+            "properties": {
+              "agent_message": {
+                "properties": {
+                  "actions": {
+                    "items": {
+                      "type": "string"
+                    },
+                    "type": "array"
+                  },
+                  "artifacts": {
+                    "additionalProperties": {
+                      "nullable": true
+                    },
+                    "type": "object"
+                  },
+                  "intent": {
+                    "type": "string"
+                  },
+                  "message": {
+                    "type": "string"
+                  },
+                  "read_only": {
+                    "type": "boolean"
+                  }
+                },
+                "required": [
+                  "message",
+                  "intent",
+                  "read_only",
+                  "actions"
+                ],
+                "type": "object"
+              }
+            },
+            "required": [
+              "agent_message"
+            ],
+            "type": "object"
+          },
+          "error": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/Error"
+              }
+            ],
+            "nullable": true
+          },
+          "metadata": {
+            "additionalProperties": true,
+            "type": "object"
+          }
+        },
+        "required": [
+          "data",
+          "metadata"
+        ],
+        "type": "object"
+      },
+      "AgentRequest": {
+        "properties": {
+          "message": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "message"
+        ],
+        "type": "object"
+      },
+      "ArchitectureSeedRequest": {
+        "properties": {
+          "known_asns": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "known_ems_systems": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "known_regions_markets": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "known_route_reflectors": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "known_services": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "known_vendors": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          },
+          "organization_network_type": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "organization_network_type",
+          "known_asns",
+          "known_route_reflectors",
+          "known_vendors",
+          "known_ems_systems",
+          "known_services",
+          "known_regions_markets"
+        ],
+        "type": "object"
+      },
+      "ArchitectureSeedResponse": {
+        "properties": {
+          "data": {
+            "properties": {
+              "architecture_seed": {
+                "properties": {
+                  "asset": {
+                    "properties": {
+                      "confidence": {
+                        "type": "number"
+                      },
+                      "confidence_reason": {
+                        "type": "string"
+                      },
+                      "created_at": {
+                        "format": "date-time",
+                        "type": "string"
+                      },
+                      "id": {
+                        "type": "string"
+                      },
+                      "identity_key": {
+                        "type": "string"
+                      },
+                      "metadata": {
+                        "additionalProperties": true,
+                        "type": "object"
+                      },
+                      "model": {
+                        "type": "string"
+                      },
+                      "serial": {
+                        "type": "string"
+                      },
+                      "state": {
+                        "type": "string"
+                      },
+                      "system_mac": {
+                        "type": "string"
+                      },
+                      "type": {
+                        "type": "string"
+                      },
+                      "updated_at": {
+                        "format": "date-time",
+                        "type": "string"
+                      },
+                      "vendor": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "id",
+                      "type",
+                      "identity_key",
+                      "confidence",
+                      "confidence_reason",
+                      "state",
+                      "metadata",
+                      "created_at",
+                      "updated_at"
+                    ],
+                    "type": "object"
+                  },
+                  "facts": {
+                    "items": {
+                      "properties": {
+                        "asset_id": {
+                          "type": "string"
+                        },
+                        "confidence": {
+                          "type": "number"
+                        },
+                        "confidence_reason": {
+                          "type": "string"
+                        },
+                        "created_at": {
+                          "format": "date-time",
+                          "type": "string"
+                        },
+                        "evidence_id": {
+                          "type": "string"
+                        },
+                        "id": {
+                          "type": "string"
+                        },
+                        "name": {
+                          "type": "string"
+                        },
+                        "source": {
+                          "type": "string"
+                        },
+                        "state": {
+                          "type": "string"
+                        },
+                        "value": {
+                          "additionalProperties": true,
+                          "type": "object"
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "asset_id",
+                        "name",
+                        "value",
+                        "source",
+                        "confidence",
+                        "confidence_reason",
+                        "state",
+                        "created_at"
+                      ],
+                      "type": "object"
+                    },
+                    "type": "array"
+                  },
+                  "warning": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "asset",
+                  "facts",
+                  "warning"
+                ],
+                "type": "object"
+              }
+            },
+            "required": [
+              "architecture_seed"
+            ],
+            "type": "object"
+          },
+          "error": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/Error"
+              }
+            ],
+            "nullable": true
+          },
+          "metadata": {
+            "additionalProperties": true,
+            "type": "object"
+          }
+        },
+        "required": [
+          "data",
+          "metadata"
+        ],
+        "type": "object"
+      },
+      "AssetHistoryResponse": {
+        "properties": {
+          "data": {
+            "properties": {
+              "asset": {
+                "properties": {
+                  "confidence": {
+                    "type": "number"
+                  },
+                  "confidence_reason": {
+                    "type": "string"
+                  },
+                  "created_at": {
+                    "format": "date-time",
+                    "type": "string"
+                  },
+                  "id": {
+                    "type": "string"
+                  },
+                  "identity_key": {
+                    "type": "string"
+                  },
+                  "metadata": {
+                    "additionalProperties": true,
+                    "type": "object"
+                  },
+                  "model": {
+                    "type": "string"
+                  },
+                  "serial": {
+                    "type": "string"
+                  },
+                  "state": {
+                    "type": "string"
+                  },
+                  "system_mac": {
+                    "type": "string"
+                  },
+                  "type": {
+                    "type": "string"
+                  },
+                  "updated_at": {
+                    "format": "date-time",
+                    "type": "string"
+                  },
+                  "vendor": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "id",
+                  "type",
+                  "identity_key",
+                  "confidence",
+                  "confidence_reason",
+                  "state",
+                  "metadata",
+                  "created_at",
+                  "updated_at"
+                ],
+                "type": "object"
+              },
+              "history": {
+                "items": {
+                  "properties": {
+                    "asset_id": {
+                      "type": "string"
+                    },
+                    "confidence": {
+                      "type": "number"
+                    },
+                    "details": {
+                      "nullable": true
+                    },
+                    "event_type": {
+                      "type": "string"
+                    },
+                    "evidence_id": {
+                      "type": "string"
+                    },
+                    "name": {
+                      "type": "string"
+                    },
+                    "occurred_at": {
+                      "type": "string"
+                    },
+                    "record_id": {
+                      "type": "string"
+                    },
+                    "relationship_to": {
+                      "type": "string"
+                    },
+                    "state": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "event_type",
+                    "asset_id",
+                    "record_id",
+                    "name",
+                    "state",
+                    "confidence",
+                    "occurred_at"
+                  ],
+                  "type": "object"
+                },
+                "type": "array"
+              }
+            },
+            "required": [
+              "asset",
+              "history"
+            ],
+            "type": "object"
+          },
+          "error": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/Error"
+              }
+            ],
+            "nullable": true
+          },
+          "metadata": {
+            "additionalProperties": true,
+            "type": "object"
+          }
+        },
+        "required": [
+          "data",
+          "metadata"
+        ],
+        "type": "object"
+      },
+      "AssetResponse": {
+        "properties": {
+          "data": {
+            "properties": {
+              "asset": {
+                "properties": {
+                  "confidence": {
+                    "type": "number"
+                  },
+                  "confidence_reason": {
+                    "type": "string"
+                  },
+                  "created_at": {
+                    "format": "date-time",
+                    "type": "string"
+                  },
+                  "id": {
+                    "type": "string"
+                  },
+                  "identity_key": {
+                    "type": "string"
+                  },
+                  "metadata": {
+                    "additionalProperties": true,
+                    "type": "object"
+                  },
+                  "model": {
+                    "type": "string"
+                  },
+                  "serial": {
+                    "type": "string"
+                  },
+                  "state": {
+                    "type": "string"
+                  },
+                  "system_mac": {
+                    "type": "string"
+                  },
+                  "type": {
+                    "type": "string"
+                  },
+                  "updated_at": {
+                    "format": "date-time",
+                    "type": "string"
+                  },
+                  "vendor": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "id",
+                  "type",
+                  "identity_key",
+                  "confidence",
+                  "confidence_reason",
+                  "state",
+                  "metadata",
+                  "created_at",
+                  "updated_at"
+                ],
+                "type": "object"
+              }
+            },
+            "required": [
+              "asset"
+            ],
+            "type": "object"
+          },
+          "error": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/Error"
+              }
+            ],
+            "nullable": true
+          },
+          "metadata": {
+            "additionalProperties": true,
+            "type": "object"
+          }
+        },
+        "required": [
+          "data",
+          "metadata"
+        ],
+        "type": "object"
+      },
+      "AssetsResponse": {
+        "properties": {
+          "data": {
+            "properties": {
+              "assets": {
+                "items": {
+                  "properties": {
+                    "confidence": {
+                      "type": "number"
+                    },
+                    "confidence_reason": {
+                      "type": "string"
+                    },
+                    "created_at": {
+                      "format": "date-time",
+                      "type": "string"
+                    },
+                    "id": {
+                      "type": "string"
+                    },
+                    "identity_key": {
+                      "type": "string"
+                    },
+                    "metadata": {
+                      "additionalProperties": true,
+                      "type": "object"
+                    },
+                    "model": {
+                      "type": "string"
+                    },
+                    "serial": {
+                      "type": "string"
+                    },
+                    "state": {
+                      "type": "string"
+                    },
+                    "system_mac": {
+                      "type": "string"
+                    },
+                    "type": {
+                      "type": "string"
+                    },
+                    "updated_at": {
+                      "format": "date-time",
+                      "type": "string"
+                    },
+                    "vendor": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "type",
+                    "identity_key",
+                    "confidence",
+                    "confidence_reason",
+                    "state",
+                    "metadata",
+                    "created_at",
+                    "updated_at"
+                  ],
+                  "type": "object"
+                },
+                "type": "array"
+              }
+            },
+            "required": [
+              "assets"
+            ],
+            "type": "object"
+          },
+          "error": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/Error"
+              }
+            ],
+            "nullable": true
+          },
+          "metadata": {
+            "additionalProperties": true,
+            "type": "object"
+          }
+        },
+        "required": [
+          "data",
+          "metadata"
+        ],
+        "type": "object"
+      },
+      "CreateDiscoveryRunRequest": {
+        "properties": {
+          "seed_input": {
+            "additionalProperties": true,
+            "type": "object"
+          }
+        },
+        "required": [
+          "seed_input"
+        ],
+        "type": "object"
+      },
+      "DiscoveryPlanRequest": {
+        "properties": {
+          "method": {
+            "type": "string"
+          },
+          "profile": {
+            "type": "string"
+          },
+          "seed_input": {
+            "additionalProperties": true,
+            "type": "object"
+          },
+          "target": {
+            "type": "string"
+          },
+          "tasks": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "seed_input",
+          "target",
+          "method",
+          "profile",
+          "tasks"
+        ],
+        "type": "object"
+      },
+      "DiscoveryPlanResponse": {
+        "properties": {
+          "data": {
+            "properties": {
+              "discovery_plan": {
+                "properties": {
+                  "approval_required": {
+                    "type": "boolean"
+                  },
+                  "execution_allowed": {
+                    "type": "boolean"
+                  },
+                  "seed_input": {
+                    "additionalProperties": {
+                      "nullable": true
+                    },
+                    "type": "object"
+                  },
+                  "steps": {
+                    "items": {
+                      "properties": {
+                        "expected_evidence": {
+                          "type": "string"
+                        },
+                        "method": {
+                          "type": "string"
+                        },
+                        "profile": {
+                          "type": "string"
+                        },
+                        "reason": {
+                          "type": "string"
+                        },
+                        "risk_level": {
+                          "type": "string"
+                        },
+                        "target": {
+                          "type": "string"
+                        },
+                        "task": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "target",
+                        "method",
+                        "profile",
+                        "task",
+                        "reason",
+                        "expected_evidence",
+                        "risk_level"
+                      ],
+                      "type": "object"
+                    },
+                    "type": "array"
+                  },
+                  "warnings": {
+                    "items": {
+                      "type": "string"
+                    },
+                    "type": "array"
+                  }
+                },
+                "required": [
+                  "steps",
+                  "approval_required",
+                  "execution_allowed"
+                ],
+                "type": "object"
+              }
+            },
+            "required": [
+              "discovery_plan"
+            ],
+            "type": "object"
+          },
+          "error": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/Error"
+              }
+            ],
+            "nullable": true
+          },
+          "metadata": {
+            "additionalProperties": true,
+            "type": "object"
+          }
+        },
+        "required": [
+          "data",
+          "metadata"
+        ],
+        "type": "object"
+      },
+      "DiscoveryRunResponse": {
+        "properties": {
+          "data": {
+            "properties": {
+              "discovery_run": {
+                "properties": {
+                  "completed_at": {
+                    "format": "date-time",
+                    "type": "string"
+                  },
+                  "created_at": {
+                    "format": "date-time",
+                    "type": "string"
+                  },
+                  "error_message": {
+                    "type": "string"
+                  },
+                  "id": {
+                    "type": "string"
+                  },
+                  "seed_input": {
+                    "additionalProperties": true,
+                    "type": "object"
+                  },
+                  "started_at": {
+                    "format": "date-time",
+                    "type": "string"
+                  },
+                  "status": {
+                    "type": "string"
+                  },
+                  "updated_at": {
+                    "format": "date-time",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "id",
+                  "status",
+                  "seed_input",
+                  "started_at",
+                  "created_at",
+                  "updated_at"
+                ],
+                "type": "object"
+              }
+            },
+            "required": [
+              "discovery_run"
+            ],
+            "type": "object"
+          },
+          "error": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/Error"
+              }
+            ],
+            "nullable": true
+          },
+          "metadata": {
+            "additionalProperties": true,
+            "type": "object"
+          }
+        },
+        "required": [
+          "data",
+          "metadata"
+        ],
+        "type": "object"
+      },
+      "DiscoveryRunsResponse": {
+        "properties": {
+          "data": {
+            "properties": {
+              "discovery_runs": {
+                "items": {
+                  "properties": {
+                    "completed_at": {
+                      "format": "date-time",
+                      "type": "string"
+                    },
+                    "created_at": {
+                      "format": "date-time",
+                      "type": "string"
+                    },
+                    "error_message": {
+                      "type": "string"
+                    },
+                    "id": {
+                      "type": "string"
+                    },
+                    "seed_input": {
+                      "additionalProperties": true,
+                      "type": "object"
+                    },
+                    "started_at": {
+                      "format": "date-time",
+                      "type": "string"
+                    },
+                    "status": {
+                      "type": "string"
+                    },
+                    "updated_at": {
+                      "format": "date-time",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "status",
+                    "seed_input",
+                    "started_at",
+                    "created_at",
+                    "updated_at"
+                  ],
+                  "type": "object"
+                },
+                "type": "array"
+              }
+            },
+            "required": [
+              "discovery_runs"
+            ],
+            "type": "object"
+          },
+          "error": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/Error"
+              }
+            ],
+            "nullable": true
+          },
+          "metadata": {
+            "additionalProperties": true,
+            "type": "object"
+          }
+        },
+        "required": [
+          "data",
+          "metadata"
+        ],
+        "type": "object"
+      },
+      "Error": {
+        "properties": {
+          "message": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "message"
+        ],
+        "type": "object"
+      },
+      "ErrorResponseEnvelope": {
+        "properties": {
+          "data": {
+            "nullable": true
+          },
+          "error": {
+            "$ref": "#/components/schemas/Error"
+          },
+          "metadata": {
+            "additionalProperties": true,
+            "type": "object"
+          }
+        },
+        "required": [
+          "error",
+          "metadata"
+        ],
+        "type": "object"
+      },
+      "EvidenceListResponse": {
+        "properties": {
+          "data": {
+            "properties": {
+              "evidence": {
+                "items": {
+                  "properties": {
+                    "collected_at": {
+                      "format": "date-time",
+                      "type": "string"
+                    },
+                    "command_or_api": {
+                      "type": "string"
+                    },
+                    "discovery_run_id": {
+                      "type": "string"
+                    },
+                    "id": {
+                      "type": "string"
+                    },
+                    "metadata": {
+                      "additionalProperties": true,
+                      "type": "object"
+                    },
+                    "method": {
+                      "type": "string"
+                    },
+                    "parser_name": {
+                      "type": "string"
+                    },
+                    "raw_output": {
+                      "type": "string"
+                    },
+                    "raw_output_hash": {
+                      "type": "string"
+                    },
+                    "target": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "discovery_run_id",
+                    "target",
+                    "method",
+                    "command_or_api",
+                    "raw_output",
+                    "raw_output_hash",
+                    "collected_at",
+                    "metadata"
+                  ],
+                  "type": "object"
+                },
+                "type": "array"
+              }
+            },
+            "required": [
+              "evidence"
+            ],
+            "type": "object"
+          },
+          "error": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/Error"
+              }
+            ],
+            "nullable": true
+          },
+          "metadata": {
+            "additionalProperties": true,
+            "type": "object"
+          }
+        },
+        "required": [
+          "data",
+          "metadata"
+        ],
+        "type": "object"
+      },
+      "EvidenceResponse": {
+        "properties": {
+          "data": {
+            "properties": {
+              "evidence": {
+                "properties": {
+                  "collected_at": {
+                    "format": "date-time",
+                    "type": "string"
+                  },
+                  "command_or_api": {
+                    "type": "string"
+                  },
+                  "discovery_run_id": {
+                    "type": "string"
+                  },
+                  "id": {
+                    "type": "string"
+                  },
+                  "metadata": {
+                    "additionalProperties": true,
+                    "type": "object"
+                  },
+                  "method": {
+                    "type": "string"
+                  },
+                  "parser_name": {
+                    "type": "string"
+                  },
+                  "raw_output": {
+                    "type": "string"
+                  },
+                  "raw_output_hash": {
+                    "type": "string"
+                  },
+                  "target": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "id",
+                  "discovery_run_id",
+                  "target",
+                  "method",
+                  "command_or_api",
+                  "raw_output",
+                  "raw_output_hash",
+                  "collected_at",
+                  "metadata"
+                ],
+                "type": "object"
+              }
+            },
+            "required": [
+              "evidence"
+            ],
+            "type": "object"
+          },
+          "error": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/Error"
+              }
+            ],
+            "nullable": true
+          },
+          "metadata": {
+            "additionalProperties": true,
+            "type": "object"
+          }
+        },
+        "required": [
+          "data",
+          "metadata"
+        ],
+        "type": "object"
+      },
+      "ExecuteDiscoveryRunRequest": {
+        "properties": {
+          "collector": {
+            "type": "string"
+          },
+          "fixture_root": {
+            "type": "string"
+          },
+          "profile": {
+            "type": "string"
+          },
+          "target": {
+            "type": "string"
+          },
+          "tasks": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "collector",
+          "target",
+          "profile",
+          "tasks",
+          "fixture_root"
+        ],
+        "type": "object"
+      },
+      "ExecuteDiscoveryRunResponse": {
+        "properties": {
+          "data": {
+            "properties": {
+              "discovery_run": {
+                "properties": {
+                  "completed_at": {
+                    "format": "date-time",
+                    "type": "string"
+                  },
+                  "created_at": {
+                    "format": "date-time",
+                    "type": "string"
+                  },
+                  "error_message": {
+                    "type": "string"
+                  },
+                  "id": {
+                    "type": "string"
+                  },
+                  "seed_input": {
+                    "additionalProperties": true,
+                    "type": "object"
+                  },
+                  "started_at": {
+                    "format": "date-time",
+                    "type": "string"
+                  },
+                  "status": {
+                    "type": "string"
+                  },
+                  "updated_at": {
+                    "format": "date-time",
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "id",
+                  "status",
+                  "seed_input",
+                  "started_at",
+                  "created_at",
+                  "updated_at"
+                ],
+                "type": "object"
+              },
+              "evidence": {
+                "items": {
+                  "properties": {
+                    "collected_at": {
+                      "format": "date-time",
+                      "type": "string"
+                    },
+                    "command_or_api": {
+                      "type": "string"
+                    },
+                    "discovery_run_id": {
+                      "type": "string"
+                    },
+                    "id": {
+                      "type": "string"
+                    },
+                    "metadata": {
+                      "additionalProperties": true,
+                      "type": "object"
+                    },
+                    "method": {
+                      "type": "string"
+                    },
+                    "parser_name": {
+                      "type": "string"
+                    },
+                    "raw_output": {
+                      "type": "string"
+                    },
+                    "raw_output_hash": {
+                      "type": "string"
+                    },
+                    "target": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "discovery_run_id",
+                    "target",
+                    "method",
+                    "command_or_api",
+                    "raw_output",
+                    "raw_output_hash",
+                    "collected_at",
+                    "metadata"
+                  ],
+                  "type": "object"
+                },
+                "type": "array"
+              }
+            },
+            "required": [
+              "discovery_run",
+              "evidence"
+            ],
+            "type": "object"
+          },
+          "error": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/Error"
+              }
+            ],
+            "nullable": true
+          },
+          "metadata": {
+            "additionalProperties": true,
+            "type": "object"
+          }
+        },
+        "required": [
+          "data",
+          "metadata"
+        ],
+        "type": "object"
+      },
+      "FactsResponse": {
+        "properties": {
+          "data": {
+            "properties": {
+              "facts": {
+                "items": {
+                  "properties": {
+                    "asset_id": {
+                      "type": "string"
+                    },
+                    "confidence": {
+                      "type": "number"
+                    },
+                    "confidence_reason": {
+                      "type": "string"
+                    },
+                    "created_at": {
+                      "format": "date-time",
+                      "type": "string"
+                    },
+                    "evidence_id": {
+                      "type": "string"
+                    },
+                    "id": {
+                      "type": "string"
+                    },
+                    "name": {
+                      "type": "string"
+                    },
+                    "source": {
+                      "type": "string"
+                    },
+                    "state": {
+                      "type": "string"
+                    },
+                    "value": {
+                      "additionalProperties": true,
+                      "type": "object"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "asset_id",
+                    "name",
+                    "value",
+                    "source",
+                    "confidence",
+                    "confidence_reason",
+                    "state",
+                    "created_at"
+                  ],
+                  "type": "object"
+                },
+                "type": "array"
+              }
+            },
+            "required": [
+              "facts"
+            ],
+            "type": "object"
+          },
+          "error": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/Error"
+              }
+            ],
+            "nullable": true
+          },
+          "metadata": {
+            "additionalProperties": true,
+            "type": "object"
+          }
+        },
+        "required": [
+          "data",
+          "metadata"
+        ],
+        "type": "object"
+      },
+      "GraphResponse": {
+        "properties": {
+          "data": {
+            "properties": {
+              "graph": {
+                "properties": {
+                  "edges": {
+                    "items": {
+                      "properties": {
+                        "confidence": {
+                          "type": "number"
+                        },
+                        "confidence_reason": {
+                          "type": "string"
+                        },
+                        "evidence_id": {
+                          "type": "string"
+                        },
+                        "id": {
+                          "type": "string"
+                        },
+                        "metadata": {
+                          "additionalProperties": true,
+                          "type": "object"
+                        },
+                        "relationship_type": {
+                          "type": "string"
+                        },
+                        "source": {
+                          "type": "string"
+                        },
+                        "state": {
+                          "type": "string"
+                        },
+                        "target": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "source",
+                        "target",
+                        "relationship_type",
+                        "confidence",
+                        "confidence_reason",
+                        "state",
+                        "metadata"
+                      ],
+                      "type": "object"
+                    },
+                    "type": "array"
+                  },
+                  "nodes": {
+                    "items": {
+                      "properties": {
+                        "confidence": {
+                          "type": "number"
+                        },
+                        "confidence_reason": {
+                          "type": "string"
+                        },
+                        "facts": {
+                          "items": {
+                            "properties": {
+                              "asset_id": {
+                                "type": "string"
+                              },
+                              "confidence": {
+                                "type": "number"
+                              },
+                              "confidence_reason": {
+                                "type": "string"
+                              },
+                              "created_at": {
+                                "format": "date-time",
+                                "type": "string"
+                              },
+                              "evidence_id": {
+                                "type": "string"
+                              },
+                              "id": {
+                                "type": "string"
+                              },
+                              "name": {
+                                "type": "string"
+                              },
+                              "source": {
+                                "type": "string"
+                              },
+                              "state": {
+                                "type": "string"
+                              },
+                              "value": {
+                                "additionalProperties": true,
+                                "type": "object"
+                              }
+                            },
+                            "required": [
+                              "id",
+                              "asset_id",
+                              "name",
+                              "value",
+                              "source",
+                              "confidence",
+                              "confidence_reason",
+                              "state",
+                              "created_at"
+                            ],
+                            "type": "object"
+                          },
+                          "type": "array"
+                        },
+                        "id": {
+                          "type": "string"
+                        },
+                        "identity_key": {
+                          "type": "string"
+                        },
+                        "label": {
+                          "type": "string"
+                        },
+                        "metadata": {
+                          "additionalProperties": true,
+                          "type": "object"
+                        },
+                        "model": {
+                          "type": "string"
+                        },
+                        "serial": {
+                          "type": "string"
+                        },
+                        "state": {
+                          "type": "string"
+                        },
+                        "system_mac": {
+                          "type": "string"
+                        },
+                        "type": {
+                          "type": "string"
+                        },
+                        "vendor": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "type",
+                        "label",
+                        "identity_key",
+                        "confidence",
+                        "confidence_reason",
+                        "state",
+                        "metadata"
+                      ],
+                      "type": "object"
+                    },
+                    "type": "array"
+                  }
+                },
+                "required": [
+                  "nodes",
+                  "edges"
+                ],
+                "type": "object"
+              }
+            },
+            "required": [
+              "graph"
+            ],
+            "type": "object"
+          },
+          "error": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/Error"
+              }
+            ],
+            "nullable": true
+          },
+          "metadata": {
+            "additionalProperties": true,
+            "type": "object"
+          }
+        },
+        "required": [
+          "data",
+          "metadata"
+        ],
+        "type": "object"
+      },
+      "HealthResponse": {
+        "properties": {
+          "data": {
+            "properties": {
+              "status": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "status"
+            ],
+            "type": "object"
+          },
+          "error": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/Error"
+              }
+            ],
+            "nullable": true
+          },
+          "metadata": {
+            "additionalProperties": true,
+            "type": "object"
+          }
+        },
+        "required": [
+          "data",
+          "metadata"
+        ],
+        "type": "object"
+      },
+      "IdentityCandidateReviewResponse": {
+        "properties": {
+          "data": {
+            "properties": {
+              "identity_candidate_review": {
+                "properties": {
+                  "action": {
+                    "type": "string"
+                  },
+                  "created_at": {
+                    "format": "date-time",
+                    "type": "string"
+                  },
+                  "discovery_run_id": {
+                    "type": "string"
+                  },
+                  "effect": {
+                    "type": "string"
+                  },
+                  "evidence_id": {
+                    "type": "string"
+                  },
+                  "id": {
+                    "type": "string"
+                  },
+                  "identity_candidate_id": {
+                    "type": "string"
+                  },
+                  "metadata": {
+                    "additionalProperties": true,
+                    "type": "object"
+                  },
+                  "previous_review_state": {
+                    "type": "string"
+                  },
+                  "rationale": {
+                    "type": "string"
+                  },
+                  "resulting_review_state": {
+                    "type": "string"
+                  },
+                  "reviewer": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "id",
+                  "identity_candidate_id",
+                  "discovery_run_id",
+                  "evidence_id",
+                  "reviewer",
+                  "action",
+                  "previous_review_state",
+                  "resulting_review_state",
+                  "rationale",
+                  "effect",
+                  "metadata",
+                  "created_at"
+                ],
+                "type": "object"
+              }
+            },
+            "required": [
+              "identity_candidate_review"
+            ],
+            "type": "object"
+          },
+          "error": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/Error"
+              }
+            ],
+            "nullable": true
+          },
+          "metadata": {
+            "additionalProperties": true,
+            "type": "object"
+          }
+        },
+        "required": [
+          "data",
+          "metadata"
+        ],
+        "type": "object"
+      },
+      "IdentityCandidatesResponse": {
+        "properties": {
+          "data": {
+            "properties": {
+              "identity_candidates": {
+                "items": {
+                  "properties": {
+                    "asset_type": {
+                      "type": "string"
+                    },
+                    "candidate_identity_key": {
+                      "type": "string"
+                    },
+                    "confidence": {
+                      "type": "number"
+                    },
+                    "created_at": {
+                      "format": "date-time",
+                      "type": "string"
+                    },
+                    "discovery_run_id": {
+                      "type": "string"
+                    },
+                    "evidence_id": {
+                      "type": "string"
+                    },
+                    "hostname": {
+                      "type": "string"
+                    },
+                    "id": {
+                      "type": "string"
+                    },
+                    "metadata": {
+                      "additionalProperties": true,
+                      "type": "object"
+                    },
+                    "model": {
+                      "type": "string"
+                    },
+                    "parser_name": {
+                      "type": "string"
+                    },
+                    "proposed_asset_id": {
+                      "type": "string"
+                    },
+                    "reason": {
+                      "type": "string"
+                    },
+                    "review_state": {
+                      "type": "string"
+                    },
+                    "serial": {
+                      "type": "string"
+                    },
+                    "strength": {
+                      "type": "string"
+                    },
+                    "system_mac": {
+                      "type": "string"
+                    },
+                    "vendor": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "discovery_run_id",
+                    "evidence_id",
+                    "parser_name",
+                    "asset_type",
+                    "candidate_identity_key",
+                    "strength",
+                    "confidence",
+                    "reason",
+                    "review_state",
+                    "metadata",
+                    "created_at"
+                  ],
+                  "type": "object"
+                },
+                "type": "array"
+              }
+            },
+            "required": [
+              "identity_candidates"
+            ],
+            "type": "object"
+          },
+          "error": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/Error"
+              }
+            ],
+            "nullable": true
+          },
+          "metadata": {
+            "additionalProperties": true,
+            "type": "object"
+          }
+        },
+        "required": [
+          "data",
+          "metadata"
+        ],
+        "type": "object"
+      },
+      "IdentityReviewHandoffResponse": {
+        "properties": {
+          "data": {
+            "properties": {
+              "identity_review_handoff": {
+                "properties": {
+                  "boundary": {
+                    "type": "string"
+                  },
+                  "derived_output": {
+                    "type": "boolean"
+                  },
+                  "entries": {
+                    "items": {
+                      "properties": {
+                        "candidate": {
+                          "properties": {
+                            "asset_type": {
+                              "type": "string"
+                            },
+                            "candidate_identity_key": {
+                              "type": "string"
+                            },
+                            "confidence": {
+                              "type": "number"
+                            },
+                            "created_at": {
+                              "format": "date-time",
+                              "type": "string"
+                            },
+                            "discovery_run_id": {
+                              "type": "string"
+                            },
+                            "evidence_id": {
+                              "type": "string"
+                            },
+                            "hostname": {
+                              "type": "string"
+                            },
+                            "id": {
+                              "type": "string"
+                            },
+                            "metadata": {
+                              "additionalProperties": true,
+                              "type": "object"
+                            },
+                            "model": {
+                              "type": "string"
+                            },
+                            "parser_name": {
+                              "type": "string"
+                            },
+                            "proposed_asset_id": {
+                              "type": "string"
+                            },
+                            "reason": {
+                              "type": "string"
+                            },
+                            "review_state": {
+                              "type": "string"
+                            },
+                            "serial": {
+                              "type": "string"
+                            },
+                            "strength": {
+                              "type": "string"
+                            },
+                            "system_mac": {
+                              "type": "string"
+                            },
+                            "vendor": {
+                              "type": "string"
+                            }
+                          },
+                          "required": [
+                            "id",
+                            "discovery_run_id",
+                            "evidence_id",
+                            "parser_name",
+                            "asset_type",
+                            "candidate_identity_key",
+                            "strength",
+                            "confidence",
+                            "reason",
+                            "review_state",
+                            "metadata",
+                            "created_at"
+                          ],
+                          "type": "object"
+                        },
+                        "evidence_reference": {
+                          "properties": {
+                            "discovery_run_id": {
+                              "type": "string"
+                            },
+                            "evidence_id": {
+                              "type": "string"
+                            },
+                            "present": {
+                              "type": "boolean"
+                            }
+                          },
+                          "required": [
+                            "evidence_id",
+                            "discovery_run_id",
+                            "present"
+                          ],
+                          "type": "object"
+                        },
+                        "handoff_status": {
+                          "type": "string"
+                        },
+                        "identity_effect": {
+                          "type": "string"
+                        },
+                        "integrity_warnings": {
+                          "items": {
+                            "type": "string"
+                          },
+                          "type": "array"
+                        },
+                        "latest_review": {
+                          "properties": {
+                            "action": {
+                              "type": "string"
+                            },
+                            "created_at": {
+                              "format": "date-time",
+                              "type": "string"
+                            },
+                            "discovery_run_id": {
+                              "type": "string"
+                            },
+                            "effect": {
+                              "type": "string"
+                            },
+                            "evidence_id": {
+                              "type": "string"
+                            },
+                            "id": {
+                              "type": "string"
+                            },
+                            "identity_candidate_id": {
+                              "type": "string"
+                            },
+                            "metadata": {
+                              "additionalProperties": true,
+                              "type": "object"
+                            },
+                            "previous_review_state": {
+                              "type": "string"
+                            },
+                            "rationale": {
+                              "type": "string"
+                            },
+                            "resulting_review_state": {
+                              "type": "string"
+                            },
+                            "reviewer": {
+                              "type": "string"
+                            }
+                          },
+                          "required": [
+                            "id",
+                            "identity_candidate_id",
+                            "discovery_run_id",
+                            "evidence_id",
+                            "reviewer",
+                            "action",
+                            "previous_review_state",
+                            "resulting_review_state",
+                            "rationale",
+                            "effect",
+                            "metadata",
+                            "created_at"
+                          ],
+                          "type": "object"
+                        },
+                        "mistspren_intake_note": {
+                          "type": "string"
+                        },
+                        "output_label": {
+                          "type": "string"
+                        },
+                        "parser_source": {
+                          "properties": {
+                            "metadata": {
+                              "additionalProperties": true,
+                              "type": "object"
+                            },
+                            "parser_name": {
+                              "type": "string"
+                            }
+                          },
+                          "required": [
+                            "parser_name",
+                            "metadata"
+                          ],
+                          "type": "object"
+                        },
+                        "review_summary": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "handoff_status",
+                        "output_label",
+                        "candidate",
+                        "evidence_reference",
+                        "parser_source",
+                        "review_summary",
+                        "identity_effect",
+                        "mistspren_intake_note"
+                      ],
+                      "type": "object"
+                    },
+                    "type": "array"
+                  },
+                  "generated_at": {
+                    "format": "date-time",
+                    "type": "string"
+                  },
+                  "integrity": {
+                    "properties": {
+                      "missing_evidence_references": {
+                        "type": "integer"
+                      },
+                      "orphaned_review_records": {
+                        "type": "integer"
+                      },
+                      "unresolved_pending_entries": {
+                        "type": "integer"
+                      },
+                      "warnings": {
+                        "items": {
+                          "type": "string"
+                        },
+                        "type": "array"
+                      }
+                    },
+                    "required": [
+                      "missing_evidence_references",
+                      "orphaned_review_records",
+                      "unresolved_pending_entries"
+                    ],
+                    "type": "object"
+                  },
+                  "non_destructive_guarantee": {
+                    "type": "string"
+                  },
+                  "report_type": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "report_type",
+                  "boundary",
+                  "derived_output",
+                  "generated_at",
+                  "entries",
+                  "integrity",
+                  "non_destructive_guarantee"
+                ],
+                "type": "object"
+              }
+            },
+            "required": [
+              "identity_review_handoff"
+            ],
+            "type": "object"
+          },
+          "error": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/Error"
+              }
+            ],
+            "nullable": true
+          },
+          "metadata": {
+            "additionalProperties": true,
+            "type": "object"
+          }
+        },
+        "required": [
+          "data",
+          "metadata"
+        ],
+        "type": "object"
+      },
+      "ParseDiscoveryRunRequest": {
+        "properties": {
+          "platform": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "platform"
+        ],
+        "type": "object"
+      },
+      "ParseDiscoveryRunResponse": {
+        "properties": {
+          "data": {
+            "properties": {
+              "parse_result": {
+                "properties": {
+                  "assets": {
+                    "items": {
+                      "properties": {
+                        "confidence": {
+                          "type": "number"
+                        },
+                        "confidence_reason": {
+                          "type": "string"
+                        },
+                        "created_at": {
+                          "format": "date-time",
+                          "type": "string"
+                        },
+                        "id": {
+                          "type": "string"
+                        },
+                        "identity_key": {
+                          "type": "string"
+                        },
+                        "metadata": {
+                          "additionalProperties": true,
+                          "type": "object"
+                        },
+                        "model": {
+                          "type": "string"
+                        },
+                        "serial": {
+                          "type": "string"
+                        },
+                        "state": {
+                          "type": "string"
+                        },
+                        "system_mac": {
+                          "type": "string"
+                        },
+                        "type": {
+                          "type": "string"
+                        },
+                        "updated_at": {
+                          "format": "date-time",
+                          "type": "string"
+                        },
+                        "vendor": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "type",
+                        "identity_key",
+                        "confidence",
+                        "confidence_reason",
+                        "state",
+                        "metadata",
+                        "created_at",
+                        "updated_at"
+                      ],
+                      "type": "object"
+                    },
+                    "type": "array"
+                  },
+                  "discovery_run_id": {
+                    "type": "string"
+                  },
+                  "evidence_count": {
+                    "type": "integer"
+                  },
+                  "facts": {
+                    "items": {
+                      "properties": {
+                        "asset_id": {
+                          "type": "string"
+                        },
+                        "confidence": {
+                          "type": "number"
+                        },
+                        "confidence_reason": {
+                          "type": "string"
+                        },
+                        "created_at": {
+                          "format": "date-time",
+                          "type": "string"
+                        },
+                        "evidence_id": {
+                          "type": "string"
+                        },
+                        "id": {
+                          "type": "string"
+                        },
+                        "name": {
+                          "type": "string"
+                        },
+                        "source": {
+                          "type": "string"
+                        },
+                        "state": {
+                          "type": "string"
+                        },
+                        "value": {
+                          "additionalProperties": true,
+                          "type": "object"
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "asset_id",
+                        "name",
+                        "value",
+                        "source",
+                        "confidence",
+                        "confidence_reason",
+                        "state",
+                        "created_at"
+                      ],
+                      "type": "object"
+                    },
+                    "type": "array"
+                  },
+                  "identity_candidates": {
+                    "items": {
+                      "properties": {
+                        "asset_type": {
+                          "type": "string"
+                        },
+                        "candidate_identity_key": {
+                          "type": "string"
+                        },
+                        "confidence": {
+                          "type": "number"
+                        },
+                        "created_at": {
+                          "format": "date-time",
+                          "type": "string"
+                        },
+                        "discovery_run_id": {
+                          "type": "string"
+                        },
+                        "evidence_id": {
+                          "type": "string"
+                        },
+                        "hostname": {
+                          "type": "string"
+                        },
+                        "id": {
+                          "type": "string"
+                        },
+                        "metadata": {
+                          "additionalProperties": true,
+                          "type": "object"
+                        },
+                        "model": {
+                          "type": "string"
+                        },
+                        "parser_name": {
+                          "type": "string"
+                        },
+                        "proposed_asset_id": {
+                          "type": "string"
+                        },
+                        "reason": {
+                          "type": "string"
+                        },
+                        "review_state": {
+                          "type": "string"
+                        },
+                        "serial": {
+                          "type": "string"
+                        },
+                        "strength": {
+                          "type": "string"
+                        },
+                        "system_mac": {
+                          "type": "string"
+                        },
+                        "vendor": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "discovery_run_id",
+                        "evidence_id",
+                        "parser_name",
+                        "asset_type",
+                        "candidate_identity_key",
+                        "strength",
+                        "confidence",
+                        "reason",
+                        "review_state",
+                        "metadata",
+                        "created_at"
+                      ],
+                      "type": "object"
+                    },
+                    "type": "array"
+                  },
+                  "parse_results": {
+                    "items": {
+                      "properties": {
+                        "created_at": {
+                          "format": "date-time",
+                          "type": "string"
+                        },
+                        "discovery_run_id": {
+                          "type": "string"
+                        },
+                        "error_message": {
+                          "type": "string"
+                        },
+                        "evidence_id": {
+                          "type": "string"
+                        },
+                        "id": {
+                          "type": "string"
+                        },
+                        "parser_name": {
+                          "type": "string"
+                        },
+                        "status": {
+                          "type": "string"
+                        },
+                        "warnings": {
+                          "additionalProperties": true,
+                          "type": "object"
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "discovery_run_id",
+                        "evidence_id",
+                        "parser_name",
+                        "status",
+                        "warnings",
+                        "created_at"
+                      ],
+                      "type": "object"
+                    },
+                    "type": "array"
+                  },
+                  "relationships": {
+                    "items": {
+                      "properties": {
+                        "confidence": {
+                          "type": "number"
+                        },
+                        "confidence_reason": {
+                          "type": "string"
+                        },
+                        "created_at": {
+                          "format": "date-time",
+                          "type": "string"
+                        },
+                        "evidence_id": {
+                          "type": "string"
+                        },
+                        "id": {
+                          "type": "string"
+                        },
+                        "metadata": {
+                          "additionalProperties": true,
+                          "type": "object"
+                        },
+                        "relationship_type": {
+                          "type": "string"
+                        },
+                        "source_asset_id": {
+                          "type": "string"
+                        },
+                        "state": {
+                          "type": "string"
+                        },
+                        "target_asset_id": {
+                          "type": "string"
+                        },
+                        "updated_at": {
+                          "format": "date-time",
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "source_asset_id",
+                        "target_asset_id",
+                        "relationship_type",
+                        "confidence",
+                        "confidence_reason",
+                        "state",
+                        "metadata",
+                        "created_at",
+                        "updated_at"
+                      ],
+                      "type": "object"
+                    },
+                    "type": "array"
+                  },
+                  "warnings": {
+                    "items": {
+                      "type": "string"
+                    },
+                    "type": "array"
+                  }
+                },
+                "required": [
+                  "discovery_run_id",
+                  "evidence_count",
+                  "parse_results",
+                  "assets",
+                  "facts",
+                  "relationships"
+                ],
+                "type": "object"
+              }
+            },
+            "required": [
+              "parse_result"
+            ],
+            "type": "object"
+          },
+          "error": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/Error"
+              }
+            ],
+            "nullable": true
+          },
+          "metadata": {
+            "additionalProperties": true,
+            "type": "object"
+          }
+        },
+        "required": [
+          "data",
+          "metadata"
+        ],
+        "type": "object"
+      },
+      "ReadinessResponse": {
+        "properties": {
+          "data": {
+            "properties": {
+              "status": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "status"
+            ],
+            "type": "object"
+          },
+          "error": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/Error"
+              }
+            ],
+            "nullable": true
+          },
+          "metadata": {
+            "additionalProperties": true,
+            "type": "object"
+          }
+        },
+        "required": [
+          "data",
+          "metadata"
+        ],
+        "type": "object"
+      },
+      "RelationshipsResponse": {
+        "properties": {
+          "data": {
+            "properties": {
+              "relationships": {
+                "items": {
+                  "properties": {
+                    "confidence": {
+                      "type": "number"
+                    },
+                    "confidence_reason": {
+                      "type": "string"
+                    },
+                    "created_at": {
+                      "format": "date-time",
+                      "type": "string"
+                    },
+                    "evidence_id": {
+                      "type": "string"
+                    },
+                    "id": {
+                      "type": "string"
+                    },
+                    "metadata": {
+                      "additionalProperties": true,
+                      "type": "object"
+                    },
+                    "relationship_type": {
+                      "type": "string"
+                    },
+                    "source_asset_id": {
+                      "type": "string"
+                    },
+                    "state": {
+                      "type": "string"
+                    },
+                    "target_asset_id": {
+                      "type": "string"
+                    },
+                    "updated_at": {
+                      "format": "date-time",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "source_asset_id",
+                    "target_asset_id",
+                    "relationship_type",
+                    "confidence",
+                    "confidence_reason",
+                    "state",
+                    "metadata",
+                    "created_at",
+                    "updated_at"
+                  ],
+                  "type": "object"
+                },
+                "type": "array"
+              }
+            },
+            "required": [
+              "relationships"
+            ],
+            "type": "object"
+          },
+          "error": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/Error"
+              }
+            ],
+            "nullable": true
+          },
+          "metadata": {
+            "additionalProperties": true,
+            "type": "object"
+          }
+        },
+        "required": [
+          "data",
+          "metadata"
+        ],
+        "type": "object"
+      },
+      "ReviewIdentityCandidateRequest": {
+        "properties": {
+          "action": {
+            "type": "string"
+          },
+          "metadata": {
+            "additionalProperties": true,
+            "type": "object"
+          },
+          "rationale": {
+            "type": "string"
+          },
+          "reviewer": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "reviewer",
+          "action",
+          "rationale",
+          "metadata"
+        ],
+        "type": "object"
+      },
+      "SystemInfoResponse": {
+        "properties": {
+          "data": {
+            "properties": {
+              "system_info": {
+                "properties": {
+                  "build": {
+                    "properties": {
+                      "go_version": {
+                        "type": "string"
+                      },
+                      "main_path": {
+                        "type": "string"
+                      },
+                      "settings": {
+                        "additionalProperties": {
+                          "type": "string"
+                        },
+                        "type": "object"
+                      }
+                    },
+                    "required": [
+                      "main_path",
+                      "go_version",
+                      "settings"
+                    ],
+                    "type": "object"
+                  },
+                  "disk": {
+                    "properties": {
+                      "free_bytes": {
+                        "type": "integer"
+                      },
+                      "path": {
+                        "type": "string"
+                      },
+                      "total_bytes": {
+                        "type": "integer"
+                      },
+                      "used_bytes": {
+                        "type": "integer"
+                      }
+                    },
+                    "required": [
+                      "path",
+                      "total_bytes",
+                      "free_bytes",
+                      "used_bytes"
+                    ],
+                    "type": "object"
+                  },
+                  "generated_at": {
+                    "format": "date-time",
+                    "type": "string"
+                  },
+                  "memory": {
+                    "properties": {
+                      "alloc_bytes": {
+                        "type": "integer"
+                      },
+                      "heap_alloc_bytes": {
+                        "type": "integer"
+                      },
+                      "heap_sys_bytes": {
+                        "type": "integer"
+                      },
+                      "num_gc": {
+                        "type": "integer"
+                      },
+                      "sys_bytes": {
+                        "type": "integer"
+                      },
+                      "total_alloc_bytes": {
+                        "type": "integer"
+                      }
+                    },
+                    "required": [
+                      "alloc_bytes",
+                      "total_alloc_bytes",
+                      "sys_bytes",
+                      "heap_alloc_bytes",
+                      "heap_sys_bytes",
+                      "num_gc"
+                    ],
+                    "type": "object"
+                  },
+                  "name": {
+                    "type": "string"
+                  },
+                  "runtime": {
+                    "properties": {
+                      "arch": {
+                        "type": "string"
+                      },
+                      "cpus": {
+                        "type": "integer"
+                      },
+                      "go_version": {
+                        "type": "string"
+                      },
+                      "goroutines": {
+                        "type": "integer"
+                      },
+                      "os": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "go_version",
+                      "os",
+                      "arch",
+                      "cpus",
+                      "goroutines"
+                    ],
+                    "type": "object"
+                  },
+                  "version": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "name",
+                  "version",
+                  "runtime",
+                  "memory",
+                  "disk",
+                  "build",
+                  "generated_at"
+                ],
+                "type": "object"
+              }
+            },
+            "required": [
+              "system_info"
+            ],
+            "type": "object"
+          },
+          "error": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/Error"
+              }
+            ],
+            "nullable": true
+          },
+          "metadata": {
+            "additionalProperties": true,
+            "type": "object"
+          }
+        },
+        "required": [
+          "data",
+          "metadata"
+        ],
+        "type": "object"
+      },
+      "VersionResponse": {
+        "properties": {
+          "data": {
+            "properties": {
+              "name": {
+                "type": "string"
+              },
+              "version": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "name",
+              "version"
+            ],
+            "type": "object"
+          },
+          "error": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/Error"
+              }
+            ],
+            "nullable": true
+          },
+          "metadata": {
+            "additionalProperties": true,
+            "type": "object"
+          }
+        },
+        "required": [
+          "data",
+          "metadata"
+        ],
         "type": "object"
       }
     }
@@ -19,7 +2699,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "type": "object"
+                "$ref": "#/components/schemas/AgentRequest"
               }
             }
           },
@@ -30,7 +2710,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ResponseEnvelope"
+                  "$ref": "#/components/schemas/AgentMessageResponse"
                 }
               }
             },
@@ -40,7 +2720,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ResponseEnvelope"
+                  "$ref": "#/components/schemas/AgentMessageResponse"
                 }
               }
             },
@@ -50,7 +2730,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ResponseEnvelope"
+                  "$ref": "#/components/schemas/ErrorResponseEnvelope"
                 }
               }
             },
@@ -60,7 +2740,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ResponseEnvelope"
+                  "$ref": "#/components/schemas/ErrorResponseEnvelope"
                 }
               }
             },
@@ -79,7 +2759,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "type": "object"
+                "$ref": "#/components/schemas/ArchitectureSeedRequest"
               }
             }
           },
@@ -90,7 +2770,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ResponseEnvelope"
+                  "$ref": "#/components/schemas/ArchitectureSeedResponse"
                 }
               }
             },
@@ -100,7 +2780,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ResponseEnvelope"
+                  "$ref": "#/components/schemas/ArchitectureSeedResponse"
                 }
               }
             },
@@ -110,7 +2790,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ResponseEnvelope"
+                  "$ref": "#/components/schemas/ErrorResponseEnvelope"
                 }
               }
             },
@@ -120,7 +2800,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ResponseEnvelope"
+                  "$ref": "#/components/schemas/ErrorResponseEnvelope"
                 }
               }
             },
@@ -135,12 +2815,23 @@
     },
     "/api/v1/assets": {
       "get": {
+        "parameters": [
+          {
+            "description": "Search asset name, identity key, vendor, model, or serial",
+            "in": "query",
+            "name": "search",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
         "responses": {
           "200": {
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ResponseEnvelope"
+                  "$ref": "#/components/schemas/AssetsResponse"
                 }
               }
             },
@@ -150,7 +2841,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ResponseEnvelope"
+                  "$ref": "#/components/schemas/ErrorResponseEnvelope"
                 }
               }
             },
@@ -160,7 +2851,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ResponseEnvelope"
+                  "$ref": "#/components/schemas/ErrorResponseEnvelope"
                 }
               }
             },
@@ -180,7 +2871,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ResponseEnvelope"
+                  "$ref": "#/components/schemas/AssetsResponse"
                 }
               }
             },
@@ -190,7 +2881,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ResponseEnvelope"
+                  "$ref": "#/components/schemas/ErrorResponseEnvelope"
                 }
               }
             },
@@ -200,7 +2891,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ResponseEnvelope"
+                  "$ref": "#/components/schemas/ErrorResponseEnvelope"
                 }
               }
             },
@@ -230,7 +2921,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ResponseEnvelope"
+                  "$ref": "#/components/schemas/AssetResponse"
                 }
               }
             },
@@ -240,7 +2931,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ResponseEnvelope"
+                  "$ref": "#/components/schemas/ErrorResponseEnvelope"
                 }
               }
             },
@@ -250,7 +2941,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ResponseEnvelope"
+                  "$ref": "#/components/schemas/ErrorResponseEnvelope"
                 }
               }
             },
@@ -280,7 +2971,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ResponseEnvelope"
+                  "$ref": "#/components/schemas/EvidenceListResponse"
                 }
               }
             },
@@ -290,7 +2981,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ResponseEnvelope"
+                  "$ref": "#/components/schemas/ErrorResponseEnvelope"
                 }
               }
             },
@@ -300,7 +2991,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ResponseEnvelope"
+                  "$ref": "#/components/schemas/ErrorResponseEnvelope"
                 }
               }
             },
@@ -331,7 +3022,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ResponseEnvelope"
+                  "$ref": "#/components/schemas/FactsResponse"
                 }
               }
             },
@@ -341,7 +3032,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ResponseEnvelope"
+                  "$ref": "#/components/schemas/ErrorResponseEnvelope"
                 }
               }
             },
@@ -351,7 +3042,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ResponseEnvelope"
+                  "$ref": "#/components/schemas/ErrorResponseEnvelope"
                 }
               }
             },
@@ -382,7 +3073,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ResponseEnvelope"
+                  "$ref": "#/components/schemas/GraphResponse"
                 }
               }
             },
@@ -392,7 +3083,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ResponseEnvelope"
+                  "$ref": "#/components/schemas/ErrorResponseEnvelope"
                 }
               }
             },
@@ -402,7 +3093,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ResponseEnvelope"
+                  "$ref": "#/components/schemas/ErrorResponseEnvelope"
                 }
               }
             },
@@ -432,7 +3123,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ResponseEnvelope"
+                  "$ref": "#/components/schemas/AssetHistoryResponse"
                 }
               }
             },
@@ -442,7 +3133,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ResponseEnvelope"
+                  "$ref": "#/components/schemas/ErrorResponseEnvelope"
                 }
               }
             },
@@ -452,7 +3143,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ResponseEnvelope"
+                  "$ref": "#/components/schemas/ErrorResponseEnvelope"
                 }
               }
             },
@@ -482,7 +3173,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ResponseEnvelope"
+                  "$ref": "#/components/schemas/RelationshipsResponse"
                 }
               }
             },
@@ -492,7 +3183,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ResponseEnvelope"
+                  "$ref": "#/components/schemas/ErrorResponseEnvelope"
                 }
               }
             },
@@ -502,7 +3193,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ResponseEnvelope"
+                  "$ref": "#/components/schemas/ErrorResponseEnvelope"
                 }
               }
             },
@@ -521,7 +3212,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "type": "object"
+                "$ref": "#/components/schemas/DiscoveryPlanRequest"
               }
             }
           },
@@ -532,7 +3223,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ResponseEnvelope"
+                  "$ref": "#/components/schemas/DiscoveryPlanResponse"
                 }
               }
             },
@@ -542,7 +3233,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ResponseEnvelope"
+                  "$ref": "#/components/schemas/DiscoveryPlanResponse"
                 }
               }
             },
@@ -552,7 +3243,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ResponseEnvelope"
+                  "$ref": "#/components/schemas/ErrorResponseEnvelope"
                 }
               }
             },
@@ -562,7 +3253,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ResponseEnvelope"
+                  "$ref": "#/components/schemas/ErrorResponseEnvelope"
                 }
               }
             },
@@ -582,7 +3273,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ResponseEnvelope"
+                  "$ref": "#/components/schemas/DiscoveryRunsResponse"
                 }
               }
             },
@@ -592,7 +3283,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ResponseEnvelope"
+                  "$ref": "#/components/schemas/ErrorResponseEnvelope"
                 }
               }
             },
@@ -602,7 +3293,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ResponseEnvelope"
+                  "$ref": "#/components/schemas/ErrorResponseEnvelope"
                 }
               }
             },
@@ -619,7 +3310,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "type": "object"
+                "$ref": "#/components/schemas/CreateDiscoveryRunRequest"
               }
             }
           },
@@ -630,7 +3321,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ResponseEnvelope"
+                  "$ref": "#/components/schemas/DiscoveryRunResponse"
                 }
               }
             },
@@ -640,7 +3331,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ResponseEnvelope"
+                  "$ref": "#/components/schemas/DiscoveryRunResponse"
                 }
               }
             },
@@ -650,7 +3341,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ResponseEnvelope"
+                  "$ref": "#/components/schemas/ErrorResponseEnvelope"
                 }
               }
             },
@@ -660,7 +3351,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ResponseEnvelope"
+                  "$ref": "#/components/schemas/ErrorResponseEnvelope"
                 }
               }
             },
@@ -679,7 +3370,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "type": "object"
+                "$ref": "#/components/schemas/ExecuteDiscoveryRunRequest"
               }
             }
           },
@@ -690,7 +3381,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ResponseEnvelope"
+                  "$ref": "#/components/schemas/ExecuteDiscoveryRunResponse"
                 }
               }
             },
@@ -700,7 +3391,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ResponseEnvelope"
+                  "$ref": "#/components/schemas/ExecuteDiscoveryRunResponse"
                 }
               }
             },
@@ -710,7 +3401,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ResponseEnvelope"
+                  "$ref": "#/components/schemas/ErrorResponseEnvelope"
                 }
               }
             },
@@ -720,7 +3411,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ResponseEnvelope"
+                  "$ref": "#/components/schemas/ErrorResponseEnvelope"
                 }
               }
             },
@@ -750,7 +3441,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ResponseEnvelope"
+                  "$ref": "#/components/schemas/DiscoveryRunResponse"
                 }
               }
             },
@@ -760,7 +3451,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ResponseEnvelope"
+                  "$ref": "#/components/schemas/ErrorResponseEnvelope"
                 }
               }
             },
@@ -770,7 +3461,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ResponseEnvelope"
+                  "$ref": "#/components/schemas/ErrorResponseEnvelope"
                 }
               }
             },
@@ -800,7 +3491,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ResponseEnvelope"
+                  "$ref": "#/components/schemas/EvidenceListResponse"
                 }
               }
             },
@@ -810,7 +3501,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ResponseEnvelope"
+                  "$ref": "#/components/schemas/ErrorResponseEnvelope"
                 }
               }
             },
@@ -820,7 +3511,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ResponseEnvelope"
+                  "$ref": "#/components/schemas/ErrorResponseEnvelope"
                 }
               }
             },
@@ -850,7 +3541,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "type": "object"
+                "$ref": "#/components/schemas/ParseDiscoveryRunRequest"
               }
             }
           },
@@ -861,7 +3552,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ResponseEnvelope"
+                  "$ref": "#/components/schemas/ParseDiscoveryRunResponse"
                 }
               }
             },
@@ -871,7 +3562,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ResponseEnvelope"
+                  "$ref": "#/components/schemas/ParseDiscoveryRunResponse"
                 }
               }
             },
@@ -881,7 +3572,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ResponseEnvelope"
+                  "$ref": "#/components/schemas/ErrorResponseEnvelope"
                 }
               }
             },
@@ -891,7 +3582,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ResponseEnvelope"
+                  "$ref": "#/components/schemas/ErrorResponseEnvelope"
                 }
               }
             },
@@ -922,7 +3613,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ResponseEnvelope"
+                  "$ref": "#/components/schemas/EvidenceResponse"
                 }
               }
             },
@@ -932,7 +3623,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ResponseEnvelope"
+                  "$ref": "#/components/schemas/ErrorResponseEnvelope"
                 }
               }
             },
@@ -942,7 +3633,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ResponseEnvelope"
+                  "$ref": "#/components/schemas/ErrorResponseEnvelope"
                 }
               }
             },
@@ -962,7 +3653,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ResponseEnvelope"
+                  "$ref": "#/components/schemas/FactsResponse"
                 }
               }
             },
@@ -972,7 +3663,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ResponseEnvelope"
+                  "$ref": "#/components/schemas/ErrorResponseEnvelope"
                 }
               }
             },
@@ -982,7 +3673,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ResponseEnvelope"
+                  "$ref": "#/components/schemas/ErrorResponseEnvelope"
                 }
               }
             },
@@ -1012,7 +3703,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ResponseEnvelope"
+                  "$ref": "#/components/schemas/EvidenceListResponse"
                 }
               }
             },
@@ -1022,7 +3713,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ResponseEnvelope"
+                  "$ref": "#/components/schemas/ErrorResponseEnvelope"
                 }
               }
             },
@@ -1032,7 +3723,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ResponseEnvelope"
+                  "$ref": "#/components/schemas/ErrorResponseEnvelope"
                 }
               }
             },
@@ -1053,7 +3744,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ResponseEnvelope"
+                  "$ref": "#/components/schemas/GraphResponse"
                 }
               }
             },
@@ -1063,7 +3754,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ResponseEnvelope"
+                  "$ref": "#/components/schemas/ErrorResponseEnvelope"
                 }
               }
             },
@@ -1073,7 +3764,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ResponseEnvelope"
+                  "$ref": "#/components/schemas/ErrorResponseEnvelope"
                 }
               }
             },
@@ -1093,7 +3784,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ResponseEnvelope"
+                  "$ref": "#/components/schemas/IdentityCandidatesResponse"
                 }
               }
             },
@@ -1103,7 +3794,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ResponseEnvelope"
+                  "$ref": "#/components/schemas/ErrorResponseEnvelope"
                 }
               }
             },
@@ -1113,7 +3804,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ResponseEnvelope"
+                  "$ref": "#/components/schemas/ErrorResponseEnvelope"
                 }
               }
             },
@@ -1133,7 +3824,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ResponseEnvelope"
+                  "$ref": "#/components/schemas/IdentityReviewHandoffResponse"
                 }
               }
             },
@@ -1143,7 +3834,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ResponseEnvelope"
+                  "$ref": "#/components/schemas/ErrorResponseEnvelope"
                 }
               }
             },
@@ -1153,7 +3844,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ResponseEnvelope"
+                  "$ref": "#/components/schemas/ErrorResponseEnvelope"
                 }
               }
             },
@@ -1173,7 +3864,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ResponseEnvelope"
+                  "$ref": "#/components/schemas/IdentityCandidatesResponse"
                 }
               }
             },
@@ -1183,7 +3874,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ResponseEnvelope"
+                  "$ref": "#/components/schemas/ErrorResponseEnvelope"
                 }
               }
             },
@@ -1193,7 +3884,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ResponseEnvelope"
+                  "$ref": "#/components/schemas/ErrorResponseEnvelope"
                 }
               }
             },
@@ -1222,7 +3913,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "type": "object"
+                "$ref": "#/components/schemas/ReviewIdentityCandidateRequest"
               }
             }
           },
@@ -1233,7 +3924,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ResponseEnvelope"
+                  "$ref": "#/components/schemas/IdentityCandidateReviewResponse"
                 }
               }
             },
@@ -1243,7 +3934,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ResponseEnvelope"
+                  "$ref": "#/components/schemas/IdentityCandidateReviewResponse"
                 }
               }
             },
@@ -1253,7 +3944,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ResponseEnvelope"
+                  "$ref": "#/components/schemas/ErrorResponseEnvelope"
                 }
               }
             },
@@ -1263,7 +3954,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ResponseEnvelope"
+                  "$ref": "#/components/schemas/ErrorResponseEnvelope"
                 }
               }
             },
@@ -1283,7 +3974,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ResponseEnvelope"
+                  "$ref": "#/components/schemas/SystemInfoResponse"
                 }
               }
             },
@@ -1293,7 +3984,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ResponseEnvelope"
+                  "$ref": "#/components/schemas/ErrorResponseEnvelope"
                 }
               }
             },
@@ -1303,7 +3994,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ResponseEnvelope"
+                  "$ref": "#/components/schemas/ErrorResponseEnvelope"
                 }
               }
             },
@@ -1323,7 +4014,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ResponseEnvelope"
+                  "$ref": "#/components/schemas/VersionResponse"
                 }
               }
             },
@@ -1333,7 +4024,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ResponseEnvelope"
+                  "$ref": "#/components/schemas/ErrorResponseEnvelope"
                 }
               }
             },
@@ -1343,7 +4034,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ResponseEnvelope"
+                  "$ref": "#/components/schemas/ErrorResponseEnvelope"
                 }
               }
             },
@@ -1363,7 +4054,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ResponseEnvelope"
+                  "$ref": "#/components/schemas/HealthResponse"
                 }
               }
             },
@@ -1373,7 +4064,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ResponseEnvelope"
+                  "$ref": "#/components/schemas/ErrorResponseEnvelope"
                 }
               }
             },
@@ -1383,7 +4074,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ResponseEnvelope"
+                  "$ref": "#/components/schemas/ErrorResponseEnvelope"
                 }
               }
             },
@@ -1403,7 +4094,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ResponseEnvelope"
+                  "$ref": "#/components/schemas/ReadinessResponse"
                 }
               }
             },
@@ -1413,7 +4104,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ResponseEnvelope"
+                  "$ref": "#/components/schemas/ErrorResponseEnvelope"
                 }
               }
             },
@@ -1423,7 +4114,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ResponseEnvelope"
+                  "$ref": "#/components/schemas/ErrorResponseEnvelope"
                 }
               }
             },
