@@ -10,9 +10,10 @@ import (
 	"runtime/debug"
 	"strconv"
 	"strings"
-	"sync/atomic"
 	"syscall"
 	"time"
+
+	"github.com/google/uuid"
 
 	"truthwatcher/internal/agent"
 	"truthwatcher/internal/assets"
@@ -88,8 +89,6 @@ type buildInfo struct {
 	GoVersion string            `json:"go_version"`
 	Settings  map[string]string `json:"settings"`
 }
-
-var requestCounter uint64
 
 func NewHandler(opts Options) http.Handler {
 	if opts.Logger == nil {
@@ -700,15 +699,28 @@ func writeError(w http.ResponseWriter, status int, message string) {
 
 func requestID(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		id := r.Header.Get("X-Request-ID")
+		id := strings.TrimSpace(r.Header.Get("X-Request-ID"))
 		if id == "" {
-			id = "req-" + strconv.FormatUint(atomic.AddUint64(&requestCounter, 1), 10)
+			generatedID, err := newRequestID()
+			if err != nil {
+				writeError(w, http.StatusInternalServerError, "failed to generate request id")
+				return
+			}
+			id = generatedID
 		}
 
 		r.Header.Set("X-Request-ID", id)
 		w.Header().Set("X-Request-ID", id)
 		next.ServeHTTP(w, r)
 	})
+}
+
+func newRequestID() (string, error) {
+	id, err := uuid.NewV7()
+	if err != nil {
+		return "", err
+	}
+	return id.String(), nil
 }
 
 func requestLog(logger *slog.Logger, next http.Handler) http.Handler {
