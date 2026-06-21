@@ -100,6 +100,8 @@ func NewHandler(opts Options) http.Handler {
 	mux.HandleFunc("GET /healthz", handleHealthz)
 	mux.HandleFunc("GET /readyz", handleReadyz)
 	mux.HandleFunc("GET /api/v1/version", handleVersion(opts.Version))
+	mux.HandleFunc("GET /openapi.json", handleOpenAPIJSON(opts.Version))
+	mux.HandleFunc("GET /docs", handleSwaggerUI)
 	mux.HandleFunc("GET /api/v1/system-info", handleSystemInfo(opts.Version))
 	mux.HandleFunc("POST /api/v1/discovery-runs", handleCreateDiscoveryRun(opts.DiscoveryRuns))
 	mux.HandleFunc("POST /api/v1/discovery-runs/execute", handleExecuteDiscoveryRun(opts.DiscoveryRuns, opts.Evidence, opts.Audit))
