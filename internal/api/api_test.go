@@ -472,6 +472,34 @@ func TestRequestIDMiddlewarePreservesIncomingID(t *testing.T) {
 	}
 }
 
+func TestRequestIDMiddlewareGeneratesUUIDv7(t *testing.T) {
+	handler := NewHandler(Options{Version: "test-version"})
+
+	response := httptest.NewRecorder()
+	request := httptest.NewRequest(http.MethodGet, "/healthz", nil)
+	handler.ServeHTTP(response, request)
+
+	requestID := response.Header().Get("X-Request-ID")
+	if requestID == "" {
+		t.Fatal("X-Request-ID is empty")
+	}
+	if len(requestID) != 36 {
+		t.Fatalf("X-Request-ID length = %d, want 36", len(requestID))
+	}
+	if requestID[14] != '7' {
+		t.Fatalf("X-Request-ID version = %q, want 7", requestID[14])
+	}
+	if requestID[8] != '-' || requestID[13] != '-' || requestID[18] != '-' || requestID[23] != '-' {
+		t.Fatalf("X-Request-ID = %q, want canonical UUID format", requestID)
+	}
+	if !strings.Contains("89ab", strings.ToLower(string(requestID[19]))) {
+		t.Fatalf("X-Request-ID variant = %q, want RFC 4122 variant", requestID[19])
+	}
+	if got := request.Header.Get("X-Request-ID"); got != requestID {
+		t.Fatalf("request header X-Request-ID = %q, want response id %q", got, requestID)
+	}
+}
+
 func TestRequestLoggingMiddleware(t *testing.T) {
 	var logs bytes.Buffer
 	logger := slog.New(slog.NewTextHandler(&logs, nil))
