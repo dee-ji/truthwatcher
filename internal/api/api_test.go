@@ -2439,3 +2439,61 @@ func testGraphAssetReader() fakeGraphAssetReader {
 		}},
 	}
 }
+
+func TestOpenAPIJSON(t *testing.T) {
+	handler := NewHandler(Options{Version: "test-version"})
+
+	response := httptest.NewRecorder()
+	request := httptest.NewRequest(http.MethodGet, "/openapi.json", nil)
+	handler.ServeHTTP(response, request)
+
+	if response.Code != http.StatusOK {
+		t.Fatalf("status = %d, want %d; body=%s", response.Code, http.StatusOK, response.Body.String())
+	}
+	if contentType := response.Header().Get("Content-Type"); !strings.Contains(contentType, "application/json") {
+		t.Fatalf("Content-Type = %q, want application/json", contentType)
+	}
+
+	var spec struct {
+		OpenAPI string `json:"openapi"`
+		Info    struct {
+			Title   string `json:"title"`
+			Version string `json:"version"`
+		} `json:"info"`
+		Paths map[string]any `json:"paths"`
+	}
+	if err := json.Unmarshal(response.Body.Bytes(), &spec); err != nil {
+		t.Fatalf("decode openapi spec: %v", err)
+	}
+	if spec.OpenAPI != "3.0.3" {
+		t.Fatalf("openapi = %q, want 3.0.3", spec.OpenAPI)
+	}
+	if spec.Info.Title != "Truthwatcher API" || spec.Info.Version != "test-version" {
+		t.Fatalf("info = %+v, want Truthwatcher API test-version", spec.Info)
+	}
+	if _, ok := spec.Paths["/api/v1/assets/{id}"]; !ok {
+		t.Fatalf("spec does not include asset detail path: %#v", spec.Paths)
+	}
+}
+
+func TestDocsServesSwaggerUI(t *testing.T) {
+	handler := NewHandler(Options{Version: "test-version"})
+
+	response := httptest.NewRecorder()
+	request := httptest.NewRequest(http.MethodGet, "/docs", nil)
+	handler.ServeHTTP(response, request)
+
+	if response.Code != http.StatusOK {
+		t.Fatalf("status = %d, want %d; body=%s", response.Code, http.StatusOK, response.Body.String())
+	}
+	if contentType := response.Header().Get("Content-Type"); !strings.Contains(contentType, "text/html") {
+		t.Fatalf("Content-Type = %q, want text/html", contentType)
+	}
+	body := response.Body.String()
+	if !strings.Contains(body, "SwaggerUIBundle") {
+		t.Fatalf("body does not render swagger UI: %s", body)
+	}
+	if !strings.Contains(body, "/openapi.json") {
+		t.Fatalf("body does not point swagger UI at generated spec endpoint: %s", body)
+	}
+}

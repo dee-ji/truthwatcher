@@ -1,4 +1,4 @@
-.PHONY: fmt test lint build-ui build release-local checksums run seed-demo unseed-demo
+.PHONY: fmt test lint build-ui generate-openapi build release-local checksums run seed-demo unseed-demo
 
 BINARY := truthwatcher
 GOCACHE_DIR ?= $(CURDIR)/.gocache
@@ -23,7 +23,10 @@ build-ui:
 	@test -f web/assets/app.css
 	@test -f web/assets/app.js
 
-build: build-ui
+generate-openapi:
+	@$(GO) run ./cmd/openapi-gen -out docs/openapi.json
+
+build: build-ui generate-openapi
 	@mkdir -p bin
 	@$(GO) build -o bin/$(BINARY) ./cmd/truthwatcher
 
