@@ -2,54 +2,52 @@
 
 ## One-Sentence Mission
 
-TruthWatcher is a single-binary, Go-based, read-only network cartography and source-of-truth bootstrap platform that transforms discovered evidence into a dynamic model of network assets, relationships, access paths, services, and intent.
+TruthWatcher is a vendor-neutral source-of-truth, discovery, reasoning, and intent platform for complex service-provider networks. It turns raw evidence into identity, assets, facts, relationships, knowledge graphs, and operational understanding so teams can keep up with multi-vendor networks as they change.
 
 ## Core Problem
 
-Large service-provider networks often do not have a trustworthy, complete, dynamic understanding of what exists, how it is connected, how it is accessed, what manages it, and which services depend on it.
+Large service-provider networks change faster than static inventory, tribal knowledge, manual discovery, and disconnected tooling can keep up. Operators may have monitoring, IP address records, EMS exports, spreadsheets, CMDBs, config archives, and vendor portals, yet still lack one trustworthy explanation of what exists, how it is connected, how it is accessed, which services depend on it, and which claims are stale or unproven.
+
+The result is operational risk: failed automation, slow troubleshooting, low change confidence, duplicated engineering work, and planning decisions based on partial truth.
 
 The hardest problem is not only discovering devices. The hardest problem is:
 
-> Discovering how to discover.
+> Dynamically discovering how to discover, validate, relate, and reason over network reality.
 
-TruthWatcher exists to help engineers initialize and continuously improve a source-of-truth model for complex networks using safe, read-only evidence collection.
+TruthWatcher exists to make dynamically keeping up with multi-vendor networks a solved workflow rather than a recurring fire drill.
 
 ## What TruthWatcher Is
 
 TruthWatcher is:
 
-- A network evidence engine.
-- A network cartography system.
-- A source-of-truth bootstrap platform.
-- A graph-based relationship model for network infrastructure.
-- A service-provider inventory and modeling foundation.
-- A read-only discovery framework.
-- A future agentic network engineering workbench.
-- A single Go binary with embedded frontend assets.
-- A CLI-first server application inspired by tools like HashiCorp Vault.
+- A vendor-neutral evidence and source-of-truth platform.
+- A read-only discovery and modeling kernel for complex networks.
+- A graph-based relationship model for infrastructure, access paths, services, and intent.
+- A reasoning foundation that can explain what the system believes and why.
+- A proof-of-concept packaged as a single Go binary with embedded frontend assets and PostgreSQL storage.
+- A CLI-first server application with explicit integration boundaries.
+- A future network engineering workbench for safer automation, planning, and review.
 
-## What TruthWatcher Is Not in v0.1
+## What TruthWatcher Is Not in the POC
 
 TruthWatcher is not:
 
-- An observability platform.
-- An alarm system.
-- A monitoring system.
-- A config deployment system.
-- A remediation platform.
-- A full NMS.
-- A replacement for Nautobot or NetBox.
-- A Kubernetes-first application.
-- A Docker-first application.
-- A chat-first AI app in the first milestone.
+- A monitoring, alerting, or observability replacement.
+- A configuration deployment, remediation, or service activation platform.
+- A full NMS, CMDB, IPAM, EMS, or cloud inventory product.
+- A clone of any existing source-of-truth system.
+- A Kubernetes-first, Docker-first, or microservice-first application.
+- A chat-first AI application.
+- A system that runs arbitrary commands on network devices.
+- A platform tied to one vendor, protocol, data source, or operational stack.
 
-Observability, chat, service activation, and remediation may become later phases, but they must not distract from the v0.1 kernel.
+Those capabilities may become integrations or later phases, but they must not distract from the POC kernel: evidence-backed understanding.
 
 ## Product Philosophy
 
-TruthWatcher is evidence-first.
+TruthWatcher is evidence-first and uncertainty-aware.
 
-The system must store raw evidence before it creates facts. It must track where every fact came from, when it was collected, how it was parsed, and how confident the system is.
+The system must preserve raw evidence before it creates identity, facts, assets, relationships, graph views, or answers. It must track where every conclusion came from, when the evidence was collected, how it was interpreted, and how confident the system is.
 
 TruthWatcher should never pretend to know something without evidence.
 
@@ -60,32 +58,57 @@ TruthWatcher treats uncertainty as a first-class concept:
 - Partially known.
 - Conflicting evidence.
 - Inferred.
+- Seeded by a human or external system.
 - Human-confirmed.
+
+## Central Conceptual Pipeline
+
+```text
+Evidence
+  | IdentitySkill
+  v
+Identity
+  | AssetDiscoverySkill
+  v
+Assets
+  | FactExtractionSkill
+  v
+Facts
+  | RelationshipSkill
+  v
+Relationships
+  | GraphBuilderSkill
+  v
+KnowledgeGraph
+  | ReasoningSkill
+  v
+Understanding
+```
+
+The named skills are conceptual responsibilities, not mandatory runtime plugins. The POC may implement them directly in the kernel; later versions may expose some of them through adapter or plugin contracts.
 
 ## Primary User
 
-The primary user is a network engineer or network automation engineer working in a large service-provider, carrier, MSP, enterprise, or hybrid infrastructure environment where inventory and access methods are incomplete or fragmented.
+The primary user is a network engineer, network automation engineer, or infrastructure architect working in a large service-provider, carrier, MSP, enterprise, or hybrid network where inventory, access methods, and service relationships are incomplete, stale, or fragmented across teams and tools.
 
-## Long-Term Vision
+## Why Traditional Tools Have Not Solved This Completely
 
-TruthWatcher should allow an engineer to eventually ask:
+Traditional tools usually own one slice of truth:
 
-- What devices exist in this market?
-- How do I log into this device?
-- Is this device behind an EMS?
-- What route reflectors know about this PE?
-- What services depend on this asset?
-- What chassis, cards, ports, and optics are installed?
-- Which sites are connected by this service?
-- What is unknown or contradictory about this network?
-- Help me plan an E-Line or EVLAN between these two locations.
-- Generate a method of procedure using discovered network knowledge.
+- Monitoring knows symptoms but not full intent.
+- IP address and inventory systems know assigned records but may not know observed state.
+- EMS and controller systems know their managed domain but not the whole network.
+- Config archives know historical text but not always identity, relationships, or confidence.
+- Spreadsheets and tribal knowledge move quickly but do not provide durable provenance.
+- Automation frameworks need truth before they can act safely.
+
+TruthWatcher does not replace all of these systems. It relates their evidence and observed network data through a neutral model so engineers can understand where sources agree, disagree, or remain unknown.
 
 ## Initial Constraint
 
-The first version must do one thing well:
+The proof of concept must do one thing well:
 
-> Given a seed network device and read-only access, collect evidence, parse basic identity and topology facts, store assets and relationships, and expose them through a simple API and UI.
+> Starting from a seed target or fixture and approved read-only collection, preserve evidence, derive identity, assets, facts, and relationships, project a graph, and expose the result through a simple API and UI with confidence and provenance.
 
 ## Build Principle
 
@@ -93,8 +116,48 @@ Do not build the dream first. Build the kernel.
 
 The kernel must prove:
 
-- I collected this evidence.
-- I parsed this fact.
+- I collected or imported this evidence.
+- I derived this identity.
 - I believe this asset exists.
+- I extracted this fact.
 - I believe this relationship exists.
-- Here is why.
+- I can show why, including uncertainty and conflicts.
+
+## Adaptability Principle
+
+TruthWatcher must be designed as a stable kernel with adaptable edges.
+
+The platform should never assume that one organization uses the same vendors, IPAM, CMDB, EMS, monitoring platform, credential vault, cloud provider, automation stack, or service model as another organization. Large service-provider environments are heterogeneous by default.
+
+The core product owns:
+
+- evidence storage
+- identity lifecycle
+- asset modeling
+- fact modeling
+- relationship modeling
+- confidence and state
+- discovery runs
+- safety policy
+- graph construction
+- reasoning boundaries
+- API contracts
+
+External systems may provide or consume context through adapters, including DNS, DHCP, IP address management, monitoring, EMS/controller inventory, credential references, cloud inventory, vendor support records, config archives, service orders, circuit data, customer metadata, and existing source-of-truth platforms.
+
+The rule is:
+
+> Stable core, replaceable integrations.
+
+If a feature only makes sense for one vendor, one company, one protocol, one source-of-truth product, one NMS, or one EMS, it belongs behind an adapter boundary.
+
+## Path From POC To Enterprise Platform
+
+TruthWatcher can become enterprise-ready by expanding from the kernel outward:
+
+1. Prove evidence preservation, identity, fact extraction, relationships, and graph projection with fixtures and safe read-only collection.
+2. Add human review for identity merges, conflicts, and seeded context.
+3. Expand adapters without changing the core model.
+4. Add policy, audit, credential-reference, and permission controls around discovery and imports.
+5. Improve scale, HA, packaging, and operational hardening only after the model proves value.
+6. Introduce planning, intent, service modeling, and automation guardrails on top of explainable understanding.

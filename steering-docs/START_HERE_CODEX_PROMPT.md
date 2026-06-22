@@ -24,7 +24,7 @@ Rules:
 
 You are helping build Truthwatcher.
 
-Truthwatcher is a Go-based, single-binary, evidence-first network cartography platform for service-provider environments.
+Truthwatcher is a vendor-neutral, evidence-first source-of-truth, discovery, reasoning, and intent platform for complex service-provider networks.
 
 First, read the steering documents listed above. Then read `steering-docs/PROMPT_INDEX.md`.
 

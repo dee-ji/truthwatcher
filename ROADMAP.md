@@ -21,7 +21,7 @@ Facts
     ↓
 Relationships
     ↓
-Graph
+KnowledgeGraph
     ↓
 Understanding
 ```
@@ -101,7 +101,7 @@ Fact
     ↓
 Relationship
     ↓
-Graph
+KnowledgeGraph
     ↓
 UI
 ```

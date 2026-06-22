@@ -1,6 +1,6 @@
 # Security Policy
 
-Truthwatcher is an evidence-first network cartography project. Security reports are handled conservatively because discovery code may interact with real network infrastructure.
+Truthwatcher is an evidence-first, vendor-neutral network understanding project. Security reports are handled conservatively because discovery code may interact with real network infrastructure.
 
 ## Supported Versions
 

@@ -12,7 +12,7 @@ Future contributors, maintainers, and AI coding agents should read this document
 
 ## What Truthwatcher Is
 
-Truthwatcher is an evidence-first network knowledge platform designed for Internet Service Providers and other organizations operating large-scale networks.
+Truthwatcher is a vendor-neutral, evidence-first source-of-truth, discovery, reasoning, and intent platform for Internet Service Providers and other organizations operating complex multi-vendor networks.
 
 Truthwatcher is not primarily an inventory platform.
 
@@ -51,7 +51,7 @@ Knowledge becomes fragmented across:
 * Configuration archives
 * Engineer tribal knowledge
 
-Truthwatcher exists to continuously build and refine a network understanding model from evidence.
+Truthwatcher exists to continuously build and refine a network understanding model from evidence so dynamically keeping up with multi-vendor networks becomes a normal workflow instead of a recurring crisis.
 
 The system should always be capable of explaining why it believes something is true.
 
@@ -61,7 +61,7 @@ The system should always be capable of explaining why it believes something is t
 
 Truthwatcher follows this chain:
 
-Evidence → Identity → Assets → Facts → Relationships → Graph → Understanding
+Evidence → Identity → Assets → Facts → Relationships → KnowledgeGraph → Understanding
 
 The graph is the product.
 
