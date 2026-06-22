@@ -30,6 +30,8 @@ import (
 
 type Options struct {
 	Version            string
+	Commit             string
+	BuildDate          string
 	Logger             *slog.Logger
 	DiscoveryRuns      *discovery.Service
 	Evidence           *evidence.Service
@@ -98,7 +100,8 @@ func NewHandler(opts Options) http.Handler {
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /healthz", handleHealthz)
 	mux.HandleFunc("GET /readyz", handleReadyz)
-	mux.HandleFunc("GET /api/v1/version", handleVersion(opts.Version))
+	mux.HandleFunc("GET /api/version", handleVersion(opts.Version, opts.Commit, opts.BuildDate))
+	mux.HandleFunc("GET /api/v1/version", handleVersion(opts.Version, opts.Commit, opts.BuildDate))
 	mux.HandleFunc("GET /openapi.json", handleOpenAPIJSON(opts.Version))
 	mux.HandleFunc("GET /docs", handleSwaggerUI)
 	mux.HandleFunc("GET /api/v1/system-info", handleSystemInfo(opts.Version))
@@ -141,9 +144,18 @@ func handleReadyz(w http.ResponseWriter, r *http.Request) {
 	writeData(w, http.StatusOK, readinessResponse{Status: "ready"})
 }
 
-func handleVersion(version string) http.HandlerFunc {
+func handleVersion(version, commit, buildDate string) http.HandlerFunc {
+	if version == "" {
+		version = "dev"
+	}
+	if commit == "" {
+		commit = "unknown"
+	}
+	if buildDate == "" {
+		buildDate = "unknown"
+	}
 	return func(w http.ResponseWriter, r *http.Request) {
-		writeData(w, http.StatusOK, versionResponse{Name: "truthwatcher", Version: version})
+		writeData(w, http.StatusOK, versionResponse{Name: "truthwatcher", Version: version, Commit: commit, BuildDate: buildDate})
 	}
 }
 

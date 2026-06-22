@@ -2652,6 +2652,12 @@
         "properties": {
           "data": {
             "properties": {
+              "build_date": {
+                "type": "string"
+              },
+              "commit": {
+                "type": "string"
+              },
               "name": {
                 "type": "string"
               },
@@ -2661,7 +2667,9 @@
             },
             "required": [
               "name",
-              "version"
+              "version",
+              "commit",
+              "build_date"
             ],
             "type": "object"
           },
@@ -4042,6 +4050,46 @@
           }
         },
         "summary": "Get API version",
+        "tags": [
+          "System"
+        ]
+      }
+    },
+    "/api/version": {
+      "get": {
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VersionResponse"
+                }
+              }
+            },
+            "description": "Successful response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseEnvelope"
+                }
+              }
+            },
+            "description": "Invalid request"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseEnvelope"
+                }
+              }
+            },
+            "description": "Internal server error"
+          }
+        },
+        "summary": "Get running version",
         "tags": [
           "System"
         ]

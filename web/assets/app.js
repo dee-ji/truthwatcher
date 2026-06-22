@@ -11,7 +11,10 @@ const discoveryTasks = [
 const agentHistoryKey = "truthwatcher.agent.history";
 
 window.addEventListener("hashchange", renderRoute);
-window.addEventListener("DOMContentLoaded", renderRoute);
+window.addEventListener("DOMContentLoaded", () => {
+  void loadShellVersion();
+  void renderRoute();
+});
 
 async function apiGet(path) {
   const response = await fetch(path, { headers: { Accept: "application/json" } });
@@ -36,6 +39,21 @@ async function apiPost(path, body) {
     throw new Error(payload?.error?.message || `POST ${path} failed`);
   }
   return payload;
+}
+
+async function loadShellVersion() {
+  const shellVersion = document.getElementById("shell-version");
+  if (!shellVersion) {
+    return;
+  }
+  try {
+    const payload = await apiGet("/api/version");
+    const info = payload?.data || {};
+    shellVersion.textContent = `${info.name || "truthwatcher"} ${info.version || "unknown"}`;
+    shellVersion.title = `commit ${info.commit || "unknown"}; build ${info.build_date || "unknown"}`;
+  } catch (error) {
+    shellVersion.textContent = "Version unavailable";
+  }
 }
 
 async function renderRoute() {
@@ -203,7 +221,7 @@ async function checkAPI() {
   }
 
   try {
-    const versionPayload = await apiGet("/api/v1/version");
+    const versionPayload = await apiGet("/api/version");
     const appVersion = versionPayload?.data?.version || "unknown";
 
     status.textContent = "API ready";

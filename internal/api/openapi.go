@@ -34,6 +34,7 @@ type parameterDoc struct {
 var documentedRoutes = []routeDoc{
 	{Method: http.MethodGet, Path: "/healthz", Summary: "Health check", Tags: []string{"System"}, ResponseSchema: "HealthResponse"},
 	{Method: http.MethodGet, Path: "/readyz", Summary: "Readiness check", Tags: []string{"System"}, ResponseSchema: "ReadinessResponse"},
+	{Method: http.MethodGet, Path: "/api/version", Summary: "Get running version", Tags: []string{"System"}, ResponseSchema: "VersionResponse"},
 	{Method: http.MethodGet, Path: "/api/v1/version", Summary: "Get API version", Tags: []string{"System"}, ResponseSchema: "VersionResponse"},
 	{Method: http.MethodGet, Path: "/api/v1/system-info", Summary: "Get runtime system information", Tags: []string{"System"}, ResponseSchema: "SystemInfoResponse"},
 	{Method: http.MethodPost, Path: "/api/v1/discovery-runs", Summary: "Create a discovery run", Tags: []string{"Discovery"}, RequestSchema: "CreateDiscoveryRunRequest", ResponseSchema: "DiscoveryRunResponse"},

@@ -25,7 +25,7 @@ func TestVersionCommand(t *testing.T) {
 		t.Fatalf("version command returned error: %v", err)
 	}
 
-	if got, want := stdout.String(), "truthwatcher test-version\n"; got != want {
+	if got, want := stdout.String(), "truthwatcher test-version\ncommit unknown\nbuild_date unknown\n"; got != want {
 		t.Fatalf("version output = %q, want %q", got, want)
 	}
 	if stderr.Len() != 0 {
