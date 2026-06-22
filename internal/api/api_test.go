@@ -58,7 +58,7 @@ func TestVersion(t *testing.T) {
 	handler := NewHandler(Options{Version: "test-version"})
 
 	response := httptest.NewRecorder()
-	request := httptest.NewRequest(http.MethodGet, "/api/v1/version", nil)
+	request := httptest.NewRequest(http.MethodGet, "/api/version", nil)
 	handler.ServeHTTP(response, request)
 
 	if response.Code != http.StatusOK {
@@ -71,6 +71,12 @@ func TestVersion(t *testing.T) {
 	}
 	if body["version"] != "test-version" {
 		t.Fatalf("version = %q, want test-version", body["version"])
+	}
+	if body["commit"] != "unknown" {
+		t.Fatalf("commit = %q, want unknown", body["commit"])
+	}
+	if body["build_date"] != "unknown" {
+		t.Fatalf("build_date = %q, want unknown", body["build_date"])
 	}
 }
 

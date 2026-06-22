@@ -21,8 +21,10 @@ type readinessResponse struct {
 	Status string `json:"status"`
 }
 type versionResponse struct {
-	Name    string `json:"name"`
-	Version string `json:"version"`
+	Name      string `json:"name"`
+	Version   string `json:"version"`
+	Commit    string `json:"commit"`
+	BuildDate string `json:"build_date"`
 }
 type systemInfoResponse struct {
 	SystemInfo systemInfo `json:"system_info"`

@@ -27,13 +27,11 @@ import (
 	"truthwatcher/internal/logging"
 	"truthwatcher/internal/parser"
 	"truthwatcher/internal/policy"
+	"truthwatcher/internal/version"
 	"truthwatcher/migrations"
 )
 
-const (
-	Name    = "truthwatcher"
-	Version = "0.1.0-dev"
-)
+const Name = "truthwatcher"
 
 type App struct {
 	Version    string
@@ -43,7 +41,7 @@ type App struct {
 
 func New() App {
 	return App{
-		Version:    Version,
+		Version:    version.Version,
 		loadConfig: config.Load,
 		serveHTTP:  serveHTTP,
 	}
@@ -99,12 +97,12 @@ func (a App) runVersion(args []string, stdout io.Writer) error {
 		return fmt.Errorf("version accepts no arguments")
 	}
 
-	version := strings.TrimSpace(a.Version)
-	if version == "" {
-		version = Version
+	appVersion := strings.TrimSpace(a.Version)
+	if appVersion == "" {
+		appVersion = version.Version
 	}
 
-	fmt.Fprintf(stdout, "%s %s\n", Name, version)
+	fmt.Fprintf(stdout, "%s %s\ncommit %s\nbuild_date %s\n", Name, appVersion, version.Commit, version.BuildDate)
 	return nil
 }
 
@@ -822,7 +820,9 @@ func serveHTTP(ctx context.Context, cfg config.Config, logger *slog.Logger, stdo
 
 	server := &http.Server{
 		Handler: api.NewHandler(api.Options{
-			Version:            Version,
+			Version:            version.Version,
+			Commit:             version.Commit,
+			BuildDate:          version.BuildDate,
 			Logger:             logger,
 			DiscoveryRuns:      discoveryRuns,
 			Evidence:           evidenceStore,
