@@ -1,6 +1,6 @@
 # Contributing to Truthwatcher
 
-Truthwatcher is a single-binary, Go-based, evidence-first network cartography platform. Contributions should keep the project focused on the read-only evidence kernel before expanding into later roadmap phases.
+Truthwatcher is a vendor-neutral, evidence-first source-of-truth, discovery, reasoning, and intent platform for complex service-provider networks. Contributions should keep the project focused on the read-only evidence-to-understanding kernel before expanding into later roadmap phases.
 
 ## Before Coding
 

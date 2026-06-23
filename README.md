@@ -1,10 +1,10 @@
 # Truthwatcher
 
-Truthwatcher is a Go-based, single-binary, evidence-first network cartography platform for service-provider-style environments.
+Truthwatcher is a vendor-neutral source-of-truth, discovery, reasoning, and intent platform for complex service-provider networks.
 
-It stores raw read-only discovery evidence, derives facts from that evidence, models assets and relationships, and exposes the resulting knowledge through a local API and embedded UI.
+It continuously turns raw network evidence into identity, assets, facts, relationships, graph views, and operational understanding so engineering teams can keep up with multi-vendor networks without depending on static inventory, tribal knowledge, or disconnected tools.
 
-Truthwatcher is early-stage. The current kernel focuses on safe collection, evidence storage, basic modeling APIs, graph projection, deterministic planning, and local fixture-backed workflows.
+Truthwatcher is early-stage proof-of-concept software. The current kernel focuses on safe evidence collection, evidence storage, basic modeling APIs, graph projection, deterministic planning, local fixture-backed workflows, and clear adapter boundaries that keep vendor-specific behavior outside the core model.
 
 ## Why Truthwatcher Exists
 
@@ -17,37 +17,51 @@ Network operators often have monitoring, alarms, SNMP polling, EMS platforms, sp
 - Which facts are verified by evidence?
 - Which facts are stale, inferred, conflicting, or unknown?
 
-Truthwatcher exists to collect safe read-only evidence and turn it into assets, facts, relationships, and graph views that explain what the system believes and why.
+Truthwatcher exists to make the problem of dynamically keeping up with multi-vendor networks a thing of the past. It collects safe read-only evidence, validates and models what the evidence says, relates the results into a graph, and makes every conclusion explainable.
 
 ## What Truthwatcher Is
 
-- A read-only network evidence engine.
-- A source-of-truth bootstrap tool.
-- A relational network graph model backed by PostgreSQL.
-- A single Go binary with embedded migrations and embedded UI assets.
-- A CLI and HTTP server for local, inspectable workflows.
-- A foundation for safe discovery planning and future adapters.
+- A vendor-neutral network evidence and source-of-truth platform.
+- A discovery and reasoning kernel for complex service-provider networks.
+- A relationship model that links evidence, identity, assets, facts, and intent.
+- A local proof-of-concept packaged as a single Go binary with embedded migrations and UI assets.
+- A CLI and HTTP server for inspectable, incremental workflows.
+- A foundation for safe discovery planning, human review, and replaceable integrations.
 
 ## What Truthwatcher Is Not
 
 - Not an observability, monitoring, or alerting platform.
 - Not a configuration deployment or remediation tool.
 - Not a Kubernetes, Docker, Helm, or microservice-first application.
-- Not a replacement for NetBox, Nautobot, or an existing source of truth.
+- Not tied to any one source-of-truth product, vendor ecosystem, protocol, cloud, IPAM, EMS, or monitoring stack.
 - Not a chat-first AI application.
 - Not a system that runs arbitrary commands on network devices.
 
 ## Core Principle
 
 ```text
-Evidence first.
-Inventory second.
-Relationships third.
-Intent later.
-Automation last.
+Evidence
+  | IdentitySkill
+  v
+Identity
+  | AssetDiscoverySkill
+  v
+Assets
+  | FactExtractionSkill
+  v
+Facts
+  | RelationshipSkill
+  v
+Relationships
+  | GraphBuilderSkill
+  v
+KnowledgeGraph
+  | ReasoningSkill
+  v
+Understanding
 ```
 
-Truthwatcher should not pretend something is true unless it can show supporting evidence or explicitly label the knowledge as seeded, inferred, conflicting, or unknown.
+Truthwatcher should not pretend something is true unless it can show supporting evidence or explicitly label the knowledge as seeded, inferred, conflicting, or unknown. Skills in this pipeline are conceptual responsibilities; implementations may be built into the kernel or provided through adapters as the proof of concept matures.
 
 ## Quickstart
 
@@ -88,10 +102,10 @@ Run fake fixture-backed discovery without touching a network:
 ./bin/truthwatcher discover fake --target fixture://junos-mx
 ```
 
-Register a local device seed without running discovery:
+Register a local device seed without running discovery. Vendor fields are optional metadata and do not bind Truthwatcher to a vendor-specific model:
 
 ```sh
-./bin/truthwatcher devices add --hostname mx-edge-01 --management-ip 192.0.2.10 --vendor juniper --role edge --site lab
+./bin/truthwatcher devices add --hostname edge-01 --management-ip 192.0.2.10 --vendor example-vendor --role edge --site lab
 ./bin/truthwatcher devices list
 ```
 
@@ -161,9 +175,9 @@ http://127.0.0.1:8080/#/architecture-seeds
 
 Current limitation: fake discovery stores raw evidence first. Parser persistence is an explicit second step so raw evidence is preserved even when parsing produces warnings or skips unsupported commands.
 
-## Target Milestone
+## Proof-Of-Concept Scope
 
-The evidence kernel is moving toward this first complete workflow:
+The proof of concept is intentionally narrow but strategically complete. It must demonstrate the full evidence-to-understanding loop without pretending to be an enterprise platform on day one:
 
 1. Start from one seed network device or fixture target.
 2. Use an approved read-only discovery profile.
@@ -172,7 +186,7 @@ The evidence kernel is moving toward this first complete workflow:
 5. Create assets and relationships with confidence and evidence references.
 6. Display evidence, assets, and graph relationships in the UI.
 
-Some pieces of this target exist today; others are intentionally tracked as separate roadmap work. See [ROADMAP.md](ROADMAP.md) for current completion status.
+Some pieces of this target exist today; others are intentionally tracked as separate roadmap work. The POC is successful when it proves that raw evidence can become explainable network understanding through a repeatable, vendor-neutral pipeline. See [ROADMAP.md](ROADMAP.md) for current completion status.
 
 ## Safety Model
 
@@ -189,7 +203,7 @@ See [docs/concepts/evidence-first.md](docs/concepts/evidence-first.md) and [stee
 
 ## Architecture
 
-Truthwatcher keeps the early architecture deliberately boring:
+Truthwatcher keeps the early architecture deliberately boring so the hard problem remains the model, not the deployment topology:
 
 ```text
 single Go binary
@@ -212,18 +226,18 @@ Core packages model:
 - deterministic planning
 - compile-time extensibility contracts
 
-PostgreSQL remains the only database. Graph relationships are modeled in relational tables first; a separate graph database is not part of the current kernel.
+PostgreSQL remains the only database in the POC. Graph relationships are modeled in relational tables first; a separate graph database is not part of the current kernel unless a later architecture decision proves it is necessary.
 
 ## Long-Term Direction
 
-Truthwatcher may eventually support:
+Truthwatcher evolves from POC to enterprise-ready platform by expanding adapters, review workflows, policy controls, scale characteristics, and integration surfaces while preserving the evidence-first kernel. Later phases may support:
 
 - architecture seeding questionnaires
 - agentic discovery planning
 - service-aware modeling
 - MOP generation
 - config candidate generation
-- Nautobot or NetBox export
+- source-of-truth export adapters
 - EMS/controller integrations
 - optional observability overlays
 
@@ -231,6 +245,7 @@ These are not all current capabilities. The v0.1 priority remains the evidence k
 
 ## Concepts
 
+- [POC Walkthrough](docs/poc-walkthrough.md)
 - [Evidence First](docs/concepts/evidence-first.md)
 - [Discover How To Discover](docs/concepts/discover-how-to-discover.md)
 - [Assets, Facts, Relationships](docs/concepts/assets-facts-relationships.md)

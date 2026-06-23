@@ -41,10 +41,28 @@ The raw output hash allows integrity checks and deduplication workflows later wi
 Truthwatcher follows this chain:
 
 ```text
-Evidence -> Facts -> Assets -> Relationships -> Graph -> Understanding
+Evidence
+  | IdentitySkill
+  v
+Identity
+  | AssetDiscoverySkill
+  v
+Assets
+  | FactExtractionSkill
+  v
+Facts
+  | RelationshipSkill
+  v
+Relationships
+  | GraphBuilderSkill
+  v
+KnowledgeGraph
+  | ReasoningSkill
+  v
+Understanding
 ```
 
-The system should not skip steps. If an asset, fact, or relationship exists, it should be explainable through evidence or explicitly marked as seeded/inferred/unknown.
+The system should not skip steps. If identity, an asset, a fact, a relationship, a graph edge, or an answer exists, it should be explainable through evidence or explicitly marked as seeded, inferred, conflicting, or unknown. The skill names are conceptual responsibilities, not a requirement that v0.1 implement a runtime plugin system.
 
 ## Seeded Context Is Not Evidence
 

@@ -84,7 +84,7 @@ Truthwatcher's north star is:
 The project should always preserve this chain:
 
 ```text
-Evidence -> Facts -> Assets -> Relationships -> Graph -> Understanding
+Evidence -> Identity -> Assets -> Facts -> Relationships -> KnowledgeGraph -> Understanding
 ```
 
 The agent must not skip directly to chat, automation, service activation, or observability before this chain is working.

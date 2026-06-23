@@ -1,6 +1,6 @@
 # Evidence-First Knowledge Pipeline
 
-Truthwatcher's core path is intentionally evidence-first: raw read-only collection output is persisted before the system creates facts, assets, relationships, graph views, or agent answers.
+Truthwatcher's core path is intentionally evidence-first: raw read-only collection output is persisted before the system creates identity, assets, facts, relationships, graph views, or reasoning outputs.
 
 ```mermaid
 flowchart LR
@@ -8,24 +8,25 @@ flowchart LR
     Profile --> Policy[Policy allowlist validation]
     Policy --> Collector[Collector boundary]
     Collector --> Evidence[(Raw evidence store)]
-    Evidence --> Parser[Vendor/parser workflow]
-    Parser --> Facts[(Facts)]
-    Parser --> Assets[(Assets)]
-    Parser --> Relationships[(Relationships)]
-    Facts --> Graph[Graph projection]
-    Assets --> Graph
-    Relationships --> Graph
+    Evidence --> Identity[IdentitySkill: derive identity candidates]
+    Identity --> Assets[AssetDiscoverySkill: model assets]
+    Assets --> Facts[FactExtractionSkill: extract facts]
+    Facts --> Relationships[RelationshipSkill: relate facts and assets]
+    Relationships --> Graph[GraphBuilderSkill: project knowledge graph]
+    Graph --> Reasoning[ReasoningSkill: explain understanding]
     Evidence --> API[Evidence API]
     Evidence --> UI[Evidence drawer]
     Graph --> API
     Graph --> UI
+    Reasoning --> API
+    Reasoning --> UI
     API --> Operator[Operator or automation]
     UI --> Operator
 ```
 
 ## Why this is the correct path
 
-Inventory without evidence becomes another unsupported source of truth. Truthwatcher therefore stores evidence first and treats all derived model records as explainable outputs of that evidence chain.
+Inventory without evidence becomes another unsupported source of truth. Truthwatcher therefore stores evidence first and treats identity, assets, facts, relationships, graphs, and reasoning outputs as explainable results of that evidence chain.
 
 This decision is reinforced by:
 
@@ -36,4 +37,4 @@ This decision is reinforced by:
 
 ## Traceability impact
 
-The diagram preserves a backward path from UI/API answers to graph data, relationships, assets, facts, parser output, and raw evidence. That is the system property that lets an operator ask, "Why do we believe this?" instead of only seeing the final modeled value.
+The diagram preserves a backward path from UI/API answers to graph data, relationships, facts, assets, identity decisions, parser output, and raw evidence. That is the system property that lets an operator ask, "Why do we believe this?" instead of only seeing the final modeled value.
