@@ -1069,3 +1069,79 @@ button:disabled {
 .run-evidence-table code {
   overflow-wrap: anywhere;
 }
+
+.identity-review-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1.55fr) minmax(340px, .85fr);
+  gap: 1rem;
+  align-items: start;
+}
+
+.identity-table small {
+  color: var(--muted);
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.identity-detail-panel {
+  padding: 1.2rem;
+  position: sticky;
+  top: 1rem;
+}
+
+.identity-detail-content {
+  display: grid;
+  gap: 1rem;
+}
+
+.identity-action-form {
+  margin-bottom: 0;
+  box-shadow: none;
+}
+
+.review-state-badge {
+  display: inline-flex;
+  align-items: center;
+  width: fit-content;
+  margin-top: .35rem;
+  padding: .24rem .52rem;
+  border: 1px solid rgb(16 32 39 / 10%);
+  border-radius: 999px;
+  color: var(--muted);
+  font-size: .72rem;
+  font-weight: 900;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  background: rgb(255 250 241 / 72%);
+}
+
+.review-state-badge.pending,
+.review-state-badge.deferred,
+.review-state-badge.more_evidence_requested {
+  color: var(--accent-dark);
+  border-color: rgb(196 85 45 / 24%);
+  background: rgb(196 85 45 / 8%);
+}
+
+.review-state-badge.accepted,
+.review-state-badge.auto_accepted {
+  color: var(--ok);
+  border-color: rgb(47 125 85 / 24%);
+  background: rgb(47 125 85 / 8%);
+}
+
+.review-state-badge.rejected {
+  color: var(--bad);
+  border-color: rgb(162 59 59 / 24%);
+  background: rgb(162 59 59 / 8%);
+}
+
+@media (max-width: 1080px) {
+  .identity-review-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .identity-detail-panel {
+    position: static;
+  }
+}
