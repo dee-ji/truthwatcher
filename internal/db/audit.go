@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"strings"
 
 	"truthwatcher/internal/audit"
 	"truthwatcher/internal/discovery"
@@ -75,6 +76,74 @@ RETURNING id, action, initiator, COALESCE(request_id, ''), COALESCE(discovery_ru
 	}
 
 	return result, nil
+}
+
+func (r AuditRepository) ListAuditRecords(ctx context.Context, filters audit.ListRecordsFilters) ([]audit.Record, error) {
+	if r.db == nil {
+		return nil, fmt.Errorf("database is required")
+	}
+	clauses := []string{}
+	args := []any{}
+	add := func(format string, value any) {
+		args = append(args, value)
+		clauses = append(clauses, fmt.Sprintf(format, len(args)))
+	}
+	if strings.TrimSpace(filters.DiscoveryRunID) != "" {
+		add("discovery_run_id = $%d::uuid", filters.DiscoveryRunID)
+	}
+	if strings.TrimSpace(filters.EvidenceID) != "" {
+		add("evidence_id = $%d::uuid", filters.EvidenceID)
+	}
+	if strings.TrimSpace(filters.RequestID) != "" {
+		add("request_id = $%d", filters.RequestID)
+	}
+	if strings.TrimSpace(filters.Action) != "" {
+		add("action = $%d", filters.Action)
+	}
+	if strings.TrimSpace(filters.Status) != "" {
+		add("status = $%d", filters.Status)
+	}
+	if strings.TrimSpace(filters.Target) != "" {
+		add("target ILIKE '%' || $%d || '%'", filters.Target)
+	}
+	if strings.TrimSpace(filters.Method) != "" {
+		add("method = $%d", filters.Method)
+	}
+	if strings.TrimSpace(filters.Profile) != "" {
+		add("profile = $%d", filters.Profile)
+	}
+	limit := filters.Limit
+	if limit <= 0 {
+		limit = 50
+	}
+	if limit > 200 {
+		limit = 200
+	}
+	query := `
+SELECT id, action, initiator, COALESCE(request_id, ''), COALESCE(discovery_run_id::text, ''), target, method, COALESCE(profile, ''), COALESCE(task, ''), COALESCE(command_or_api, ''), status, COALESCE(evidence_id::text, ''), COALESCE(error_message, ''), started_at, completed_at, context
+FROM audit_records`
+	if len(clauses) > 0 {
+		query += " WHERE " + strings.Join(clauses, " AND ")
+	}
+	args = append(args, limit)
+	query += fmt.Sprintf(" ORDER BY started_at DESC, created_at DESC LIMIT $%d", len(args))
+	rows, err := r.db.QueryContext(ctx, query, args...)
+	if err != nil {
+		return nil, fmt.Errorf("list audit records: %w", err)
+	}
+	defer rows.Close()
+	var results []audit.Record
+	for rows.Next() {
+		item, err := scanAuditRecord(rows)
+		if err != nil {
+			return nil, fmt.Errorf("scan audit record: %w", err)
+		}
+		results = append(results, item)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("list audit records: %w", err)
+	}
+	return results, nil
 }
 
 func scanAuditRecord(s scanner) (audit.Record, error) {

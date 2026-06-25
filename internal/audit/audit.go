@@ -54,8 +54,21 @@ type CreateRecordParams struct {
 	Context        json.RawMessage
 }
 
+type ListRecordsFilters struct {
+	DiscoveryRunID string `json:"discovery_run_id,omitempty"`
+	EvidenceID     string `json:"evidence_id,omitempty"`
+	RequestID      string `json:"request_id,omitempty"`
+	Action         string `json:"action,omitempty"`
+	Status         string `json:"status,omitempty"`
+	Target         string `json:"target,omitempty"`
+	Method         string `json:"method,omitempty"`
+	Profile        string `json:"profile,omitempty"`
+	Limit          int    `json:"limit"`
+}
+
 type Repository interface {
 	CreateAuditRecord(context.Context, CreateRecordParams) (Record, error)
+	ListAuditRecords(context.Context, ListRecordsFilters) ([]Record, error)
 }
 
 type Service struct {
@@ -125,4 +138,25 @@ func normalizeContext(value json.RawMessage) json.RawMessage {
 		return nil
 	}
 	return value
+}
+
+func (s Service) ListRecords(ctx context.Context, filters ListRecordsFilters) ([]Record, error) {
+	if s.repo == nil {
+		return nil, fmt.Errorf("audit repository is required")
+	}
+	filters.DiscoveryRunID = strings.TrimSpace(filters.DiscoveryRunID)
+	filters.EvidenceID = strings.TrimSpace(filters.EvidenceID)
+	filters.RequestID = strings.TrimSpace(filters.RequestID)
+	filters.Action = strings.TrimSpace(filters.Action)
+	filters.Status = strings.TrimSpace(filters.Status)
+	filters.Target = RedactSensitiveText(strings.TrimSpace(filters.Target))
+	filters.Method = strings.TrimSpace(filters.Method)
+	filters.Profile = strings.TrimSpace(filters.Profile)
+	if filters.Limit <= 0 {
+		filters.Limit = 50
+	}
+	if filters.Limit > 200 {
+		filters.Limit = 200
+	}
+	return s.repo.ListAuditRecords(ctx, filters)
 }

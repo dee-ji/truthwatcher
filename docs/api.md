@@ -711,3 +711,8 @@ Graph responses are shaped for frontend rendering:
   }
 }
 ```
+
+
+## Audit records
+
+`GET /api/v1/audit-records` lists read-only discovery audit records with filters for discovery run ID, evidence ID, request ID, action, status, target, method, profile, and limit. See [Audit records](audit.md) for interpretation and safety boundaries.

@@ -42,6 +42,7 @@ var documentedRoutes = []routeDoc{
 	{Method: http.MethodGet, Path: "/api/v1/discovery-runs", Summary: "List discovery runs", Tags: []string{"Discovery"}, ResponseSchema: "DiscoveryRunsResponse"},
 	{Method: http.MethodGet, Path: "/api/v1/discovery-runs/{id}", Summary: "Get a discovery run", Tags: []string{"Discovery"}, ResponseSchema: "DiscoveryRunResponse"},
 	{Method: http.MethodGet, Path: "/api/v1/discovery-runs/{id}/evidence", Summary: "List evidence for a discovery run", Tags: []string{"Discovery", "Evidence"}, ResponseSchema: "EvidenceListResponse"},
+	{Method: http.MethodGet, Path: "/api/v1/audit-records", Summary: "List read-only audit records", Tags: []string{"Audit"}, ResponseSchema: "AuditRecordsResponse", QueryParams: []parameterDoc{{Name: "discovery_run_id", Schema: stringSchema(), Description: "Filter by discovery run ID"}, {Name: "evidence_id", Schema: stringSchema(), Description: "Filter by evidence ID"}, {Name: "request_id", Schema: stringSchema(), Description: "Filter by request ID"}, {Name: "action", Schema: stringSchema(), Description: "Filter by action"}, {Name: "status", Schema: stringSchema(), Description: "Filter by status"}, {Name: "target", Schema: stringSchema(), Description: "Filter by target substring"}, {Name: "method", Schema: stringSchema(), Description: "Filter by method"}, {Name: "profile", Schema: stringSchema(), Description: "Filter by profile"}, {Name: "limit", Schema: map[string]any{"type": "integer"}, Description: "Maximum records to return (1-200; default 50)"}}},
 	{Method: http.MethodPost, Path: "/api/v1/discovery-runs/{id}/parse", Summary: "Parse a discovery run", Tags: []string{"Discovery", "Parser"}, RequestSchema: "ParseDiscoveryRunRequest", ResponseSchema: "ParseDiscoveryRunResponse"},
 	{Method: http.MethodGet, Path: "/api/v1/identity-candidates", Summary: "List identity candidates", Tags: []string{"Identity"}, ResponseSchema: "IdentityCandidatesResponse"},
 	{Method: http.MethodGet, Path: "/api/v1/identity-candidates/review-queue", Summary: "List pending identity candidates", Tags: []string{"Identity"}, ResponseSchema: "IdentityCandidatesResponse"},
@@ -139,6 +140,7 @@ func schemaComponents() map[string]any {
 	add("DiscoveryRunResponse", discoveryRunResponse{})
 	add("ExecuteDiscoveryRunResponse", executeDiscoveryRunResponse{})
 	add("DiscoveryRunsResponse", discoveryRunsResponse{})
+	add("AuditRecordsResponse", auditRecordsResponse{})
 	add("EvidenceListResponse", evidenceListResponse{})
 	add("EvidenceResponse", evidenceResponse{})
 	add("ParseDiscoveryRunResponse", parseDiscoveryRunResponse{})

@@ -5,6 +5,7 @@ import (
 
 	"truthwatcher/internal/agent"
 	"truthwatcher/internal/assets"
+	"truthwatcher/internal/audit"
 	"truthwatcher/internal/discovery"
 	"truthwatcher/internal/evidence"
 	"truthwatcher/internal/graph"
@@ -47,6 +48,9 @@ type executeDiscoveryRunResponse struct {
 }
 type discoveryRunsResponse struct {
 	DiscoveryRuns []discovery.DiscoveryRun `json:"discovery_runs"`
+}
+type auditRecordsResponse struct {
+	AuditRecords []audit.Record `json:"audit_records"`
 }
 type evidenceListResponse struct {
 	Evidence []evidence.Evidence `json:"evidence"`

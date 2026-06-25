@@ -589,6 +589,105 @@
         ],
         "type": "object"
       },
+      "AuditRecordsResponse": {
+        "properties": {
+          "data": {
+            "properties": {
+              "audit_records": {
+                "items": {
+                  "properties": {
+                    "action": {
+                      "type": "string"
+                    },
+                    "command_or_api": {
+                      "type": "string"
+                    },
+                    "completed_at": {
+                      "format": "date-time",
+                      "type": "string"
+                    },
+                    "context": {
+                      "additionalProperties": true,
+                      "type": "object"
+                    },
+                    "discovery_run_id": {
+                      "type": "string"
+                    },
+                    "error": {
+                      "type": "string"
+                    },
+                    "evidence_id": {
+                      "type": "string"
+                    },
+                    "id": {
+                      "type": "string"
+                    },
+                    "initiator": {
+                      "type": "string"
+                    },
+                    "method": {
+                      "type": "string"
+                    },
+                    "profile": {
+                      "type": "string"
+                    },
+                    "request_id": {
+                      "type": "string"
+                    },
+                    "started_at": {
+                      "format": "date-time",
+                      "type": "string"
+                    },
+                    "status": {
+                      "type": "string"
+                    },
+                    "target": {
+                      "type": "string"
+                    },
+                    "task": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "action",
+                    "initiator",
+                    "discovery_run_id",
+                    "target",
+                    "method",
+                    "profile",
+                    "status",
+                    "started_at",
+                    "completed_at"
+                  ],
+                  "type": "object"
+                },
+                "type": "array"
+              }
+            },
+            "required": [
+              "audit_records"
+            ],
+            "type": "object"
+          },
+          "error": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/Error"
+              }
+            ],
+            "nullable": true
+          },
+          "metadata": {
+            "additionalProperties": true,
+            "type": "object"
+          }
+        },
+        "required": [
+          "data",
+          "metadata"
+        ],
+        "type": "object"
+      },
       "CreateDiscoveryRunRequest": {
         "properties": {
           "seed_input": {
@@ -3214,6 +3313,129 @@
         ]
       }
     },
+    "/api/v1/audit-records": {
+      "get": {
+        "parameters": [
+          {
+            "description": "Filter by discovery run ID",
+            "in": "query",
+            "name": "discovery_run_id",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Filter by evidence ID",
+            "in": "query",
+            "name": "evidence_id",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Filter by request ID",
+            "in": "query",
+            "name": "request_id",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Filter by action",
+            "in": "query",
+            "name": "action",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Filter by status",
+            "in": "query",
+            "name": "status",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Filter by target substring",
+            "in": "query",
+            "name": "target",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Filter by method",
+            "in": "query",
+            "name": "method",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Filter by profile",
+            "in": "query",
+            "name": "profile",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Maximum records to return (1-200; default 50)",
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AuditRecordsResponse"
+                }
+              }
+            },
+            "description": "Successful response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseEnvelope"
+                }
+              }
+            },
+            "description": "Invalid request"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponseEnvelope"
+                }
+              }
+            },
+            "description": "Internal server error"
+          }
+        },
+        "summary": "List read-only audit records",
+        "tags": [
+          "Audit"
+        ]
+      }
+    },
     "/api/v1/discovery-plans": {
       "post": {
         "requestBody": {
@@ -4187,6 +4409,9 @@
     },
     {
       "name": "Assets"
+    },
+    {
+      "name": "Audit"
     },
     {
       "name": "Discovery"

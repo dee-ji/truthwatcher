@@ -99,6 +99,9 @@ func TestServesEmbeddedFrontend(t *testing.T) {
 	if !strings.Contains(response.Body.String(), "#/discovery-runs") {
 		t.Fatalf("body does not contain discovery runs navigation: %s", response.Body.String())
 	}
+	if !strings.Contains(response.Body.String(), "#/audit") {
+		t.Fatalf("body does not contain audit navigation: %s", response.Body.String())
+	}
 	if !strings.Contains(response.Body.String(), "#/assets") {
 		t.Fatalf("body does not contain assets navigation: %s", response.Body.String())
 	}
@@ -183,6 +186,15 @@ func TestServesEmbeddedFrontendAsset(t *testing.T) {
 	}
 	if !strings.Contains(body, "copyEvidenceRawOutput") {
 		t.Fatalf("body does not contain raw output copy helper: %s", body)
+	}
+	if !strings.Contains(body, "renderAuditView") {
+		t.Fatalf("body does not contain audit renderer: %s", body)
+	}
+	if !strings.Contains(body, "/api/v1/audit-records") {
+		t.Fatalf("body does not contain audit records endpoint: %s", body)
+	}
+	if !strings.Contains(body, "Audit inspection is read-only") {
+		t.Fatalf("body does not label audit as read-only: %s", body)
 	}
 	if !strings.Contains(body, "/api/v1/agent/messages") {
 		t.Fatalf("body does not contain agent message endpoint: %s", body)
@@ -836,6 +848,44 @@ func TestListDiscoveryRuns(t *testing.T) {
 	}
 }
 
+func TestListAuditRecords(t *testing.T) {
+	now := time.Date(2026, 6, 10, 12, 0, 0, 0, time.UTC)
+	repo := &fakeAuditRepository{records: []audit.Record{{
+		ID:             "audit-a",
+		Action:         "discovery_command",
+		Initiator:      "api",
+		DiscoveryRunID: "11111111-1111-4111-8111-111111111111",
+		EvidenceID:     "22222222-2222-4222-8222-222222222222",
+		Target:         "fixture://junos-mx",
+		Method:         "fake",
+		Profile:        "juniper_junos",
+		Task:           "identify_device",
+		CommandOrAPI:   "show version",
+		Status:         audit.StatusCompleted,
+		StartedAt:      now,
+		CompletedAt:    now,
+	}}}
+	service := audit.NewService(repo)
+	handler := NewHandler(Options{Version: "test-version", Audit: &service})
+
+	response := httptest.NewRecorder()
+	request := httptest.NewRequest(http.MethodGet, "/api/v1/audit-records?status=completed&action=discovery_command&limit=10", nil)
+	handler.ServeHTTP(response, request)
+
+	if response.Code != http.StatusOK {
+		t.Fatalf("status = %d, want %d; body=%s", response.Code, http.StatusOK, response.Body.String())
+	}
+	body := decodeResponseData[struct {
+		AuditRecords []audit.Record `json:"audit_records"`
+	}](t, response)
+	if len(body.AuditRecords) != 1 {
+		t.Fatalf("len = %d, want 1", len(body.AuditRecords))
+	}
+	if body.AuditRecords[0].CommandOrAPI != "show version" {
+		t.Fatalf("command = %q, want show version", body.AuditRecords[0].CommandOrAPI)
+	}
+}
+
 func TestGetDiscoveryRun(t *testing.T) {
 	now := time.Date(2026, 6, 10, 12, 0, 0, 0, time.UTC)
 	id := "11111111-1111-4111-8111-111111111111"
@@ -906,6 +956,14 @@ type fakeEvidenceRepository struct {
 
 type fakeAuditRepository struct {
 	records []audit.Record
+}
+
+func (f *fakeAuditRepository) ListAuditRecords(ctx context.Context, filters audit.ListRecordsFilters) ([]audit.Record, error) {
+	limit := filters.Limit
+	if limit <= 0 || limit > len(f.records) {
+		limit = len(f.records)
+	}
+	return append([]audit.Record(nil), f.records[:limit]...), nil
 }
 
 func (f *fakeAuditRepository) CreateAuditRecord(ctx context.Context, params audit.CreateRecordParams) (audit.Record, error) {

@@ -80,6 +80,11 @@ async function renderRoute() {
     return;
   }
 
+  if (route === "/audit") {
+    await renderAuditView();
+    return;
+  }
+
   if (route.startsWith("/assets/")) {
     await renderAssetDetail(route.split("/").pop());
     return;
@@ -124,6 +129,9 @@ function setActiveNav(route) {
   }
   if (route.startsWith("/assets")) {
     active = document.querySelector('[data-nav="assets"]');
+  }
+  if (route === "/audit") {
+    active = document.querySelector('[data-nav="audit"]');
   }
   if (route === "/discovery-plans") {
     active = document.querySelector('[data-nav="discovery-plans"]');
@@ -421,6 +429,99 @@ async function renderDiscoveryRunDetail(id) {
     `;
   } catch (error) {
     panel.innerHTML = `<div class="error-state">${escapeHTML(error.message)}</div>`;
+  }
+}
+
+async function renderAuditView() {
+  app.innerHTML = `
+    <section class="section-header">
+      <div>
+        <p class="eyebrow">Audit</p>
+        <h1>Audit records</h1>
+        <p>Audit inspection is read-only. Records show the safe discovery actions Truthwatcher mapped and persisted.</p>
+      </div>
+      <a class="button secondary" href="#/">Back to dashboard</a>
+    </section>
+    <form class="form-panel" id="audit-filter-form">
+      <div class="form-grid audit-filter-grid">
+        <div class="field"><label for="audit-status-filter">Status</label><input id="audit-status-filter" name="status" placeholder="completed"></div>
+        <div class="field"><label for="audit-action-filter">Action</label><input id="audit-action-filter" name="action" placeholder="discovery_command"></div>
+        <div class="field"><label for="audit-target-filter">Target</label><input id="audit-target-filter" name="target" placeholder="fixture://junos-mx"></div>
+        <div class="field"><label for="audit-run-filter">Discovery run ID</label><input id="audit-run-filter" name="discovery_run_id" placeholder="uuid"></div>
+        <div class="field"><label for="audit-evidence-filter">Evidence ID</label><input id="audit-evidence-filter" name="evidence_id" placeholder="uuid"></div>
+      </div>
+      <div class="form-actions">
+        <button type="submit">Apply filters</button>
+        <button class="secondary" type="button" id="clear-audit-filters">Clear</button>
+        <span class="muted" id="audit-filter-message">Shows up to 50 records. Audit records should not contain raw credentials or secrets.</span>
+      </div>
+    </form>
+    <section class="table-panel audit-table-panel" id="audit-panel">
+      <div class="empty-state">Loading audit records...</div>
+    </section>
+    <div class="drawer-backdrop hidden" id="evidence-drawer-backdrop"></div>
+    <aside class="evidence-drawer hidden" id="evidence-drawer" aria-label="Evidence drawer">
+      <button class="drawer-close" id="close-evidence-drawer" type="button">Close</button>
+      <div id="evidence-drawer-body"></div>
+    </aside>
+  `;
+  setupEvidenceDrawer();
+  document.getElementById("audit-filter-form").addEventListener("submit", (event) => {
+    event.preventDefault();
+    loadAuditRecordsFromFilters();
+  });
+  document.getElementById("clear-audit-filters").addEventListener("click", () => {
+    document.getElementById("audit-filter-form").reset();
+    loadAuditRecordsFromFilters();
+  });
+  await loadAuditRecordsFromFilters();
+}
+
+async function loadAuditRecordsFromFilters() {
+  const panel = document.getElementById("audit-panel");
+  const message = document.getElementById("audit-filter-message");
+  const form = document.getElementById("audit-filter-form");
+  const params = new URLSearchParams({ limit: "50" });
+  for (const [key, value] of new FormData(form).entries()) {
+    const trimmed = String(value || "").trim();
+    if (trimmed) {
+      params.set(key, trimmed);
+    }
+  }
+
+  panel.innerHTML = `<div class="empty-state">Loading audit records...</div>`;
+  try {
+    const payload = await apiGet(`/api/v1/audit-records?${params.toString()}`);
+    const records = payload?.data?.audit_records || [];
+    message.textContent = `${records.length} audit records shown. Audit inspection is read-only.`;
+    if (records.length === 0) {
+      panel.innerHTML = `<div class="empty-state">No audit records match these filters. Audit records are created by discovery execution, including fake fixture-backed runs.</div>`;
+      return;
+    }
+    panel.innerHTML = `
+      <table class="table audit-table">
+        <thead><tr><th>Action</th><th>Status</th><th>Target</th><th>Method</th><th>Profile</th><th>Task</th><th>Command/API</th><th>Initiator</th><th>Discovery run</th><th>Evidence</th><th>Started</th><th>Completed</th><th>Error</th></tr></thead>
+        <tbody>${records.map((record) => `
+          <tr>
+            <td>${escapeHTML(record.action || "unknown")}</td>
+            <td>${statusPill(record.status || "unknown")}</td>
+            <td>${escapeHTML(record.target || "unknown")}</td>
+            <td>${escapeHTML(record.method || "unknown")}</td>
+            <td>${escapeHTML(record.profile || "")}</td>
+            <td>${escapeHTML(record.task || "")}</td>
+            <td><code>${escapeHTML(record.command_or_api || "")}</code></td>
+            <td>${escapeHTML(record.initiator || "unknown")}</td>
+            <td>${record.discovery_run_id ? `<a href="#/discovery-runs/${escapeHTML(record.discovery_run_id)}">${escapeHTML(shortID(record.discovery_run_id))}</a>` : ""}</td>
+            <td>${record.evidence_id ? `<button class="link-button" type="button" data-evidence-id="${escapeHTML(record.evidence_id)}">${escapeHTML(shortID(record.evidence_id))}</button>` : ""}</td>
+            <td>${escapeHTML(formatDate(record.started_at))}</td>
+            <td>${escapeHTML(formatDate(record.completed_at))}</td>
+            <td>${record.error ? `<span class="error-text">${escapeHTML(record.error)}</span>` : ""}</td>
+          </tr>`).join("")}</tbody>
+      </table>
+    `;
+    attachEvidenceButtons(panel);
+  } catch (error) {
+    panel.innerHTML = `<div class="error-state">Could not load audit records: ${escapeHTML(error.message)}</div>`;
   }
 }
 
