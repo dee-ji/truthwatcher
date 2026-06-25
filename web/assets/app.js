@@ -80,7 +80,7 @@ async function renderRoute() {
     return;
   }
 
-  if (route === "/audit") {
+  if (route === "/audit" || route.startsWith("/audit?")) {
     await renderAuditView();
     return;
   }
@@ -386,50 +386,141 @@ async function renderDiscoveryRunDetail(id) {
       <div>
         <p class="eyebrow">Discovery details</p>
         <h1>Run ${escapeHTML(shortID(id))}</h1>
-        <p>Inspect status, seed input, timestamps, and evidence count for one discovery run.</p>
+        <p>Inspect this read-only run, its raw evidence records, audit trail, and next parsing or graph inspection steps.</p>
       </div>
       <a class="button secondary" href="#/discovery-runs">Back to runs</a>
     </section>
     <section class="detail-panel" id="run-detail">
       <div class="empty-state">Loading discovery run...</div>
     </section>
+    ${evidenceDrawerMarkup()}
   `;
+  setupEvidenceDrawer();
 
   const panel = document.getElementById("run-detail");
   try {
-    const [runPayload, evidencePayload] = await Promise.all([
-      apiGet(`/api/v1/discovery-runs/${encodeURIComponent(id)}`),
-      apiGet(`/api/v1/discovery-runs/${encodeURIComponent(id)}/evidence`),
-    ]);
+    const runPayload = await apiGet(`/api/v1/discovery-runs/${encodeURIComponent(id)}`);
     const run = runPayload?.data?.discovery_run;
-    const evidence = evidencePayload?.data?.evidence || [];
+    panel.innerHTML = discoveryRunDetailMarkup(run, [], true);
 
-    panel.innerHTML = `
-      <div class="detail-grid">
-        <div class="metric">
-          <small>Status</small>
-          <strong>${statusPill(run.status)}</strong>
-        </div>
-        <div class="metric">
-          <small>Evidence count</small>
-          <strong>${evidence.length}</strong>
-        </div>
-        <div class="metric">
-          <small>Started</small>
-          <strong>${escapeHTML(formatDate(run.started_at))}</strong>
-        </div>
-        <div class="metric">
-          <small>Completed</small>
-          <strong>${escapeHTML(formatDate(run.completed_at))}</strong>
-        </div>
-      </div>
-      <span class="code-block-label">Seed input</span>
-      <pre class="code-block">${escapeHTML(JSON.stringify(run.seed_input || {}, null, 2))}</pre>
-      ${run.error_message ? `<p class="error-state">${escapeHTML(run.error_message)}</p>` : ""}
-    `;
+    try {
+      const evidencePayload = await apiGet(`/api/v1/discovery-runs/${encodeURIComponent(id)}/evidence`);
+      const evidence = evidencePayload?.data?.evidence || [];
+      panel.innerHTML = discoveryRunDetailMarkup(run, evidence, false);
+      setupEvidenceLinks(panel);
+    } catch (evidenceError) {
+      panel.innerHTML = discoveryRunDetailMarkup(run, [], false, evidenceError);
+    }
   } catch (error) {
-    panel.innerHTML = `<div class="error-state">${escapeHTML(error.message)}</div>`;
+    panel.innerHTML = `<div class="error-state">Could not load discovery run: ${escapeHTML(error.message)}</div>`;
   }
+}
+
+function discoveryRunDetailMarkup(run, evidence, evidenceLoading, evidenceError) {
+  const runID = run?.id || "";
+  const parseRunID = escapeHTML(runID || "<run-id>");
+  return `
+    <div class="detail-grid">
+      <div class="metric">
+        <small>Status</small>
+        <strong>${statusPill(run?.status)}</strong>
+      </div>
+      <div class="metric">
+        <small>Evidence count</small>
+        <strong>${evidenceLoading ? "Loading..." : evidence.length}</strong>
+      </div>
+      <div class="metric">
+        <small>Started</small>
+        <strong>${escapeHTML(formatDate(run?.started_at))}</strong>
+      </div>
+      <div class="metric">
+        <small>Completed</small>
+        <strong>${escapeHTML(formatDate(run?.completed_at))}</strong>
+      </div>
+    </div>
+    <div class="next-step-panel">
+      <strong>Next steps</strong>
+      <ul>
+        <li>Inspect raw evidence with the Open evidence actions below. Raw output stays hidden until the read-only drawer opens.</li>
+        <li>If assets or graph data are missing, parse this run with <code>truthwatcher parse discovery-run --id ${parseRunID} --platform &lt;platform&gt;</code> or <code>POST /api/v1/discovery-runs/${parseRunID}/parse</code>.</li>
+        <li><a href="#/assets">Inspect assets</a>${firstGraphLink(evidence)} after parsing.</li>
+        <li><a href="#/audit?discovery_run_id=${encodeURIComponent(runID)}">Inspect audit records for this run</a>.</li>
+      </ul>
+    </div>
+    <span class="code-block-label">Seed input</span>
+    <pre class="code-block">${escapeHTML(JSON.stringify(run?.seed_input || {}, null, 2))}</pre>
+    ${run?.error_message ? `<p class="error-state">${escapeHTML(run.error_message)}</p>` : ""}
+    <h2>Evidence collected by this run</h2>
+    <p class="muted">Discovery evidence is read-only. Command output is intentionally not rendered in this table; open a record to inspect raw output and integrity metadata.</p>
+    ${discoveryRunEvidenceMarkup(evidence, evidenceLoading, evidenceError)}
+  `;
+}
+
+function discoveryRunEvidenceMarkup(evidence, loading, error) {
+  if (loading) {
+    return `<div class="empty-state">Loading evidence records...</div>`;
+  }
+  if (error) {
+    return `<div class="error-state">Could not load evidence for this run: ${escapeHTML(error.message)}</div>`;
+  }
+  if (evidence.length === 0) {
+    return `<div class="empty-state">No evidence records are stored for this run yet. Evidence appears after successful discovery execution; after evidence exists, parse the discovery run before expecting assets or graph relationships.</div>`;
+  }
+  return `
+    <div class="table-panel run-evidence-table">
+      <table class="table">
+        <thead>
+          <tr>
+            <th>Command/API</th>
+            <th>Method</th>
+            <th>Target</th>
+            <th>Profile</th>
+            <th>Collected</th>
+            <th>Raw output hash</th>
+            <th>Evidence ID</th>
+            <th>Action</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${evidence.map((item) => `
+            <tr>
+              <td>${escapeHTML(item.command_or_api || "unknown")}</td>
+              <td>${escapeHTML(item.method || "unknown")}</td>
+              <td>${escapeHTML(item.target || "unknown")}</td>
+              <td>${escapeHTML(evidenceMetadataField(item, "profile") || "not recorded")}</td>
+              <td>${escapeHTML(formatDate(item.collected_at))}</td>
+              <td><code>${escapeHTML(item.raw_output_hash || "missing")}</code></td>
+              <td><code>${escapeHTML(item.id || "unknown")}</code></td>
+              <td>${evidenceButton(item.id)}</td>
+            </tr>
+          `).join("")}
+        </tbody>
+      </table>
+    </div>
+  `;
+}
+
+function evidenceMetadataField(item, field) {
+  const metadata = parseJSONValue(item?.metadata);
+  return metadata && typeof metadata[field] === "string" ? metadata[field] : "";
+}
+
+function parseJSONValue(value) {
+  if (!value) {
+    return null;
+  }
+  if (typeof value === "object") {
+    return value;
+  }
+  try {
+    return JSON.parse(value);
+  } catch (_error) {
+    return null;
+  }
+}
+
+function firstGraphLink() {
+  return ` and <a href="#/graph">inspect the graph</a>`;
 }
 
 async function renderAuditView() {
@@ -466,6 +557,13 @@ async function renderAuditView() {
     </aside>
   `;
   setupEvidenceDrawer();
+  const auditQuery = new URLSearchParams((location.hash.split("?")[1] || ""));
+  for (const [key, value] of auditQuery.entries()) {
+    const field = document.querySelector(`#audit-filter-form [name="${CSS.escape(key)}"]`);
+    if (field) {
+      field.value = value;
+    }
+  }
   document.getElementById("audit-filter-form").addEventListener("submit", (event) => {
     event.preventDefault();
     loadAuditRecordsFromFilters();

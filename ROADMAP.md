@@ -510,7 +510,7 @@ The v0.1.0 stabilization slice now focuses the release on a reproducible local f
 
 ### Next release blockers
 
-* [ ] Discovery run evidence list in UI.
+* [x] Discovery run evidence list in UI.
 * [ ] Identity review UI.
 * [ ] Graph and empty-state polish.
 * [ ] Deterministic question surface naming and clarification.
@@ -527,7 +527,6 @@ Completed:
 
 Remaining v0.1.0 blockers:
 
-* Discovery run evidence list UI.
 * Identity review UI.
 * Graph and empty-state polish.
 * Deterministic question surface naming/clarification.
