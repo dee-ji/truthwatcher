@@ -33,11 +33,12 @@ echo "==> parsing discovery run $run_id as $PLATFORM"
 "$BIN" parse discovery-run --id "$run_id" --platform "$PLATFORM"
 
 echo "==> checking persisted evidence, assets, and relationships"
-read -r evidence_count asset_count relationship_count <<<"$(psql "$TRUTHWATCHER_DATABASE_URL" -v ON_ERROR_STOP=1 -At -F ' ' -c "SELECT (SELECT count(*) FROM evidence WHERE discovery_run_id = '$run_id'), (SELECT count(*) FROM assets), (SELECT count(*) FROM relationships);")"
+read -r evidence_count asset_count relationship_count audit_count <<<"$(psql "$TRUTHWATCHER_DATABASE_URL" -v ON_ERROR_STOP=1 -At -F ' ' -c "SELECT (SELECT count(*) FROM evidence WHERE discovery_run_id = '$run_id'), (SELECT count(*) FROM assets), (SELECT count(*) FROM relationships), (SELECT count(*) FROM audit_records WHERE discovery_run_id = '$run_id');")"
 
 echo "evidence_count=$evidence_count"
 echo "asset_count=$asset_count"
 echo "relationship_count=$relationship_count"
+echo "audit_count=$audit_count"
 
 if [[ "$evidence_count" -lt 1 ]]; then
   echo "expected at least one evidence record for discovery run $run_id" >&2
@@ -49,6 +50,10 @@ if [[ "$asset_count" -lt 1 ]]; then
 fi
 if [[ "$relationship_count" -lt 1 ]]; then
   echo "expected at least one relationship after parsing discovery run $run_id" >&2
+  exit 1
+fi
+if [[ "$audit_count" -lt 1 ]]; then
+  echo "expected at least one audit record for discovery run $run_id" >&2
   exit 1
 fi
 

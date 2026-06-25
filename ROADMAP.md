@@ -510,8 +510,25 @@ The v0.1.0 stabilization slice now focuses the release on a reproducible local f
 
 ### Next release blockers
 
-* [ ] Audit read API/UI.
 * [ ] Discovery run evidence list in UI.
 * [ ] Identity review UI.
 * [ ] Graph and empty-state polish.
 * [ ] Deterministic question surface naming and clarification.
+
+### v0.1.0 Stabilization Slice 2 — read-only audit inspection
+
+Completed:
+
+* [x] Added read-only audit record listing with small default limits and filters for discovery run, evidence, request, action, status, target, method, and profile.
+* [x] Added `GET /api/v1/audit-records` and OpenAPI documentation for read-only audit inspection.
+* [x] Added the embedded `#/audit` UI page with filters, discovery-run links, and evidence drawer links.
+* [x] Added audit documentation and linked it from the quickstart, API docs, and README.
+* [x] Extended local v0.1.0 acceptance to verify persisted audit records after fake discovery.
+
+Remaining v0.1.0 blockers:
+
+* Discovery run evidence list UI.
+* Identity review UI.
+* Graph and empty-state polish.
+* Deterministic question surface naming/clarification.
+* Final acceptance run and release transcript.

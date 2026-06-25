@@ -56,6 +56,10 @@ type fakeRepository struct {
 	records []Record
 }
 
+func (f *fakeRepository) ListAuditRecords(ctx context.Context, filters ListRecordsFilters) ([]Record, error) {
+	return f.records, nil
+}
+
 func (f *fakeRepository) CreateAuditRecord(ctx context.Context, params CreateRecordParams) (Record, error) {
 	record := Record{
 		ID:             "audit-a",

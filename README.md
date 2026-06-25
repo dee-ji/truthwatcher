@@ -287,3 +287,8 @@ See [LICENSE](LICENSE) for the full license text.
 - [Future Phases](docs/future.md)
 - [Roadmap](ROADMAP.md)
 - [Agent Collaboration Contract](steering-docs/AGENT_COLLABORATION_CONTRACT.md)
+
+
+## Audit inspection
+
+Truthwatcher includes read-only audit inspection for discovery execution through `GET /api/v1/audit-records` and the embedded `#/audit` UI page. See [docs/audit.md](docs/audit.md).

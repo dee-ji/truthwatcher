@@ -110,6 +110,7 @@ func NewHandler(opts Options) http.Handler {
 	mux.HandleFunc("GET /api/v1/discovery-runs", handleListDiscoveryRuns(opts.DiscoveryRuns))
 	mux.HandleFunc("GET /api/v1/discovery-runs/{id}", handleGetDiscoveryRun(opts.DiscoveryRuns))
 	mux.HandleFunc("GET /api/v1/discovery-runs/{id}/evidence", handleListEvidenceByDiscoveryRun(opts.Evidence))
+	mux.HandleFunc("GET /api/v1/audit-records", handleListAuditRecords(opts.Audit))
 	mux.HandleFunc("POST /api/v1/discovery-runs/{id}/parse", handleParseDiscoveryRun(opts.Parser))
 	mux.HandleFunc("GET /api/v1/identity-candidates", handleListIdentityCandidates(opts.IdentityCandidates))
 	mux.HandleFunc("GET /api/v1/identity-candidates/review-queue", handleListPendingIdentityCandidates(opts.IdentityCandidates))
@@ -474,6 +475,37 @@ func handleListEvidenceByDiscoveryRun(service *evidence.Service) http.HandlerFun
 		}
 
 		writeData(w, http.StatusOK, evidenceListResponse{Evidence: items})
+	}
+}
+
+func handleListAuditRecords(service *audit.Service) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if service == nil {
+			writeError(w, http.StatusServiceUnavailable, "audit repository is not configured")
+			return
+		}
+		filters := audit.ListRecordsFilters{
+			DiscoveryRunID: strings.TrimSpace(r.URL.Query().Get("discovery_run_id")),
+			EvidenceID:     strings.TrimSpace(r.URL.Query().Get("evidence_id")),
+			RequestID:      strings.TrimSpace(r.URL.Query().Get("request_id")),
+			Action:         strings.TrimSpace(r.URL.Query().Get("action")),
+			Status:         strings.TrimSpace(r.URL.Query().Get("status")),
+			Target:         strings.TrimSpace(r.URL.Query().Get("target")),
+			Method:         strings.TrimSpace(r.URL.Query().Get("method")),
+			Profile:        strings.TrimSpace(r.URL.Query().Get("profile")),
+			Limit:          queryInt(r, "limit", 50, 1, 200),
+		}
+		records, err := service.ListRecords(r.Context(), filters)
+		if err != nil {
+			writeError(w, http.StatusInternalServerError, err.Error())
+			return
+		}
+		metadata := map[string]any{
+			"filters": filters,
+			"count":   len(records),
+			"limit":   filters.Limit,
+		}
+		writeDataWithMetadata(w, http.StatusOK, auditRecordsResponse{AuditRecords: records}, metadata)
 	}
 }
 
