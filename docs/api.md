@@ -312,6 +312,8 @@ Response `data`:
 
 ## Identity Candidates
 
+See [Identity Review](identity-review.md) for UI workflow, review states, strengths, and the non-destructive identity model.
+
 Identity candidates are read-only review records derived from parser evidence. They preserve parser-derived identity clues separately from canonical assets so hostname, neighbor-name, serial, system MAC, and similar clues can be inspected without silently merging or rewriting assets.
 
 Strong vendor+serial or system-MAC candidates may be marked `auto_accepted` only when deterministic parser persistence finds no plausible conflict with existing canonical asset identifiers. Hostname, name, weak, provisional, ambiguous, or conflicting candidates remain `pending`. Candidate `metadata` includes operator-visible `identity_review_rule` and `identity_review_explanation` fields describing why a candidate was auto-accepted or queued.

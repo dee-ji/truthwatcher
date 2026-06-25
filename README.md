@@ -184,7 +184,10 @@ The proof of concept is intentionally narrow but strategically complete. It must
 3. Store raw evidence before facts are created.
 4. Parse basic identity and topology outputs.
 5. Create assets and relationships with confidence and evidence references.
-6. Display evidence, assets, and graph relationships in the UI.
+6. Review parser-derived identity candidates without silently merging assets.
+7. Display evidence, assets, and graph relationships in the UI.
+
+See [Identity Review](docs/identity-review.md) for the embedded identity candidate review workflow.
 
 Some pieces of this target exist today; others are intentionally tracked as separate roadmap work. The POC is successful when it proves that raw evidence can become explainable network understanding through a repeatable, vendor-neutral pipeline. See [ROADMAP.md](ROADMAP.md) for current completion status.
 

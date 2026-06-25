@@ -511,7 +511,7 @@ The v0.1.0 stabilization slice now focuses the release on a reproducible local f
 ### Next release blockers
 
 * [x] Discovery run evidence list in UI.
-* [ ] Identity review UI.
+* [x] Identity review UI.
 * [ ] Graph and empty-state polish.
 * [ ] Deterministic question surface naming and clarification.
 
@@ -527,7 +527,20 @@ Completed:
 
 Remaining v0.1.0 blockers:
 
-* Identity review UI.
+* Graph and empty-state polish.
+* Deterministic question surface naming/clarification.
+* Final acceptance run and release transcript.
+
+### v0.1.0 Stabilization Slice 4 — Identity Review UI
+
+Completed:
+
+* [x] Added the embedded `#/identity-review` UI page with pending-by-default filters, candidate badges, candidate detail, evidence/run/asset links, safe metadata rendering, and non-destructive review actions.
+* [x] Linked the existing read-only identity handoff report endpoint from the UI.
+* [x] Added identity review documentation and linked it from the quickstart, API docs, and README.
+
+Remaining v0.1.0 blockers:
+
 * Graph and empty-state polish.
 * Deterministic question surface naming/clarification.
 * Final acceptance run and release transcript.

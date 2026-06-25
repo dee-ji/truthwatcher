@@ -80,6 +80,11 @@ async function renderRoute() {
     return;
   }
 
+  if (route === "/identity-review" || route.startsWith("/identity-review?")) {
+    await renderIdentityReviewView();
+    return;
+  }
+
   if (route === "/audit" || route.startsWith("/audit?")) {
     await renderAuditView();
     return;
@@ -129,6 +134,9 @@ function setActiveNav(route) {
   }
   if (route.startsWith("/assets")) {
     active = document.querySelector('[data-nav="assets"]');
+  }
+  if (route.startsWith("/identity-review")) {
+    active = document.querySelector('[data-nav="identity-review"]');
   }
   if (route === "/audit") {
     active = document.querySelector('[data-nav="audit"]');
@@ -1460,6 +1468,159 @@ function selectGraphNode(node, edges) {
   `;
   attachEvidenceButtons(detail);
 }
+
+
+async function renderIdentityReviewView() {
+  app.innerHTML = `
+    <section class="section-header">
+      <div>
+        <p class="eyebrow">Identity Review</p>
+        <h1>Review parser-derived identity candidates</h1>
+        <p>Inspect evidence-backed identity clues before accepting, rejecting, deferring, or requesting more evidence. Review actions are non-destructive and never silently merge assets.</p>
+      </div>
+      <a class="button secondary" href="/api/v1/identity-candidates/handoff-report">Handoff API</a>
+    </section>
+    <form class="form-panel" id="identity-filter-form">
+      <div class="form-grid identity-filter-grid">
+        <div class="field"><label for="identity-review-state">Review state</label><select id="identity-review-state" name="review_state">
+          <option value="pending">pending</option><option value="">all states</option><option value="accepted">accepted</option><option value="rejected">rejected</option><option value="deferred">deferred</option><option value="more_evidence_requested">more evidence requested</option><option value="auto_accepted">auto accepted</option>
+        </select></div>
+        <div class="field"><label for="identity-strength">Strength</label><select id="identity-strength" name="strength"><option value="">all strengths</option><option value="strong">strong</option><option value="provisional">provisional</option><option value="weak">weak</option></select></div>
+        <div class="field"><label for="identity-asset-type">Asset type</label><input id="identity-asset-type" name="asset_type" placeholder="device"></div>
+        <div class="field"><label for="identity-run-id">Discovery run ID</label><input id="identity-run-id" name="discovery_run_id" placeholder="uuid"></div>
+        <div class="field"><label for="identity-proposed-asset-id">Proposed asset ID</label><input id="identity-proposed-asset-id" name="proposed_asset_id" placeholder="uuid"></div>
+        <div class="field"><label for="identity-search">Search</label><input id="identity-search" name="search" placeholder="hostname, serial, MAC, identity key"></div>
+      </div>
+      <div class="form-actions">
+        <button type="submit">Apply filters</button>
+        <button class="secondary" type="button" id="clear-identity-filters">Clear</button>
+        <span class="muted" id="identity-result-message">Pending candidates are shown by default. Asset type, proposed asset, and search filters are applied in this UI.</span>
+      </div>
+    </form>
+    <section class="identity-review-layout">
+      <div class="table-panel" id="identity-candidates-panel"><div class="empty-state">Loading identity candidates...</div></div>
+      <aside class="detail-panel identity-detail-panel" id="identity-candidate-detail"><div class="empty-state">Select a candidate to inspect provenance and review actions.</div></aside>
+    </section>
+    ${evidenceDrawerMarkup()}
+  `;
+  setupEvidenceDrawer();
+  const query = new URLSearchParams((location.hash.split("?")[1] || ""));
+  for (const [key, value] of query.entries()) {
+    const field = document.querySelector(`#identity-filter-form [name="${CSS.escape(key)}"]`);
+    if (field) field.value = value;
+  }
+  document.getElementById("identity-filter-form").addEventListener("submit", (event) => { event.preventDefault(); loadIdentityCandidatesFromFilters(); });
+  document.getElementById("clear-identity-filters").addEventListener("click", () => { location.hash = "#/identity-review"; void loadIdentityCandidates({ review_state: "pending" }); });
+  await loadIdentityCandidatesFromFilters();
+}
+
+async function loadIdentityCandidatesFromFilters() {
+  const form = document.getElementById("identity-filter-form");
+  const params = new URLSearchParams(new FormData(form));
+  for (const [key, value] of Array.from(params.entries())) if (!String(value).trim()) params.delete(key);
+  if (!params.has("review_state")) params.set("review_state", "pending");
+  history.replaceState(null, "", `#/identity-review?${params.toString()}`);
+  await loadIdentityCandidates(Object.fromEntries(params.entries()));
+}
+
+async function loadIdentityCandidates(filters) {
+  const panel = document.getElementById("identity-candidates-panel");
+  panel.innerHTML = `<div class="empty-state">Loading identity candidates...</div>`;
+  try {
+    const serverParams = new URLSearchParams();
+    for (const key of ["review_state", "strength", "discovery_run_id"]) if (filters[key]) serverParams.set(key, filters[key]);
+    const endpoint = filters.review_state === "pending" ? "/api/v1/identity-candidates/review-queue" : "/api/v1/identity-candidates";
+    const payload = await apiGet(`${endpoint}${serverParams.toString() ? `?${serverParams}` : ""}`);
+    let candidates = payload?.data?.identity_candidates || [];
+    candidates = filterIdentityCandidatesClientSide(candidates, filters);
+    renderIdentityCandidateList(candidates);
+    if (candidates[0]) renderIdentityCandidateDetail(candidates[0]);
+  } catch (error) {
+    panel.innerHTML = `<div class="error-state">${escapeHTML(error.message)}</div>`;
+  }
+}
+
+function filterIdentityCandidatesClientSide(candidates, filters) {
+  const includes = (value, needle) => String(value || "").toLowerCase().includes(String(needle || "").toLowerCase());
+  return candidates.filter((candidate) => {
+    if (filters.asset_type && candidate.asset_type !== filters.asset_type) return false;
+    if (filters.proposed_asset_id && candidate.proposed_asset_id !== filters.proposed_asset_id) return false;
+    if (filters.search) {
+      const haystack = [candidate.candidate_identity_key, candidate.vendor, candidate.model, candidate.serial, candidate.system_mac, candidate.hostname, candidate.parser_name, candidate.evidence_id, candidate.discovery_run_id, candidate.proposed_asset_id].join(" ");
+      if (!includes(haystack, filters.search)) return false;
+    }
+    return true;
+  });
+}
+
+function renderIdentityCandidateList(candidates) {
+  const panel = document.getElementById("identity-candidates-panel");
+  if (!candidates.length) { panel.innerHTML = `<div class="empty-state">No identity candidates match these filters.</div>`; return; }
+  panel.innerHTML = `<table class="table identity-table"><thead><tr><th>Candidate</th><th>Identity clues</th><th>Provenance</th><th>Created</th><th></th></tr></thead><tbody>${candidates.map((candidate) => `
+    <tr>
+      <td><strong>${escapeHTML(candidate.candidate_identity_key)}</strong><br>${identityValueBadge(candidate.strength)} ${reviewStateBadge(candidate.review_state)}<br><small>${escapeHTML(candidate.asset_type || "asset")} · ${escapeHTML(confidenceLabel(candidate))}</small></td>
+      <td><small>Vendor</small> ${escapeHTML(candidate.vendor || "—")}<br><small>Model</small> ${escapeHTML(candidate.model || "—")}<br><small>Serial</small> ${escapeHTML(candidate.serial || "—")}<br><small>MAC</small> ${escapeHTML(candidate.system_mac || "—")}<br><small>Hostname</small> ${escapeHTML(candidate.hostname || "—")}</td>
+      <td><small>Parser</small> ${escapeHTML(candidate.parser_name || "—")}<br><small>Run</small> ${discoveryRunLink(candidate.discovery_run_id)}<br><small>Evidence</small> ${evidenceButton(candidate.evidence_id)}<br><small>Proposed asset</small> ${assetLink(candidate.proposed_asset_id)}</td>
+      <td>${escapeHTML(formatDate(candidate.created_at))}</td>
+      <td><button type="button" data-candidate-id="${escapeHTML(candidate.id)}">Review</button></td>
+    </tr>`).join("")}</tbody></table>`;
+  for (const button of panel.querySelectorAll("[data-candidate-id]")) button.addEventListener("click", () => renderIdentityCandidateDetail(candidates.find((candidate) => candidate.id === button.dataset.candidateId)));
+  attachEvidenceButtons(panel);
+}
+
+function renderIdentityCandidateDetail(candidate) {
+  const detail = document.getElementById("identity-candidate-detail");
+  if (!candidate) return;
+  detail.innerHTML = `
+    <div class="identity-detail-content">
+      <p class="eyebrow">Candidate detail</p><h2>${escapeHTML(candidate.candidate_identity_key)}</h2>
+      <p class="readonly-note">Review records an explicit decision only. Truthwatcher does not silently merge assets or rewrite canonical identity.</p>
+      <div class="detail-grid compact">
+        <div class="metric"><small>Strength</small><strong>${identityValueBadge(candidate.strength)}</strong></div>
+        <div class="metric"><small>Review state</small><strong>${reviewStateBadge(candidate.review_state)}</strong></div>
+        <div class="metric"><small>Confidence</small><strong>${escapeHTML(confidenceLabel(candidate))}</strong></div>
+        <div class="metric"><small>Reason</small><strong>${escapeHTML(candidate.reason || "—")}</strong></div>
+      </div>
+      <span class="code-block-label">Evidence and provenance</span>
+      <ul class="edge-list"><li><strong>Discovery run</strong><span>${discoveryRunLink(candidate.discovery_run_id)}</span></li><li><strong>Evidence</strong><span>${evidenceButton(candidate.evidence_id)}</span></li><li><strong>Parser</strong><span>${escapeHTML(candidate.parser_name || "—")}</span></li><li><strong>Proposed asset</strong><span>${assetLink(candidate.proposed_asset_id)}</span></li></ul>
+      <span class="code-block-label">Metadata JSON</span><pre class="code-block">${escapeHTML(formatJSON(candidate.metadata))}</pre>
+      ${identityReviewFormMarkup(candidate)}
+    </div>`;
+  attachEvidenceButtons(detail);
+  document.getElementById("identity-review-action-form")?.addEventListener("submit", (event) => submitIdentityReview(event, candidate));
+}
+
+function identityReviewFormMarkup(candidate) {
+  return `<form class="form-panel identity-action-form" id="identity-review-action-form">
+    <div class="field"><label for="identity-action">Review action</label><select id="identity-action" name="action"><option value="accept">accept</option><option value="reject">reject</option><option value="defer">defer</option><option value="request_more_evidence">request more evidence</option></select></div>
+    <div class="field"><label for="identity-reviewer">Reviewer</label><input id="identity-reviewer" name="reviewer" value="ui:identity-review" required></div>
+    <div class="field"><label for="identity-rationale">Review note / reason</label><textarea id="identity-rationale" name="rationale" rows="3" placeholder="Required for reject, defer, and request more evidence"></textarea></div>
+    <p class="muted">Accept requires an existing proposed asset ID. Current proposed asset: ${assetLink(candidate.proposed_asset_id)}</p>
+    <div class="form-actions"><button type="submit">Submit review</button><span class="muted" id="identity-action-message"></span></div>
+  </form>`;
+}
+
+async function submitIdentityReview(event, candidate) {
+  event.preventDefault();
+  const form = event.currentTarget;
+  const action = form.elements.action.value;
+  const rationale = form.elements.rationale.value.trim();
+  const message = document.getElementById("identity-action-message");
+  if (["reject", "defer", "request_more_evidence"].includes(action) && !rationale) { message.textContent = "A short review note is required for this action."; return; }
+  if (action === "accept" && !candidate.proposed_asset_id) { message.textContent = "Accept requires a proposed_asset_id; request more evidence or defer instead."; return; }
+  try {
+    const payload = await apiPost(`/api/v1/identity-candidates/${encodeURIComponent(candidate.id)}/review`, { action, reviewer: form.elements.reviewer.value.trim(), rationale, metadata: { source: "embedded_identity_review_ui" } });
+    const review = payload?.data?.identity_candidate_review;
+    document.getElementById("identity-result-message").textContent = `Recorded ${review?.action || action}; resulting state ${review?.resulting_review_state || "updated"}.`;
+    await loadIdentityCandidatesFromFilters();
+  } catch (error) { message.textContent = error.message; }
+}
+
+function identityValueBadge(value) { return `<span class="identity-badge ${escapeHTML(value || "unknown")}">${escapeHTML(value || "unknown")}</span>`; }
+function reviewStateBadge(value) { return `<span class="review-state-badge ${escapeHTML(value || "unknown")}">${escapeHTML(value || "unknown")}</span>`; }
+function discoveryRunLink(id) { return id ? `<a href="#/discovery-runs/${encodeURIComponent(id)}">${escapeHTML(shortID(id))}</a>` : "—"; }
+function assetLink(id) { return id ? `<a href="#/assets/${encodeURIComponent(id)}">${escapeHTML(shortID(id))}</a>` : "—"; }
+function formatJSON(value) { try { return JSON.stringify(typeof value === "string" ? JSON.parse(value) : (value || {}), null, 2); } catch { return String(value || "{}"); } }
 
 function setupEvidenceDrawer() {
   const drawer = document.getElementById("evidence-drawer");
