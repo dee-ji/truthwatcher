@@ -213,6 +213,14 @@ The former steering roadmap tracked completed implementation details that suppor
 * [x] Provisional hostname/name/IP identities, conflict review, and weak/provisional identity review APIs
 * [x] Additional fixture parser coverage where it supports the evidence-kernel workflow
 
+#### v0.1.0 Stabilization
+
+* [x] Quickstart, known limitations, identity review, audit, API, and acceptance documentation aligned to the local fixture-backed workflow
+* [x] Discovery-run evidence, identity review, audit inspection, asset/evidence browsing, and graph UI surfaces available in the embedded app
+* [x] Graph and empty-state polish guides first-time users from fake discovery to explicit parsing to assets and read-only graph inspection
+* [x] “Ask Truthwatcher” clarified as deterministic local Questions / read-only answers with no external LLM calls or discovery execution
+* [ ] Final acceptance and release validation
+
 ⸻
 
 ## Phase 2 — Discovery Kernel

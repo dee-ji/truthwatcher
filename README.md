@@ -159,6 +159,8 @@ You can also browse assets, facts, relationships, and linked read-only evidence 
 
 ```text
 http://127.0.0.1:8080/#/assets
+http://127.0.0.1:8080/#/graph
+http://127.0.0.1:8080/#/questions
 ```
 
 Review safe discovery plan suggestions without executing them:
@@ -173,7 +175,7 @@ Seed architecture context without treating it as observed proof:
 http://127.0.0.1:8080/#/architecture-seeds
 ```
 
-Current limitation: fake discovery stores raw evidence first. Parser persistence is an explicit second step so raw evidence is preserved even when parsing produces warnings or skips unsupported commands.
+Current limitation: fake discovery stores raw evidence first. Parser persistence is an explicit second step so raw evidence is preserved even when parsing produces warnings or skips unsupported commands. Empty Assets or Graph pages usually mean discovery has not run yet or the stored discovery run has not been parsed.
 
 ## Proof-Of-Concept Scope
 
@@ -199,7 +201,7 @@ Truthwatcher is read-only by design.
 - Dangerous command patterns such as `configure`, `commit`, `delete`, `reload`, `clear`, `write memory`, `copy`, and reboot requests are denied.
 - Fake discovery uses local fixture files and does not touch a network.
 - Optional SSH collection is behind the collector boundary and must pass policy checks before execution.
-- Chat or agent-style features do not execute discovery or network actions.
+- The Questions page provides deterministic local read-only answers only; it does not call external LLMs, execute discovery, or perform network actions.
 - Seeded architecture hints are context, not observed proof.
 
 See [docs/concepts/evidence-first.md](docs/concepts/evidence-first.md) and [steering-docs/SAFETY_MODEL.md](steering-docs/SAFETY_MODEL.md).

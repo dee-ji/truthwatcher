@@ -114,8 +114,8 @@ func TestServesEmbeddedFrontend(t *testing.T) {
 	if !strings.Contains(response.Body.String(), "#/graph") {
 		t.Fatalf("body does not contain graph navigation: %s", response.Body.String())
 	}
-	if !strings.Contains(response.Body.String(), "#/ask") {
-		t.Fatalf("body does not contain ask navigation: %s", response.Body.String())
+	if !strings.Contains(response.Body.String(), "#/questions") {
+		t.Fatalf("body does not contain questions navigation: %s", response.Body.String())
 	}
 	if !strings.Contains(response.Body.String(), "#/about") {
 		t.Fatalf("body does not contain about navigation: %s", response.Body.String())
@@ -199,8 +199,8 @@ func TestServesEmbeddedFrontendAsset(t *testing.T) {
 	if !strings.Contains(body, "/api/v1/agent/messages") {
 		t.Fatalf("body does not contain agent message endpoint: %s", body)
 	}
-	if !strings.Contains(body, "Deterministic canned responses only") {
-		t.Fatalf("body does not label agent shell as deterministic: %s", body)
+	if !strings.Contains(body, "Deterministic local responses only") {
+		t.Fatalf("body does not label questions page as deterministic: %s", body)
 	}
 	if !strings.Contains(body, "renderAboutView") {
 		t.Fatalf("body does not contain about system renderer: %s", body)
