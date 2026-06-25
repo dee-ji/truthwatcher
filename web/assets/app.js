@@ -8,7 +8,7 @@ const discoveryTasks = [
   "get_bgp_summary",
 ];
 
-const agentHistoryKey = "truthwatcher.agent.history";
+const agentHistoryKey = "truthwatcher.questions.history";
 
 window.addEventListener("hashchange", renderRoute);
 window.addEventListener("DOMContentLoaded", () => {
@@ -110,8 +110,13 @@ async function renderRoute() {
     return;
   }
 
+  if (route === "/questions") {
+    renderQuestionsView();
+    return;
+  }
+
   if (route === "/ask") {
-    renderAskView();
+    location.hash = "#/questions";
     return;
   }
 
@@ -150,8 +155,8 @@ function setActiveNav(route) {
   if (route === "/graph") {
     active = document.querySelector('[data-nav="graph"]');
   }
-  if (route === "/ask") {
-    active = document.querySelector('[data-nav="ask"]');
+  if (route === "/questions" || route === "/ask") {
+    active = document.querySelector('[data-nav="questions"]');
   }
   if (route === "/about") {
     active = document.querySelector('[data-nav="about"]');
@@ -219,9 +224,9 @@ async function renderDashboard() {
         <p>Record ASNs, vendors, route reflectors, EMS systems, services, and regions as user-seeded context.</p>
       </article>
       <article class="card">
-        <span class="card-label">Ask Truthwatcher</span>
-        <h2>Deterministic workspace</h2>
-        <p>Ask canned read-only questions without external LLM calls or network actions.</p>
+        <span class="card-label">Questions</span>
+        <h2>Read-only answers</h2>
+        <p>Ask deterministic local questions without external LLM calls, discovery execution, or network actions.</p>
       </article>
     </section>
   `;
@@ -701,7 +706,7 @@ async function loadAssetsFromFilters() {
     const pagination = payload?.metadata?.pagination;
     message.textContent = `${assets.length} assets shown${pagination ? ` of ${pagination.total}` : ""}.`;
     if (assets.length === 0) {
-      panel.innerHTML = `<div class="empty-state">No assets match these filters.</div>`;
+      panel.innerHTML = assetEmptyStateMarkup(params);
       return;
     }
     panel.innerHTML = `
@@ -739,6 +744,40 @@ async function loadAssetsFromFilters() {
     message.textContent = error.message;
     panel.innerHTML = `<div class="error-state">${escapeHTML(error.message)}</div>`;
   }
+}
+
+function assetEmptyStateMarkup(params) {
+  const hasFilters = Array.from(params.entries()).some(([key, value]) => key !== "limit" && String(value || "").trim());
+  if (hasFilters) {
+    return `<div class="empty-state">No assets match these filters. Clear filters, or parse a discovery run if this is a fresh database.</div>`;
+  }
+  return `
+    <div class="empty-state action-empty-state">
+      <h2>No assets yet</h2>
+      <p>Truthwatcher stores raw discovery evidence first. Assets, facts, relationships, identity candidates, and graph data appear only after you parse a stored discovery run.</p>
+      <ol>
+        <li>Run fake discovery from <a href="#/discovery-runs">Discovery Runs</a> or with <code>truthwatcher discover fake --target fixture://junos-mx</code>.</li>
+        <li>Open the discovery run and parse it with <code>truthwatcher parse discovery-run --id &lt;run-id&gt; --platform junos</code>.</li>
+        <li>Return to <a href="#/assets">Assets</a> or <a href="#/graph">Graph</a> to inspect evidence-backed modeled data.</li>
+      </ol>
+      <p><a href="/docs/v0.1.0-quickstart.md">v0.1.0 quickstart</a></p>
+    </div>
+  `;
+}
+
+function graphEmptyWorkflowMarkup() {
+  return `
+    <div class="empty-state action-empty-state">
+      <h2>No graph data yet</h2>
+      <p>The graph is derived from persisted assets and relationships. In a fresh database, run fake discovery first, then parse the discovery run so parser persistence can create assets, facts, and relationship edges.</p>
+      <ol>
+        <li><a href="#/discovery-runs">Run fake discovery</a> to store raw evidence.</li>
+        <li>Parse the discovery run with the CLI or parse API; parsing is intentionally not automatic.</li>
+        <li>Visit <a href="#/assets">Assets</a> to choose an asset, then return to Graph.</li>
+      </ol>
+      <p><a href="/docs/v0.1.0-quickstart.md">Follow the v0.1.0 quickstart</a></p>
+    </div>
+  `;
 }
 
 async function renderAssetDetail(id) {
@@ -1197,6 +1236,7 @@ function graphLegendMarkup() {
       <span><i class="legend-root"></i> Root asset</span>
       <span><i class="legend-peer"></i> Related asset</span>
       <span>Edge labels show relationship type and confidence.</span>
+      <span>State shows whether data is observed, inferred, seeded, conflicting, or awaiting review.</span>
     </div>
   `;
 }
@@ -1207,7 +1247,7 @@ async function renderGraphView() {
       <div>
         <p class="eyebrow">Graph</p>
         <h1>Asset graph</h1>
-        <p>Load a small asset neighborhood from the API, inspect relationships, and review edge confidence.</p>
+        <p>Load a small read-only asset neighborhood after fake discovery evidence has been parsed into assets and relationships.</p>
       </div>
       <a class="button secondary" href="#/">Back to dashboard</a>
     </section>
@@ -1239,10 +1279,10 @@ async function renderGraphView() {
     <section class="graph-layout">
       <div class="graph-panel" id="graph-canvas">
         ${graphLegendMarkup()}
-        <div class="empty-state">Select an asset to render its graph.</div>
+        <div class="empty-state">Select an asset to render its graph. If no assets appear, run fake discovery, parse the discovery run, then return here.</div>
       </div>
       <aside class="detail-panel graph-detail" id="graph-detail">
-        <div class="empty-state">Click a node to show asset details.</div>
+        <div class="empty-state">Click a node to show confidence, state, facts, relationships, and evidence references.</div>
       </aside>
     </section>
     ${evidenceDrawerMarkup()}
@@ -1286,7 +1326,9 @@ async function loadAssetOptions() {
     const assets = payload?.data?.assets || [];
     if (assets.length === 0) {
       select.innerHTML = `<option value="">No assets available</option>`;
-      message.textContent = "Create or persist assets before loading a graph.";
+      message.textContent = "No assets yet. Run fake discovery, parse that discovery run, then return to Graph.";
+      document.getElementById("graph-canvas").innerHTML = `${graphLegendMarkup()}${graphEmptyWorkflowMarkup()}`;
+      document.getElementById("graph-detail").innerHTML = `<div class="empty-state">Graph data appears after parser persistence creates assets and relationships from raw evidence.</div>`;
       return;
     }
     select.innerHTML = `
@@ -1299,7 +1341,8 @@ async function loadAssetOptions() {
     await loadGraph(assets[0].id, document.getElementById("graph-depth")?.value || "1");
   } catch (error) {
     select.innerHTML = `<option value="">Asset list unavailable</option>`;
-    message.textContent = error.message;
+    message.textContent = `Could not load assets for graph: ${error.message}`;
+    document.getElementById("graph-canvas").innerHTML = `${graphLegendMarkup()}<div class="error-state">Could not load asset choices: ${escapeHTML(error.message)}. Check the API/server, then use Discovery Runs to confirm evidence exists and Assets to confirm parsing created assets.</div>`;
   }
 }
 
@@ -1330,8 +1373,8 @@ async function loadGraph(assetID, depth = "1") {
     renderGraph(graph);
     message.textContent = `${graph.nodes?.length || 0} nodes, ${graph.edges?.length || 0} edges loaded.`;
   } catch (error) {
-    canvas.innerHTML = `${graphLegendMarkup()}<div class="error-state">${escapeHTML(error.message)}</div>`;
-    message.textContent = error.message;
+    canvas.innerHTML = `${graphLegendMarkup()}<div class="error-state">Could not load graph for this asset: ${escapeHTML(error.message)}. Suggested next action: confirm the asset exists on the Assets page; if it exists but has no edges, inspect its evidence and relationships or parse the related discovery run.</div>`;
+    message.textContent = `Graph load failed: ${error.message}`;
   }
 }
 
@@ -1341,7 +1384,7 @@ function renderGraph(graph) {
   const nodes = graph.nodes || [];
   const edges = graph.edges || [];
   if (nodes.length === 0) {
-    canvas.innerHTML = `${graphLegendMarkup()}<div class="empty-state">Graph has no nodes.</div>`;
+    canvas.innerHTML = `${graphLegendMarkup()}<div class="empty-state">Graph has no nodes for this asset. Confirm the asset ID, then parse a discovery run that contains relationship evidence such as LLDP before expecting graph edges.</div>`;
     return;
   }
 
@@ -1430,11 +1473,12 @@ function selectGraphNode(node, edges) {
       </div>
       <div class="metric">
         <small>State</small>
-        <strong>${escapeHTML(node.state || "unknown")}</strong>
+        <strong>${stateBadge(node.state)}</strong>
       </div>
       <div class="metric">
         <small>Confidence</small>
         <strong>${escapeHTML(confidenceLabel(node))}</strong>
+        <small>${escapeHTML(confidenceHelp(node))}</small>
       </div>
     </div>
     <span class="code-block-label">Identity key</span>
@@ -1447,6 +1491,7 @@ function selectGraphNode(node, edges) {
             <strong>${escapeHTML(fact.name || "fact")}</strong>
             <span>${escapeHTML(factValueLabel(fact.value))}</span>
             <small>${escapeHTML(confidenceLabel(fact))}</small>
+            <small>${escapeHTML(confidenceHelp(fact))}</small>
             ${evidenceButton(fact.evidence_id)}
           </li>
         `).join("")}
@@ -1460,6 +1505,7 @@ function selectGraphNode(node, edges) {
             <strong>${escapeHTML(edge.relationship_type || "related")}</strong>
             <span>${escapeHTML(edge.source)} -> ${escapeHTML(edge.target)}</span>
             <small>${escapeHTML(confidenceLabel(edge))}</small>
+            <small>${escapeHTML(confidenceHelp(edge))}</small>
             ${evidenceButton(edge.evidence_id)}
           </li>
         `).join("")}
@@ -1709,20 +1755,20 @@ function renderEvidenceDrawer(evidence) {
   document.getElementById("copy-evidence-output").addEventListener("click", () => copyEvidenceRawOutput(evidence.raw_output || ""));
 }
 
-function renderAskView() {
+function renderQuestionsView() {
   app.innerHTML = `
     <section class="section-header">
       <div>
-        <p class="eyebrow">Ask Truthwatcher</p>
-        <h1>Read-only agent shell</h1>
-        <p>Ask deterministic questions about known assets, asset evidence, or discovery runs. This shell does not call an external LLM and cannot execute discovery.</p>
+        <p class="eyebrow">Questions</p>
+        <h1>Read-only answers</h1>
+        <p>Ask deterministic local questions about known assets, asset evidence, or discovery runs. This page does not call an external LLM, cannot execute discovery, and cannot change stored data.</p>
       </div>
       <a class="button secondary" href="#/">Back to dashboard</a>
     </section>
     <section class="ask-layout">
       <div class="chat-panel">
         <div class="readonly-note">
-          Deterministic canned responses only. No network actions, discovery execution, or external model calls.
+          Deterministic local responses only. No network actions, discovery execution, data mutation, or external model calls.
         </div>
         <div class="prompt-chips" aria-label="Example prompts">
           <button class="secondary" type="button" data-agent-prompt="list known assets">List known assets</button>
@@ -1737,7 +1783,7 @@ function renderAskView() {
         <form class="chat-form" id="agent-form">
           <label class="sr-only" for="agent-message">Message</label>
           <textarea id="agent-message" name="message" rows="3" placeholder="Try: list known assets"></textarea>
-          <button type="submit">Ask</button>
+          <button type="submit">Answer locally</button>
         </form>
       </div>
       <aside class="detail-panel">
@@ -2037,6 +2083,24 @@ function assetLabel(asset) {
     return "unknown asset";
   }
   return asset.label || asset.identity_key || asset.serial || asset.id || "unknown asset";
+}
+
+function confidenceHelp(item) {
+  const state = item?.state || "unknown";
+  const source = item?.source || item?.metadata?.source || "source not recorded";
+  if (state === "observed") {
+    return `observed from ${source}`;
+  }
+  if (state === "user_seeded") {
+    return "seeded context, not observed proof";
+  }
+  if (state === "conflicting") {
+    return "conflicting evidence needs review";
+  }
+  if (state === "inferred") {
+    return `inferred from ${source}`;
+  }
+  return `${state}; ${source}`;
 }
 
 function confidenceLabel(item) {
