@@ -1043,3 +1043,29 @@ button:disabled {
     grid-template-columns: 1fr;
   }
 }
+
+.next-step-panel {
+  margin: 0 0 1rem;
+  padding: 1rem;
+  border: 1px solid rgb(47 125 85 / 22%);
+  border-radius: 18px;
+  background: rgb(47 125 85 / 7%);
+}
+
+.next-step-panel ul {
+  margin: .6rem 0 0;
+  padding-left: 1.2rem;
+}
+
+.next-step-panel li {
+  margin: .35rem 0;
+}
+
+.run-evidence-table {
+  margin-top: 1rem;
+  overflow-x: auto;
+}
+
+.run-evidence-table code {
+  overflow-wrap: anywhere;
+}
