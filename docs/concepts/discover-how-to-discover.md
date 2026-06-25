@@ -71,4 +71,4 @@ Optional SSH collection exists behind the same collector interface, but it is no
 
 ## Current Limitation
 
-Truthwatcher can collect fixture-backed evidence and expose graph APIs. Automatic parser output persistence into assets, facts, and relationships is intentionally separate work. Until that wiring exists, graph inspection depends on model data already persisted through available APIs, imports, tests, or future parser persistence work.
+Truthwatcher can collect fixture-backed evidence, persist raw evidence, and then parse stored discovery-run evidence into assets, facts, relationships, parse results, and identity candidates. Parser persistence is an explicit second step: discovery never needs to be re-run just to improve parsing, and raw evidence remains available when parser warnings or unsupported commands occur.

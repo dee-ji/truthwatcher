@@ -89,7 +89,6 @@ GET  /api/v1/assets
 GET  /api/v1/assets/{id}
 GET  /api/v1/assets/{id}/facts
 GET  /api/v1/assets/{id}/relationships
-GET  /api/v1/relationships
 GET  /api/v1/graph/neighbors
 ```
 

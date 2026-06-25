@@ -109,7 +109,7 @@ Register a local device seed without running discovery. Vendor fields are option
 ./bin/truthwatcher devices list
 ```
 
-See [docs/install.md](docs/install.md) for the full local install flow.
+See [docs/v0.1.0-quickstart.md](docs/v0.1.0-quickstart.md) for the copy-paste v0.1.0 local workflow, [docs/v0.1.0-known-limitations.md](docs/v0.1.0-known-limitations.md) for release boundaries, and [docs/install.md](docs/install.md) for the full local install flow.
 
 ## Example Workflow
 
@@ -245,6 +245,8 @@ These are not all current capabilities. The v0.1 priority remains the evidence k
 
 ## Concepts
 
+- [v0.1.0 Quickstart](docs/v0.1.0-quickstart.md)
+- [v0.1.0 Known Limitations](docs/v0.1.0-known-limitations.md)
 - [POC Walkthrough](docs/poc-walkthrough.md)
 - [Evidence First](docs/concepts/evidence-first.md)
 - [Discover How To Discover](docs/concepts/discover-how-to-discover.md)
@@ -276,6 +278,8 @@ See [LICENSE](LICENSE) for the full license text.
 
 ## Additional Docs
 
+- [v0.1.0 Quickstart](docs/v0.1.0-quickstart.md)
+- [v0.1.0 Known Limitations](docs/v0.1.0-known-limitations.md)
 - [Install](docs/install.md)
 - [API](docs/api.md)
 - [Testing](docs/testing.md)
