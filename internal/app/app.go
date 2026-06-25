@@ -1008,7 +1008,7 @@ read-only policy engine, and store raw evidence before any facts are created.
 TRUTHWATCHER_DATABASE_URL is required.
 
 Flags:
-  --target    Fixture target, for example fixture://junos-mx or fixture://iosxr-pe.
+  --target    Fixture target, for example fixture://junos-mx or fixture://iosxr-asr.
   --profile   Built-in discovery profile. Inferred from target when omitted.
   --tasks     Comma-separated safe discovery tasks. Defaults to fixture-backed basics.
   --fixtures  Fixture root directory. Defaults to examples/fixtures.

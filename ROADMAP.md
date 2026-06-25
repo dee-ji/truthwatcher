@@ -492,3 +492,26 @@ The following are intentionally out of scope until earlier phases are complete.
 * Kubernetes-first deployments
 
 Truthwatcher should earn complexity through successful milestones rather than assume it from the beginning.
+
+⸻
+
+## v0.1.0 Stabilization Status
+
+The v0.1.0 stabilization slice now focuses the release on a reproducible local fixture-backed evidence-to-understanding workflow.
+
+### Completed stabilization work
+
+* [x] Corrected IOS-XR fixture naming in CLI/help/docs to use `fixture://iosxr-asr`.
+* [x] Removed stale documentation references to an unrouted global `GET /api/v1/relationships` endpoint.
+* [x] Updated parser-persistence documentation to reflect implemented discovery-run parsing into persisted model records.
+* [x] Added a v0.1.0 quickstart with exact build, database, migration, fake discovery, parse, server, UI, API, and acceptance commands.
+* [x] Added v0.1.0 known limitations documenting local-only scope, fixture-backed discovery, seeded-context boundaries, and raw evidence as source of truth.
+* [x] Added a local `make acceptance-v0.1.0` workflow for migrations, fake discovery, parser persistence, and smoke checks.
+
+### Next release blockers
+
+* [ ] Audit read API/UI.
+* [ ] Discovery run evidence list in UI.
+* [ ] Identity review UI.
+* [ ] Graph and empty-state polish.
+* [ ] Deterministic question surface naming and clarification.

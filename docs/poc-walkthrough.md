@@ -2,6 +2,9 @@
 
 This walkthrough shows one complete fixture-backed Truthwatcher flow from evidence collection to identity, assets, facts, relationships, graph view, and reasoning output.
 
+For a copy-paste v0.1.0 local setup, see [v0.1.0 Quickstart](v0.1.0-quickstart.md).
+
+
 The fixture and platform names in this document are examples only. They prove the POC workflow without making Truthwatcher a Junos, Cisco, Arista, Nautobot, NetBox, IPAM, EMS, monitoring, cloud, or any other vendor-specific project. In production, the same pipeline should accept evidence from replaceable profiles, parsers, imports, and adapters.
 
 ## What This Walkthrough Proves
@@ -168,7 +171,6 @@ Inspect relationships:
 
 ```sh
 curl http://127.0.0.1:8080/api/v1/assets/<asset-id>/relationships
-curl http://127.0.0.1:8080/api/v1/relationships
 ```
 
 Expected result:

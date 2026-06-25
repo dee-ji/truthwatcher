@@ -1,4 +1,4 @@
-.PHONY: fmt test lint build-ui generate-openapi build release-local checksums run seed-demo unseed-demo
+.PHONY: fmt test lint build-ui generate-openapi build release-local checksums run seed-demo unseed-demo acceptance-v0.1.0
 
 BINARY := truthwatcher
 GOCACHE_DIR ?= $(CURDIR)/.gocache
@@ -51,3 +51,7 @@ seed-demo:
 unseed-demo:
 	@test -n "$(TRUTHWATCHER_DATABASE_URL)" || (echo "TRUTHWATCHER_DATABASE_URL is required"; exit 1)
 	@psql "$(TRUTHWATCHER_DATABASE_URL)" -v ON_ERROR_STOP=1 -f scripts/unseed_demo.sql
+
+acceptance-v0.1.0: build
+	@test -n "$(TRUTHWATCHER_DATABASE_URL)" || (echo "TRUTHWATCHER_DATABASE_URL is required"; exit 1)
+	@scripts/acceptance_v0_1_0.sh
